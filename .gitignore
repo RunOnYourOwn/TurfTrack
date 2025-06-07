@@ -1,0 +1,41 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build output
+dist/
+build/
+.next/
+out/
+coverage/
+.vite/
+
+# Python
+*.pyc
+__pycache__/
+.venv/
+env/
+venv/
+
+# Docker
+frontend_node_modules/
+postgres_data/
+redis_data/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Misc
+.env
+.env.*
+*.local
+*.lock
