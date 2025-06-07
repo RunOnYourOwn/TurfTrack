@@ -1,0 +1,60 @@
+graph TB
+    subgraph Frontend
+        UI[React/TypeScript UI]
+        Components[UI Components]
+        State[State Management]
+        UI --> Components
+        UI --> State
+    end
+
+    subgraph Backend
+        API[FastAPI Backend]
+        Tasks[Celery Tasks]
+        API --> Tasks
+    end
+
+    subgraph External Services
+        Weather[OpenMeteo API]
+        Weather --> API
+    end
+
+    subgraph Database
+        DB[(PostgreSQL)]
+        Products[Products Table]
+        Lawns[Lawns Table]
+        Applications[Applications Table]
+        WeatherData[Weather Data Table]
+        GDDModels[GDD Models Table]
+        DB --> Products
+        DB --> Lawns
+        DB --> Applications
+        DB --> WeatherData
+        DB --> GDDModels
+    end
+
+    subgraph Task Processing
+        Redis[(Redis)]
+        Celery[Celery Workers]
+        Beat[Celery Beat]
+        Redis --> Celery
+        Redis --> Beat
+    end
+
+    UI --> API
+    API --> DB
+    Tasks --> DB
+    Beat --> Tasks
+    API --> Weather
+    Tasks --> Weather
+
+    classDef frontend fill:#f9f,stroke:#333,stroke-width:2px
+    classDef backend fill:#bbf,stroke:#333,stroke-width:2px
+    classDef database fill:#bfb,stroke:#333,stroke-width:2px
+    classDef external fill:#fbb,stroke:#333,stroke-width:2px
+    classDef tasks fill:#fbf,stroke:#333,stroke-width:2px
+
+    class UI,Components,State frontend
+    class API backend
+    class DB,Products,Lawns,Applications,WeatherData,GDDModels database
+    class Weather external
+    class Redis,Celery,Beat tasks
