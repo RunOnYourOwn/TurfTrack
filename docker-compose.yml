@@ -1,129 +1,129 @@
 services:
-  # db:
-  #   image: postgres:17.4
-  #   restart: always
-  #   environment:
-  #     POSTGRES_USER: postgres
-  #     POSTGRES_PASSWORD: postgres
-  #     POSTGRES_DB: taskapp
-  #   ports:
-  #     - "5432:5432"
-  #   volumes:
-  #     - ./postgres_data:/var/lib/postgresql/data
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U postgres"]
-  #     interval: 5s
-  #     timeout: 5s
-  #     retries: 5
+  db:
+    image: postgres:17.4
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: taskapp
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
-  # redis:
-  #   image: redis:7-alpine
-  #   ports:
-  #     - "6379:6379"
-  #   volumes:
-  #     - ./redis_data:/data
-  #   command: redis-server --appendonly yes --loglevel notice --slowlog-log-slower-than 0 --slowlog-max-len 1000
-  #   healthcheck:
-  #     test: ["CMD", "redis-cli", "ping"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis_data:/data
+    command: redis-server --appendonly yes --loglevel notice --slowlog-log-slower-than 0 --slowlog-max-len 1000
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # # Celery worker for processing tasks
-  # celery_worker:
-  #   build:
-  #     context: ./backend
-  #     dockerfile: Dockerfile
-  #   # command: celery -A app.celery_app worker --loglevel=debug
-  #   command: celery -A app.celery_app worker --loglevel=info
-  #   volumes:
-  #     - ./backend:/app
-  #   environment:
-  #     - REDIS_URL=redis://redis:6379/0
-  #     # - PYTHONUNBUFFERED=1
-  #   depends_on:
-  #     - redis
-  #   restart: unless-stopped
-  #   healthcheck:
-  #     test:
-  #       [
-  #         "CMD",
-  #         "celery",
-  #         "-A",
-  #         "app.celery_app",
-  #         "inspect",
-  #         "ping",
-  #         "-d",
-  #         "celery@$$HOSTNAME",
-  #       ]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 3
+  # Celery worker for processing tasks
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    # command: celery -A app.celery_app worker --loglevel=debug
+    command: celery -A app.celery_app worker --loglevel=info
+    volumes:
+      - ./backend:/app
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      # - PYTHONUNBUFFERED=1
+    depends_on:
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "celery",
+          "-A",
+          "app.celery_app",
+          "inspect",
+          "ping",
+          "-d",
+          "celery@$$HOSTNAME",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  # # Celery beat for scheduling periodic tasks
-  # celery_beat:
-  #   build:
-  #     context: ./backend
-  #     dockerfile: Dockerfile
-  #   # command: celery -A app.celery_app beat --loglevel=debug --scheduler=redbeat.RedBeatScheduler
-  #   command: celery -A app.celery_app beat --loglevel=info --scheduler=redbeat.RedBeatScheduler
-  #   volumes:
-  #     - ./backend:/app
-  #   environment:
-  #     - REDIS_URL=redis://redis:6379/0
-  #     - REDBEAT_REDIS_URL=redis://redis:6379/0
-  #     - REDBEAT_LOCK_KEY=redbeat:lock
-  #     - REDBEAT_LOCK_TIMEOUT=900
-  #     - PYTHONUNBUFFERED=1
-  #     - CELERY_LOG_LEVEL=INFO
-  #   depends_on:
-  #     - redis
-  #     - celery_worker
-  #   restart: unless-stopped
+  # Celery beat for scheduling periodic tasks
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    # command: celery -A app.celery_app beat --loglevel=debug --scheduler=redbeat.RedBeatScheduler
+    command: celery -A app.celery_app beat --loglevel=info --scheduler=redbeat.RedBeatScheduler
+    volumes:
+      - ./backend:/app
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - REDBEAT_REDIS_URL=redis://redis:6379/0
+      - REDBEAT_LOCK_KEY=redbeat:lock
+      - REDBEAT_LOCK_TIMEOUT=900
+      - PYTHONUNBUFFERED=1
+      - CELERY_LOG_LEVEL=INFO
+    depends_on:
+      - redis
+      - celery_worker
+    restart: unless-stopped
 
-  # # Flower for monitoring Celery tasks (optional)
-  # flower:
-  #   build:
-  #     context: ./backend
-  #     dockerfile: Dockerfile
-  #   command: celery --broker=redis://redis:6379/0 -A app.celery_app flower --port=5555
-  #   ports:
-  #     - "5555:5555"
-  #   volumes:
-  #     - ./backend:/app
-  #   environment:
-  #     - REDIS_URL=redis://redis:6379/0
-  #   depends_on:
-  #     - redis
-  #     - celery_worker
-  #   restart: unless-stopped
+  # Flower for monitoring Celery tasks (optional)
+  flower:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: celery --broker=redis://redis:6379/0 -A app.celery_app flower --port=5555
+    ports:
+      - "5555:5555"
+    volumes:
+      - ./backend:/app
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+      - celery_worker
+    restart: unless-stopped
 
-  # api:
-  #   build:
-  #     context: ./backend
-  #     dockerfile: Dockerfile
-  #   command: >
-  #     sh -c "PYTHONPATH=/app ALEMBIC_DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/taskapp alembic upgrade head &&
-  #            uvicorn main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app/"
-  #   ports:
-  #     - "8000:8000"
-  #   volumes:
-  #     - ./backend:/app
-  #   environment:
-  #     - REDIS_URL=redis://redis:6379/0
-  #     - POSTGRES_SERVER=db
-  #     - POSTGRES_PORT=5432
-  #     - POSTGRES_USER=postgres
-  #     - POSTGRES_PASSWORD=postgres
-  #     - POSTGRES_DB=taskapp
-  #     - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/taskapp
-  #     - ALEMBIC_DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/taskapp
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
-  #     redis:
-  #       condition: service_started
-  #   restart: unless-stopped
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: >
+      sh -c "PYTHONPATH=/app ALEMBIC_DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/taskapp alembic upgrade head &&
+             uvicorn main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app/"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - POSTGRES_SERVER=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=taskapp
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/taskapp
+      - ALEMBIC_DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/taskapp
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
 
   frontend:
     platform: linux/amd64
@@ -139,9 +139,9 @@ services:
     environment:
       - NODE_ENV=development
       - VITE_API_URL=http://api:8000
-    # depends_on:
-    #   api:
-    #     condition: service_started
+    depends_on:
+      api:
+        condition: service_started
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "5173"] # Use netcat instead of wget
       interval: 10s
