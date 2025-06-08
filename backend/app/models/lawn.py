@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import String, DateTime, Float, Enum
+from sqlalchemy import String, DateTime, Float, Enum, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
 import enum
@@ -8,6 +8,13 @@ import enum
 class GrassType(enum.Enum):
     cold_season = "cold_season"
     warm_season = "warm_season"
+
+
+class WeatherFetchFrequency(enum.Enum):
+    four_h = "4h"
+    eight_h = "8h"
+    twelve_h = "12h"
+    twentyfour_h = "24h"
 
 
 class Lawn(Base):
@@ -19,6 +26,13 @@ class Lawn(Base):
     grass_type: Mapped[GrassType] = mapped_column(Enum(GrassType), nullable=False)
     location: Mapped[str] = mapped_column(String(255), nullable=False)
     notes: Mapped[str] = mapped_column(String(500), nullable=True)
+    weather_fetch_frequency: Mapped[WeatherFetchFrequency] = mapped_column(
+        Enum(WeatherFetchFrequency),
+        nullable=False,
+        default=WeatherFetchFrequency.twentyfour_h,
+    )
+    timezone: Mapped[str] = mapped_column(String(64), nullable=False)
+    weather_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow
     )

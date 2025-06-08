@@ -1,1 +1,1 @@
-from .lawn import Lawn
+from .lawn import Lawn, WeatherFetchFrequency, GrassType

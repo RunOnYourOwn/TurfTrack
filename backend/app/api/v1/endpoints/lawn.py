@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.core.database import get_db
-from app.models.lawn import Lawn, GrassType
+from app.models.lawn import Lawn, GrassType, WeatherFetchFrequency
 from app.schemas.lawn import LawnCreate, LawnRead, LawnUpdate
 from typing import List
 
@@ -23,6 +23,9 @@ async def create_lawn(lawn: LawnCreate, db: AsyncSession = Depends(get_db)):
         grass_type=GrassType(lawn.grass_type),
         location=lawn.location,
         notes=lawn.notes,
+        weather_fetch_frequency=WeatherFetchFrequency(lawn.weather_fetch_frequency),
+        timezone=lawn.timezone,
+        weather_enabled=lawn.weather_enabled,
     )
     db.add(db_lawn)
     await db.commit()
@@ -48,6 +51,8 @@ async def update_lawn(
     for field, value in lawn.dict(exclude_unset=True).items():
         if field == "grass_type" and value is not None:
             setattr(db_lawn, field, GrassType(value))
+        elif field == "weather_fetch_frequency" and value is not None:
+            setattr(db_lawn, field, WeatherFetchFrequency(value))
         else:
             setattr(db_lawn, field, value)
     await db.commit()

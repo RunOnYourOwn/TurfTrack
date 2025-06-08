@@ -15,6 +15,11 @@ class LawnCreate(BaseModel):
         example="123 Main St, Springfield, IL",
     )
     notes: Optional[str] = Field(None, description="Additional notes")
+    weather_fetch_frequency: Literal["4h", "8h", "12h", "24h"] = Field(
+        "24h", description="How often to fetch weather data (default: 24h)"
+    )
+    timezone: str = Field(..., description="IANA timezone, e.g. America/Chicago")
+    weather_enabled: bool = Field(True, description="Enable weather data fetching")
 
 
 class LawnRead(BaseModel):
@@ -24,6 +29,9 @@ class LawnRead(BaseModel):
     grass_type: str = Field(...)
     location: str = Field(..., description="Lawn address (used for weather lookup)")
     notes: Optional[str] = Field(None)
+    weather_fetch_frequency: str = Field(...)
+    timezone: str = Field(...)
+    weather_enabled: bool = Field(...)
     created_at: datetime = Field(...)
     updated_at: datetime = Field(...)
 
@@ -38,3 +46,6 @@ class LawnUpdate(BaseModel):
         None, description="Lawn address (used for weather lookup)"
     )
     notes: Optional[str] = Field(None)
+    weather_fetch_frequency: Optional[Literal["4h", "8h", "12h", "24h"]] = Field(None)
+    timezone: Optional[str] = Field(None)
+    weather_enabled: Optional[bool] = Field(None)
