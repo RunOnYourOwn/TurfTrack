@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 from app.core.database import get_db
 from app.models.lawn import Lawn, GrassType, WeatherFetchFrequency
 from app.schemas.lawn import LawnCreate, LawnRead, LawnUpdate
@@ -12,8 +13,25 @@ router = APIRouter(prefix="/lawns", tags=["lawns"])
 
 @router.get("/", response_model=List[LawnRead])
 async def list_lawns(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Lawn))
-    return result.scalars().all()
+    result = await db.execute(select(Lawn).options(selectinload(Lawn.location)))
+    lawns = result.scalars().all()
+    return [
+        LawnRead(
+            id=lawn.id,
+            name=lawn.name,
+            area=lawn.area,
+            grass_type=lawn.grass_type,
+            notes=lawn.notes,
+            weather_fetch_frequency=lawn.weather_fetch_frequency,
+            timezone=lawn.timezone,
+            weather_enabled=lawn.weather_enabled,
+            latitude=lawn.location.latitude if lawn.location else None,
+            longitude=lawn.location.longitude if lawn.location else None,
+            created_at=lawn.created_at,
+            updated_at=lawn.updated_at,
+        )
+        for lawn in lawns
+    ]
 
 
 @router.post("/", response_model=LawnRead, status_code=status.HTTP_201_CREATED)
@@ -32,15 +50,45 @@ async def create_lawn(lawn: LawnCreate, db: AsyncSession = Depends(get_db)):
     db.add(db_lawn)
     await db.commit()
     await db.refresh(db_lawn)
-    return db_lawn
+    return LawnRead(
+        id=db_lawn.id,
+        name=db_lawn.name,
+        area=db_lawn.area,
+        grass_type=db_lawn.grass_type,
+        notes=db_lawn.notes,
+        weather_fetch_frequency=db_lawn.weather_fetch_frequency,
+        timezone=db_lawn.timezone,
+        weather_enabled=db_lawn.weather_enabled,
+        latitude=location.latitude,
+        longitude=location.longitude,
+        created_at=db_lawn.created_at,
+        updated_at=db_lawn.updated_at,
+    )
 
 
 @router.get("/{lawn_id}", response_model=LawnRead)
 async def get_lawn(lawn_id: int, db: AsyncSession = Depends(get_db)):
-    lawn = await db.get(Lawn, lawn_id)
+    result = await db.execute(
+        select(Lawn).options(selectinload(Lawn.location)).where(Lawn.id == lawn_id)
+    )
+    lawn = result.scalars().first()
     if not lawn:
         raise HTTPException(status_code=404, detail="Lawn not found")
-    return lawn
+    location = lawn.location
+    return LawnRead(
+        id=lawn.id,
+        name=lawn.name,
+        area=lawn.area,
+        grass_type=lawn.grass_type,
+        notes=lawn.notes,
+        weather_fetch_frequency=lawn.weather_fetch_frequency,
+        timezone=lawn.timezone,
+        weather_enabled=lawn.weather_enabled,
+        latitude=location.latitude if location else None,
+        longitude=location.longitude if location else None,
+        created_at=lawn.created_at,
+        updated_at=lawn.updated_at,
+    )
 
 
 @router.put("/{lawn_id}", response_model=LawnRead)
@@ -72,7 +120,21 @@ async def update_lawn(
             setattr(db_lawn, field, value)
     await db.commit()
     await db.refresh(db_lawn)
-    return db_lawn
+    location = db_lawn.location
+    return LawnRead(
+        id=db_lawn.id,
+        name=db_lawn.name,
+        area=db_lawn.area,
+        grass_type=db_lawn.grass_type,
+        notes=db_lawn.notes,
+        weather_fetch_frequency=db_lawn.weather_fetch_frequency,
+        timezone=db_lawn.timezone,
+        weather_enabled=db_lawn.weather_enabled,
+        latitude=location.latitude if location else None,
+        longitude=location.longitude if location else None,
+        created_at=db_lawn.created_at,
+        updated_at=db_lawn.updated_at,
+    )
 
 
 @router.delete("/{lawn_id}", status_code=status.HTTP_204_NO_CONTENT)
