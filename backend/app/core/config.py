@@ -6,7 +6,7 @@ from pathlib import Path
 
 class Settings(BaseSettings):
     # Application
-    APP_NAME: str = "TaskApp"
+    APP_NAME: str = "TurfTrack"
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
     API_V1_PREFIX: str = "/api/v1"
@@ -16,8 +16,8 @@ class Settings(BaseSettings):
     POSTGRES_PORT: int = 5432
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "postgres"
-    POSTGRES_DB: str = "taskapp"
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@db:5432/taskapp"
+    POSTGRES_DB: str = "turftrack"
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@db:5432/turftrack"
 
     # Redis
     REDIS_HOST: str = "redis"

@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetcher } from "@/api/fetcher";
+import { fetcher } from "../lib/fetcher";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,17 +21,39 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import * as React from "react";
+import { PencilIcon, Trash2Icon } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
+import type { Lawn } from "../types/lawn";
 
-export interface Lawn {
-  id: number;
-  name: string;
-  area: number;
-  grass_type: "cold_season" | "warm_season";
-  location: string;
-  notes?: string;
-  created_at: string;
-  updated_at: string;
-}
+const WEATHER_FREQ_OPTIONS = [
+  { value: "4h", label: "Every 4 hours" },
+  { value: "8h", label: "Every 8 hours" },
+  { value: "12h", label: "Every 12 hours" },
+  { value: "24h", label: "Every 24 hours (Daily)" },
+];
+
+// A minimal list of common timezones; for production, use a full IANA list or a package
+const TIMEZONE_OPTIONS = [
+  "UTC",
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Los_Angeles",
+  "Europe/London",
+  "Europe/Berlin",
+  "Asia/Tokyo",
+  "Australia/Sydney",
+];
 
 const GRASS_TYPE_OPTIONS = [
   { value: "cold_season", label: "Cold Season" },
@@ -40,9 +62,14 @@ const GRASS_TYPE_OPTIONS = [
 
 export default function Lawns() {
   const queryClient = useQueryClient();
-  const { data, isLoading, error } = useQuery<Lawn[]>({
+  const {
+    data: lawns,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ["lawns"],
-    queryFn: () => fetcher<Lawn[]>("/api/v1/lawns"),
+    queryFn: () => fetcher("/api/v1/lawns/"),
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   // Add Lawn modal state
@@ -53,9 +80,33 @@ export default function Lawns() {
     grass_type: "cold_season",
     location: "",
     notes: "",
+    weather_fetch_frequency: "24h",
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+    weather_enabled: true,
   });
   const [submitting, setSubmitting] = React.useState(false);
   const [formError, setFormError] = React.useState<string | null>(null);
+
+  // Edit Lawn modal state
+  const [editOpen, setEditOpen] = React.useState(false);
+  const [editLawn, setEditLawn] = React.useState<Lawn | null>(null);
+  const [editForm, setEditForm] = React.useState({
+    name: "",
+    area: "",
+    grass_type: "cold_season",
+    location: "",
+    notes: "",
+    weather_fetch_frequency: "24h",
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+    weather_enabled: true,
+  });
+  const [editSubmitting, setEditSubmitting] = React.useState(false);
+  const [editError, setEditError] = React.useState<string | null>(null);
+
+  // Delete Lawn state
+  const [deleteLawn, setDeleteLawn] = React.useState<Lawn | null>(null);
+  const [deleteLoading, setDeleteLoading] = React.useState(false);
+  const [deleteError, setDeleteError] = React.useState<string | null>(null);
 
   function handleInputChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -67,21 +118,35 @@ export default function Lawns() {
     setForm((f) => ({ ...f, grass_type: value }));
   }
 
+  function handleWeatherFreqChange(value: string) {
+    setForm((f) => ({ ...f, weather_fetch_frequency: value }));
+  }
+
+  function handleTimezoneChange(value: string) {
+    setForm((f) => ({ ...f, timezone: value }));
+  }
+
+  function handleWeatherEnabledChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setForm((f) => ({ ...f, weather_enabled: e.target.checked }));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     setFormError(null);
     try {
-      const res = await fetcher<Lawn>("/api/v1/lawns", {
+      await fetcher("/api/v1/lawns/", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        data: {
           name: form.name,
           area: Number(form.area),
           grass_type: form.grass_type,
           location: form.location,
           notes: form.notes,
-        }),
+          weather_fetch_frequency: form.weather_fetch_frequency,
+          timezone: form.timezone,
+          weather_enabled: form.weather_enabled,
+        },
       });
       setOpen(false);
       setForm({
@@ -90,6 +155,9 @@ export default function Lawns() {
         grass_type: "cold_season",
         location: "",
         notes: "",
+        weather_fetch_frequency: "24h",
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+        weather_enabled: true,
       });
       queryClient.invalidateQueries({ queryKey: ["lawns"] });
     } catch (err: any) {
@@ -99,9 +167,92 @@ export default function Lawns() {
     }
   }
 
+  function openEditModal(lawn: Lawn) {
+    setEditLawn(lawn);
+    setEditForm({
+      name: lawn.name,
+      area: String(lawn.area),
+      grass_type: lawn.grass_type,
+      location: lawn.location,
+      notes: lawn.notes || "",
+      weather_fetch_frequency: lawn.weather_fetch_frequency,
+      timezone: lawn.timezone,
+      weather_enabled: lawn.weather_enabled,
+    });
+    setEditOpen(true);
+  }
+
+  function handleEditInputChange(
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) {
+    setEditForm((f) => ({ ...f, [e.target.name]: e.target.value }));
+  }
+
+  function handleEditGrassTypeChange(value: string) {
+    setEditForm((f) => ({ ...f, grass_type: value }));
+  }
+
+  function handleEditWeatherFreqChange(value: string) {
+    setEditForm((f) => ({ ...f, weather_fetch_frequency: value }));
+  }
+
+  function handleEditTimezoneChange(value: string) {
+    setEditForm((f) => ({ ...f, timezone: value }));
+  }
+
+  function handleEditWeatherEnabledChange(
+    e: React.ChangeEvent<HTMLInputElement>
+  ) {
+    setEditForm((f) => ({ ...f, weather_enabled: e.target.checked }));
+  }
+
+  async function handleEditSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editLawn) return;
+    setEditSubmitting(true);
+    setEditError(null);
+    try {
+      await fetcher(`/api/v1/lawns/${editLawn.id}`, {
+        method: "PUT",
+        data: {
+          name: editForm.name,
+          area: Number(editForm.area),
+          grass_type: editForm.grass_type,
+          location: editForm.location,
+          notes: editForm.notes,
+          weather_fetch_frequency: editForm.weather_fetch_frequency,
+          timezone: editForm.timezone,
+          weather_enabled: editForm.weather_enabled,
+        },
+      });
+      setEditOpen(false);
+      setEditLawn(null);
+      queryClient.invalidateQueries({ queryKey: ["lawns"] });
+    } catch (err: any) {
+      setEditError(err.message || "Failed to update lawn");
+    } finally {
+      setEditSubmitting(false);
+    }
+  }
+
+  async function handleDeleteLawn() {
+    if (!deleteLawn) return;
+    setDeleteLoading(true);
+    setDeleteError(null);
+    try {
+      await fetcher(`/api/v1/lawns/${deleteLawn.id}`, { method: "DELETE" });
+      await queryClient.resetQueries({ queryKey: ["lawns"] });
+      setDeleteLawn(null);
+    } catch (err: any) {
+      setDeleteError(err.message || "Failed to delete lawn");
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
+
   return (
     <div className="p-4 min-h-screen bg-muted/50 flex flex-col items-center">
-      <Card className="w-full max-w-5xl shadow-lg">
+      <Card className="w-full shadow-lg">
         <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
           <CardTitle className="text-2xl font-bold">Lawns</CardTitle>
           <Dialog open={open} onOpenChange={setOpen}>
@@ -179,6 +330,74 @@ export default function Lawns() {
                 <div>
                   <label
                     className="block text-sm font-medium mb-1"
+                    htmlFor="weather_fetch_frequency"
+                  >
+                    Weather Fetch Frequency
+                  </label>
+                  <Select
+                    value={form.weather_fetch_frequency}
+                    onValueChange={handleWeatherFreqChange}
+                    disabled={submitting}
+                  >
+                    <SelectTrigger
+                      id="weather_fetch_frequency"
+                      name="weather_fetch_frequency"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {WEATHER_FREQ_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label
+                    className="block text-sm font-medium mb-1"
+                    htmlFor="timezone"
+                  >
+                    Timezone
+                  </label>
+                  <Select
+                    value={form.timezone}
+                    onValueChange={handleTimezoneChange}
+                    disabled={submitting}
+                  >
+                    <SelectTrigger id="timezone" name="timezone">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TIMEZONE_OPTIONS.map((tz) => (
+                        <SelectItem key={tz} value={tz}>
+                          {tz}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="weather_enabled"
+                    name="weather_enabled"
+                    type="checkbox"
+                    checked={form.weather_enabled}
+                    onChange={handleWeatherEnabledChange}
+                    disabled={submitting}
+                    className="h-4 w-4 rounded border-gray-300 focus:ring-primary"
+                  />
+                  <label
+                    htmlFor="weather_enabled"
+                    className="text-sm font-medium"
+                  >
+                    Enable Weather Data
+                  </label>
+                </div>
+                <div>
+                  <label
+                    className="block text-sm font-medium mb-1"
                     htmlFor="location"
                   >
                     Location
@@ -233,7 +452,7 @@ export default function Lawns() {
             <div className="py-8 text-center text-red-500">
               Error loading lawns: {(error as Error).message}
             </div>
-          ) : !data || data.length === 0 ? (
+          ) : !lawns || lawns.length === 0 ? (
             <div className="py-8 text-center text-muted-foreground">
               No lawns found.
             </div>
@@ -248,13 +467,22 @@ export default function Lawns() {
                       Grass Type
                     </th>
                     <th className="px-4 py-2 text-left font-semibold">
+                      Weather Freq
+                    </th>
+                    <th className="px-4 py-2 text-left font-semibold">
+                      Weather Enabled
+                    </th>
+                    <th className="px-4 py-2 text-left font-semibold">
                       Location
                     </th>
-                    <th className="px-4 py-2 text-left font-semibold">Notes</th>
+                    <th className="px-4 py-2 text-left font-semibold">Edit</th>
+                    <th className="px-4 py-2 text-left font-semibold">
+                      Delete
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {data.map((lawn, idx) => (
+                  {lawns.map((lawn: Lawn, idx: number) => (
                     <tr
                       key={lawn.id}
                       className={
@@ -273,10 +501,44 @@ export default function Lawns() {
                         {lawn.grass_type.replace("_", " ")}
                       </td>
                       <td className="px-4 py-2 border-b whitespace-nowrap">
-                        {lawn.location}
+                        {(() => {
+                          switch (lawn.weather_fetch_frequency) {
+                            case "4h":
+                              return "Every 4 hours";
+                            case "8h":
+                              return "Every 8 hours";
+                            case "12h":
+                              return "Every 12 hours";
+                            case "24h":
+                              return "Every 24 hours (Daily)";
+                            default:
+                              return lawn.weather_fetch_frequency;
+                          }
+                        })()}
+                      </td>
+                      <td className="px-4 py-2 border-b whitespace-nowrap text-center">
+                        {lawn.weather_enabled ? "✅" : "❌"}
                       </td>
                       <td className="px-4 py-2 border-b whitespace-nowrap">
-                        {lawn.notes}
+                        {lawn.location}
+                      </td>
+                      <td className="px-4 py-2 border-b text-center">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => openEditModal(lawn)}
+                        >
+                          <PencilIcon className="w-4 h-4" />
+                        </Button>
+                      </td>
+                      <td className="px-4 py-2 border-b text-center">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => setDeleteLawn(lawn)}
+                        >
+                          <Trash2Icon className="w-4 h-4 text-destructive" />
+                        </Button>
                       </td>
                     </tr>
                   ))}
@@ -286,6 +548,234 @@ export default function Lawns() {
           )}
         </CardContent>
       </Card>
+      {/* Edit Lawn Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Lawn</DialogTitle>
+            <DialogDescription>
+              Update the details for this lawn.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            <div>
+              <label
+                className="block text-sm font-medium mb-1"
+                htmlFor="edit_name"
+              >
+                Name
+              </label>
+              <Input
+                id="edit_name"
+                name="name"
+                value={editForm.name}
+                onChange={handleEditInputChange}
+                required
+                disabled={editSubmitting}
+              />
+            </div>
+            <div>
+              <label
+                className="block text-sm font-medium mb-1"
+                htmlFor="edit_area"
+              >
+                Area (sq ft)
+              </label>
+              <Input
+                id="edit_area"
+                name="area"
+                type="number"
+                min={0}
+                value={editForm.area}
+                onChange={handleEditInputChange}
+                required
+                disabled={editSubmitting}
+              />
+            </div>
+            <div>
+              <label
+                className="block text-sm font-medium mb-1"
+                htmlFor="edit_grass_type"
+              >
+                Grass Type
+              </label>
+              <Select
+                value={editForm.grass_type}
+                onValueChange={handleEditGrassTypeChange}
+                disabled={editSubmitting}
+              >
+                <SelectTrigger id="edit_grass_type" name="grass_type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {GRASS_TYPE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label
+                className="block text-sm font-medium mb-1"
+                htmlFor="edit_weather_fetch_frequency"
+              >
+                Weather Fetch Frequency
+              </label>
+              <Select
+                value={editForm.weather_fetch_frequency}
+                onValueChange={handleEditWeatherFreqChange}
+                disabled={editSubmitting}
+              >
+                <SelectTrigger
+                  id="edit_weather_fetch_frequency"
+                  name="weather_fetch_frequency"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {WEATHER_FREQ_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label
+                className="block text-sm font-medium mb-1"
+                htmlFor="edit_timezone"
+              >
+                Timezone
+              </label>
+              <Select
+                value={editForm.timezone}
+                onValueChange={handleEditTimezoneChange}
+                disabled={editSubmitting}
+              >
+                <SelectTrigger id="edit_timezone" name="timezone">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIMEZONE_OPTIONS.map((tz) => (
+                    <SelectItem key={tz} value={tz}>
+                      {tz}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                id="edit_weather_enabled"
+                name="weather_enabled"
+                type="checkbox"
+                checked={editForm.weather_enabled}
+                onChange={handleEditWeatherEnabledChange}
+                disabled={editSubmitting}
+                className="h-4 w-4 rounded border-gray-300 focus:ring-primary"
+              />
+              <label
+                htmlFor="edit_weather_enabled"
+                className="text-sm font-medium"
+              >
+                Enable Weather Data
+              </label>
+            </div>
+            <div>
+              <label
+                className="block text-sm font-medium mb-1"
+                htmlFor="edit_location"
+              >
+                Location
+              </label>
+              <Input
+                id="edit_location"
+                name="location"
+                value={editForm.location}
+                onChange={handleEditInputChange}
+                required
+                disabled={editSubmitting}
+              />
+            </div>
+            <div>
+              <label
+                className="block text-sm font-medium mb-1"
+                htmlFor="edit_notes"
+              >
+                Notes
+              </label>
+              <Input
+                id="edit_notes"
+                name="notes"
+                value={editForm.notes}
+                onChange={handleEditInputChange}
+                disabled={editSubmitting}
+              />
+            </div>
+            {editError && (
+              <div className="text-red-500 text-sm">{editError}</div>
+            )}
+            <DialogFooter>
+              <Button type="submit" disabled={editSubmitting}>
+                {editSubmitting ? "Saving..." : "Save Changes"}
+              </Button>
+              <DialogClose asChild>
+                <Button type="button" variant="ghost" disabled={editSubmitting}>
+                  Cancel
+                </Button>
+              </DialogClose>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      {/* Delete Lawn AlertDialog (controlled by deleteLawn) */}
+      <AlertDialog
+        open={!!deleteLawn}
+        onOpenChange={(open) => {
+          if (!open) setDeleteLawn(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Lawn</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete{" "}
+              <span className="font-semibold">{deleteLawn?.name}</span>? This
+              action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteError && (
+            <div className="text-red-500 text-sm mb-2">{deleteError}</div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={deleteLoading}
+                onClick={() => setDeleteLawn(null)}
+              >
+                Cancel
+              </Button>
+            </AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={deleteLoading}
+                onClick={async () => {
+                  await handleDeleteLawn();
+                }}
+              >
+                {deleteLoading ? "Deleting..." : "Delete"}
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

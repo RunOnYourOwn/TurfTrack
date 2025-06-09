@@ -103,7 +103,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     command: >
-      sh -c "PYTHONPATH=/app ALEMBIC_DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/taskapp alembic upgrade head &&
+      sh -c "PYTHONPATH=/app ALEMBIC_DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/turftrack alembic upgrade head &&
              uvicorn main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app/"
     ports:
       - "8000:8000"
@@ -116,8 +116,8 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=turftrack
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/taskapp
-      - ALEMBIC_DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/taskapp
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/turftrack
+      - ALEMBIC_DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/turftrack
     depends_on:
       db:
         condition: service_healthy
