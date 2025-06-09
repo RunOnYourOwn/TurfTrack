@@ -20,6 +20,8 @@ class LawnCreate(BaseModel):
     )
     timezone: str = Field(..., description="IANA timezone, e.g. America/Chicago")
     weather_enabled: bool = Field(True, description="Enable weather data fetching")
+    latitude: Optional[float] = Field(None, description="Latitude for weather lookup")
+    longitude: Optional[float] = Field(None, description="Longitude for weather lookup")
 
 
 class LawnRead(BaseModel):
@@ -32,6 +34,8 @@ class LawnRead(BaseModel):
     weather_fetch_frequency: str = Field(...)
     timezone: str = Field(...)
     weather_enabled: bool = Field(...)
+    latitude: Optional[float] = Field(None, description="Latitude for weather lookup")
+    longitude: Optional[float] = Field(None, description="Longitude for weather lookup")
     created_at: datetime = Field(...)
     updated_at: datetime = Field(...)
 
@@ -49,3 +53,5 @@ class LawnUpdate(BaseModel):
     weather_fetch_frequency: Optional[Literal["4h", "8h", "12h", "24h"]] = Field(None)
     timezone: Optional[str] = Field(None)
     weather_enabled: Optional[bool] = Field(None)
+    latitude: Optional[float] = Field(None, description="Latitude for weather lookup")
+    longitude: Optional[float] = Field(None, description="Longitude for weather lookup")

@@ -83,6 +83,8 @@ export default function Lawns() {
     weather_fetch_frequency: "24h",
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
     weather_enabled: true,
+    latitude: "",
+    longitude: "",
   });
   const [submitting, setSubmitting] = React.useState(false);
   const [formError, setFormError] = React.useState<string | null>(null);
@@ -99,6 +101,8 @@ export default function Lawns() {
     weather_fetch_frequency: "24h",
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
     weather_enabled: true,
+    latitude: "",
+    longitude: "",
   });
   const [editSubmitting, setEditSubmitting] = React.useState(false);
   const [editError, setEditError] = React.useState<string | null>(null);
@@ -146,6 +150,8 @@ export default function Lawns() {
           weather_fetch_frequency: form.weather_fetch_frequency,
           timezone: form.timezone,
           weather_enabled: form.weather_enabled,
+          latitude: parseFloat(form.latitude) || null,
+          longitude: parseFloat(form.longitude) || null,
         },
       });
       setOpen(false);
@@ -158,6 +164,8 @@ export default function Lawns() {
         weather_fetch_frequency: "24h",
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
         weather_enabled: true,
+        latitude: "",
+        longitude: "",
       });
       queryClient.invalidateQueries({ queryKey: ["lawns"] });
     } catch (err: any) {
@@ -178,6 +186,8 @@ export default function Lawns() {
       weather_fetch_frequency: lawn.weather_fetch_frequency,
       timezone: lawn.timezone,
       weather_enabled: lawn.weather_enabled,
+      latitude: lawn.latitude ? String(lawn.latitude) : "",
+      longitude: lawn.longitude ? String(lawn.longitude) : "",
     });
     setEditOpen(true);
   }
@@ -223,6 +233,8 @@ export default function Lawns() {
           weather_fetch_frequency: editForm.weather_fetch_frequency,
           timezone: editForm.timezone,
           weather_enabled: editForm.weather_enabled,
+          latitude: parseFloat(editForm.latitude) || null,
+          longitude: parseFloat(editForm.longitude) || null,
         },
       });
       setEditOpen(false);
@@ -423,6 +435,40 @@ export default function Lawns() {
                     name="notes"
                     value={form.notes}
                     onChange={handleInputChange}
+                    disabled={submitting}
+                  />
+                </div>
+                <div>
+                  <label
+                    className="block text-sm font-medium mb-1"
+                    htmlFor="latitude"
+                  >
+                    Latitude
+                  </label>
+                  <Input
+                    id="latitude"
+                    name="latitude"
+                    type="number"
+                    value={form.latitude}
+                    onChange={handleInputChange}
+                    placeholder="e.g. 40.7128"
+                    disabled={submitting}
+                  />
+                </div>
+                <div>
+                  <label
+                    className="block text-sm font-medium mb-1"
+                    htmlFor="longitude"
+                  >
+                    Longitude
+                  </label>
+                  <Input
+                    id="longitude"
+                    name="longitude"
+                    type="number"
+                    value={form.longitude}
+                    onChange={handleInputChange}
+                    placeholder="e.g. -74.0060"
                     disabled={submitting}
                   />
                 </div>
@@ -712,6 +758,40 @@ export default function Lawns() {
                 name="notes"
                 value={editForm.notes}
                 onChange={handleEditInputChange}
+                disabled={editSubmitting}
+              />
+            </div>
+            <div>
+              <label
+                className="block text-sm font-medium mb-1"
+                htmlFor="edit_latitude"
+              >
+                Latitude
+              </label>
+              <Input
+                id="edit_latitude"
+                name="latitude"
+                type="number"
+                value={editForm.latitude}
+                onChange={handleEditInputChange}
+                placeholder="e.g. 40.7128"
+                disabled={editSubmitting}
+              />
+            </div>
+            <div>
+              <label
+                className="block text-sm font-medium mb-1"
+                htmlFor="edit_longitude"
+              >
+                Longitude
+              </label>
+              <Input
+                id="edit_longitude"
+                name="longitude"
+                type="number"
+                value={editForm.longitude}
+                onChange={handleEditInputChange}
+                placeholder="e.g. -74.0060"
                 disabled={editSubmitting}
               />
             </div>

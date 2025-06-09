@@ -33,6 +33,8 @@ class Lawn(Base):
     )
     timezone: Mapped[str] = mapped_column(String(64), nullable=False)
     weather_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow
     )

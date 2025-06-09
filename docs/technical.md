@@ -8,6 +8,7 @@
 - Vite for build tooling
 - shadcn/ui for component library
 - React Query for data fetching
+- Axios for all API requests (replacing fetch)
 - React Router for navigation
 - Chart.js for analytics visualization
 
@@ -184,3 +185,9 @@ Where:
 - Optimized GDD calculations
 - Efficient database queries
 - Background processing for heavy computations
+
+## Data Fetching and API Integration
+
+- All frontend API requests are now handled via Axios, using a generic fetcher utility in `src/lib/fetcher.ts`.
+- React Query is used for caching, background updates, and UI state management.
+- Lawns CRUD UI is fully integrated with the backend, supporting create, read, update, and delete operations via Axios and React Query.

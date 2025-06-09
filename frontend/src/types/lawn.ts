@@ -8,6 +8,8 @@ export interface Lawn {
   weather_fetch_frequency: "4h" | "8h" | "12h" | "24h";
   timezone: string;
   weather_enabled: boolean;
+  latitude?: number | null;
+  longitude?: number | null;
   created_at: string;
   updated_at: string;
 }

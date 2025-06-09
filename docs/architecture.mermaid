@@ -40,7 +40,7 @@ graph TB
         Redis --> Beat
     end
 
-    UI --> API
+    UI -- "Axios/REST" --> API
     API --> DB
     Tasks --> DB
     Beat --> Tasks

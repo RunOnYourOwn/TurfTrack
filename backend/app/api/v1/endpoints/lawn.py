@@ -26,6 +26,8 @@ async def create_lawn(lawn: LawnCreate, db: AsyncSession = Depends(get_db)):
         weather_fetch_frequency=WeatherFetchFrequency(lawn.weather_fetch_frequency),
         timezone=lawn.timezone,
         weather_enabled=lawn.weather_enabled,
+        latitude=lawn.latitude,
+        longitude=lawn.longitude,
     )
     db.add(db_lawn)
     await db.commit()
