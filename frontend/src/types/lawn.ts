@@ -3,7 +3,7 @@ export interface Lawn {
   name: string;
   area: number;
   grass_type: "cold_season" | "warm_season";
-  location: string;
+  // location: string; // REMOVE THIS LINE
   notes?: string;
   weather_fetch_frequency: "4h" | "8h" | "12h" | "24h";
   timezone: string;

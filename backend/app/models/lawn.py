@@ -1,6 +1,6 @@
 from datetime import datetime
-from sqlalchemy import String, DateTime, Float, Enum, Boolean
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import String, DateTime, Float, Enum, Boolean, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 import enum
 
@@ -33,8 +33,8 @@ class Lawn(Base):
     )
     timezone: Mapped[str] = mapped_column(String(64), nullable=False)
     weather_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
-    longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    location_id: Mapped[int] = mapped_column(ForeignKey("locations.id"), nullable=False)
+    location = relationship("Location", back_populates="lawns")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow
     )

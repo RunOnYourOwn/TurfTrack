@@ -78,7 +78,6 @@ export default function Lawns() {
     name: "",
     area: "",
     grass_type: "cold_season",
-    location: "",
     notes: "",
     weather_fetch_frequency: "24h",
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
@@ -96,7 +95,6 @@ export default function Lawns() {
     name: "",
     area: "",
     grass_type: "cold_season",
-    location: "",
     notes: "",
     weather_fetch_frequency: "24h",
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
@@ -145,7 +143,6 @@ export default function Lawns() {
           name: form.name,
           area: Number(form.area),
           grass_type: form.grass_type,
-          location: form.location,
           notes: form.notes,
           weather_fetch_frequency: form.weather_fetch_frequency,
           timezone: form.timezone,
@@ -159,7 +156,6 @@ export default function Lawns() {
         name: "",
         area: "",
         grass_type: "cold_season",
-        location: "",
         notes: "",
         weather_fetch_frequency: "24h",
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
@@ -181,7 +177,6 @@ export default function Lawns() {
       name: lawn.name,
       area: String(lawn.area),
       grass_type: lawn.grass_type,
-      location: lawn.location,
       notes: lawn.notes || "",
       weather_fetch_frequency: lawn.weather_fetch_frequency,
       timezone: lawn.timezone,
@@ -228,7 +223,6 @@ export default function Lawns() {
           name: editForm.name,
           area: Number(editForm.area),
           grass_type: editForm.grass_type,
-          location: editForm.location,
           notes: editForm.notes,
           weather_fetch_frequency: editForm.weather_fetch_frequency,
           timezone: editForm.timezone,
@@ -410,22 +404,6 @@ export default function Lawns() {
                 <div>
                   <label
                     className="block text-sm font-medium mb-1"
-                    htmlFor="location"
-                  >
-                    Location
-                  </label>
-                  <Input
-                    id="location"
-                    name="location"
-                    value={form.location}
-                    onChange={handleInputChange}
-                    required
-                    disabled={submitting}
-                  />
-                </div>
-                <div>
-                  <label
-                    className="block text-sm font-medium mb-1"
                     htmlFor="notes"
                   >
                     Notes
@@ -518,9 +496,6 @@ export default function Lawns() {
                     <th className="px-4 py-2 text-left font-semibold">
                       Weather Enabled
                     </th>
-                    <th className="px-4 py-2 text-left font-semibold">
-                      Location
-                    </th>
                     <th className="px-4 py-2 text-left font-semibold">Edit</th>
                     <th className="px-4 py-2 text-left font-semibold">
                       Delete
@@ -564,9 +539,6 @@ export default function Lawns() {
                       </td>
                       <td className="px-4 py-2 border-b whitespace-nowrap text-center">
                         {lawn.weather_enabled ? "✅" : "❌"}
-                      </td>
-                      <td className="px-4 py-2 border-b whitespace-nowrap">
-                        {lawn.location}
                       </td>
                       <td className="px-4 py-2 border-b text-center">
                         <Button
@@ -729,22 +701,6 @@ export default function Lawns() {
               >
                 Enable Weather Data
               </label>
-            </div>
-            <div>
-              <label
-                className="block text-sm font-medium mb-1"
-                htmlFor="edit_location"
-              >
-                Location
-              </label>
-              <Input
-                id="edit_location"
-                name="location"
-                value={editForm.location}
-                onChange={handleEditInputChange}
-                required
-                disabled={editSubmitting}
-              />
             </div>
             <div>
               <label

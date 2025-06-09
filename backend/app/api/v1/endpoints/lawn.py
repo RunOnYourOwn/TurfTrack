@@ -5,6 +5,7 @@ from app.core.database import get_db
 from app.models.lawn import Lawn, GrassType, WeatherFetchFrequency
 from app.schemas.lawn import LawnCreate, LawnRead, LawnUpdate
 from typing import List
+from app.utils.location import get_or_create_location
 
 router = APIRouter(prefix="/lawns", tags=["lawns"])
 
@@ -17,17 +18,16 @@ async def list_lawns(db: AsyncSession = Depends(get_db)):
 
 @router.post("/", response_model=LawnRead, status_code=status.HTTP_201_CREATED)
 async def create_lawn(lawn: LawnCreate, db: AsyncSession = Depends(get_db)):
+    location = await get_or_create_location(db, lawn.latitude, lawn.longitude)
     db_lawn = Lawn(
         name=lawn.name,
         area=lawn.area,
         grass_type=GrassType(lawn.grass_type),
-        location=lawn.location,
         notes=lawn.notes,
         weather_fetch_frequency=WeatherFetchFrequency(lawn.weather_fetch_frequency),
         timezone=lawn.timezone,
         weather_enabled=lawn.weather_enabled,
-        latitude=lawn.latitude,
-        longitude=lawn.longitude,
+        location_id=location.id,
     )
     db.add(db_lawn)
     await db.commit()
@@ -50,7 +50,20 @@ async def update_lawn(
     db_lawn = await db.get(Lawn, lawn_id)
     if not db_lawn:
         raise HTTPException(status_code=404, detail="Lawn not found")
-    for field, value in lawn.dict(exclude_unset=True).items():
+    update_data = lawn.dict(exclude_unset=True)
+    if (
+        "latitude" in update_data
+        and "longitude" in update_data
+        and update_data["latitude"] is not None
+        and update_data["longitude"] is not None
+    ):
+        location = await get_or_create_location(
+            db, update_data["latitude"], update_data["longitude"]
+        )
+        db_lawn.location_id = location.id
+        update_data.pop("latitude")
+        update_data.pop("longitude")
+    for field, value in update_data.items():
         if field == "grass_type" and value is not None:
             setattr(db_lawn, field, GrassType(value))
         elif field == "weather_fetch_frequency" and value is not None:
