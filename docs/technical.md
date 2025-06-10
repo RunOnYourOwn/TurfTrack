@@ -61,9 +61,18 @@
 - name: String
 - area: Float
 - grass_type: Enum (cold_season, warm_season)
-- location: Geography (PostGIS)
+- location_id: ForeignKey to Location
 - created_at: DateTime
 - updated_at: DateTime
+- weather_fetch_frequency: Enum (4h, 8h, 12h, 24h)
+- timezone: String (IANA timezone)
+- weather_enabled: Boolean
+
+### Locations
+
+- id: UUID (primary key)
+- latitude: Float
+- longitude: Float
 
 ### Applications
 
@@ -80,10 +89,11 @@
 ### Weather Data
 
 - id: UUID (primary key)
-- location: Geography (PostGIS)
+- location_id: ForeignKey to Location
 - date: DateTime
-- temperature: JSONB (min, max, avg)
-- precipitation: Float
+- type: Enum (historical, forecast)
+- temperature_max_c/f, temperature_min_c/f: Float
+- precipitation_mm/in: Float
 - humidity: Float
 - wind_speed: Float
 - created_at: DateTime
@@ -113,7 +123,7 @@
 ### Lawns
 
 - GET /api/lawns - List all lawns
-- POST /api/lawns - Create new lawn
+- POST /api/lawns - Create new lawn (triggers weather fetch only if no data exists for location)
 - GET /api/lawns/{id} - Get lawn details
 - PUT /api/lawns/{id} - Update lawn
 - DELETE /api/lawns/{id} - Delete lawn
@@ -131,6 +141,12 @@
 - GET /api/gdd/{lawn_id} - Get current GDD for lawn
 - GET /api/gdd/{lawn_id}/history - Get GDD history
 - GET /api/gdd/{lawn_id}/predictions - Get GDD predictions
+
+### Weather
+
+- Weather data is fetched and upserted per unique location
+- No duplicate fetches for same location
+- Scheduled Celery Beat task updates all locations daily at 3am Central (09:00 UTC)
 
 ## GDD Calculation Methodology
 
@@ -191,3 +207,16 @@ Where:
 - All frontend API requests are now handled via Axios, using a generic fetcher utility in `src/lib/fetcher.ts`.
 - React Query is used for caching, background updates, and UI state management.
 - Lawns CRUD UI is fully integrated with the backend, supporting create, read, update, and delete operations via Axios and React Query.
+
+## Weather Data Deduplication & Scheduling
+
+- When a lawn is created, backend checks if weather data exists for the location before fetching
+- Weather data is stored per location, not per lawn
+- Celery Beat runs a daily job to update the latest historical and forecast data for all locations
+- Logging is in place to track deduplication and fetch logic
+
+## Frontend Integration
+
+- React Query and Axios handle all CRUD and weather data fetching
+- UI is built with shadcn/ui components
+- Weather data is displayed per lawn, but deduplicated at the backend

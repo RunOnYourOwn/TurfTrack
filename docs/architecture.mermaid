@@ -22,14 +22,18 @@ graph TB
         DB[(PostgreSQL)]
         Products[Products Table]
         Lawns[Lawns Table]
+        Locations[Location Table]
         Applications[Applications Table]
         WeatherData[Weather Data Table]
         GDDModels[GDD Models Table]
         DB --> Products
         DB --> Lawns
+        DB --> Locations
         DB --> Applications
         DB --> WeatherData
         DB --> GDDModels
+        Lawns --> Locations
+        WeatherData --> Locations
     end
 
     subgraph Task Processing
@@ -38,6 +42,8 @@ graph TB
         Beat[Celery Beat]
         Redis --> Celery
         Redis --> Beat
+        Beat --> Tasks
+        Beat -. Schedules daily weather update .-> Tasks
     end
 
     UI -- "Axios/REST" --> API
@@ -55,6 +61,8 @@ graph TB
 
     class UI,Components,State frontend
     class API backend
-    class DB,Products,Lawns,Applications,WeatherData,GDDModels database
+    class DB,Products,Lawns,Applications,WeatherData,GDDModels,Locations database
     class Weather external
     class Redis,Celery,Beat tasks
+
+    %% Note: WeatherData is deduplicated per Location, not per Lawn. Beat schedules daily updates.

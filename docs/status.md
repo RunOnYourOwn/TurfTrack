@@ -2,7 +2,8 @@
 
 ## Current Phase
 
-- Core backend and frontend integration
+- Core backend and frontend integration (weather, lawns, deduplication)
+- Weather data deduplication and scheduled updates implemented
 - Documentation and refactoring
 
 ## Completed Items
@@ -13,19 +14,22 @@
 - Lawns CRUD UI (add, edit, delete, list) fully integrated with backend
 - Axios refactor: all frontend API requests now use Axios and a generic fetcher utility
 - React Query integration for all data fetching and caching
+- Weather data ingestion and deduplication (no duplicate fetches for same location)
+- Celery Beat and Worker setup for scheduled and manual weather updates
+- Logging for weather fetch logic and deduplication
 
 ## In Progress
 
-- Database schema design
-- API endpoint planning
-- Task processing architecture
+- GDD calculation service
+- Advanced analytics and reporting
+- More frontend features and polish
 
 ## Next Steps
 
-1. Set up development environment
-2. Create initial database migrations
-3. Implement core backend models
-4. Set up weather data integration
+1. Implement GDD calculations and UI
+2. Add advanced analytics and reporting
+3. Continue frontend enhancements
+4. Expand test coverage
 
 ## Known Issues
 
@@ -33,15 +37,11 @@
 
 ## Upcoming Milestones
 
-1. Complete foundation setup
-2. Implement core backend functionality
-3. Develop basic frontend interface
-4. Set up task processing system
+1. Complete GDD and analytics features
+2. Finalize backend and frontend integration
+3. Prepare for production deployment
 
 ## Notes
 
-- Project is in initial planning phase
-- All core features have been documented
-- Ready to begin implementation
-- Weather integration planned with OpenMeteo API
-- GDD calculations will be implemented for both cold and warm season grasses
+- Weather data is now robustly deduplicated and scheduled for daily updates
+- System is ready for further analytics and user-facing features
