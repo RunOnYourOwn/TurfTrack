@@ -7,6 +7,7 @@ from app.models.lawn import Lawn, GrassType, WeatherFetchFrequency
 from app.schemas.lawn import LawnCreate, LawnRead, LawnUpdate
 from typing import List
 from app.utils.location import get_or_create_location
+from app.tasks.weather import fetch_and_store_weather
 
 router = APIRouter(prefix="/lawns", tags=["lawns"])
 
@@ -50,6 +51,11 @@ async def create_lawn(lawn: LawnCreate, db: AsyncSession = Depends(get_db)):
     db.add(db_lawn)
     await db.commit()
     await db.refresh(db_lawn)
+    # Trigger weather fetch task if enabled
+    if db_lawn.weather_enabled:
+        fetch_and_store_weather.delay(
+            location.id, location.latitude, location.longitude
+        )
     return LawnRead(
         id=db_lawn.id,
         name=db_lawn.name,
