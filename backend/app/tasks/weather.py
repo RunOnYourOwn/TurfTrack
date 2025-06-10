@@ -6,13 +6,90 @@ from app.models.daily_weather import WeatherType
 import openmeteo_requests
 from app.models.lawn import Lawn
 from sqlalchemy.future import select
+from app.models.task_status import TaskStatus, TaskStatusEnum
 
 
-@app.task(name="fetch_and_store_weather")
-def fetch_and_store_weather(location_id: int, latitude: float, longitude: float):
+async def create_or_update_task_status(
+    session,
+    task_id,
+    task_name,
+    location_id,
+    status,
+    error=None,
+    result=None,
+    started=False,
+    finished=False,
+):
+    result_db = await session.execute(
+        select(TaskStatus).where(TaskStatus.task_id == task_id)
+    )
+    task_status = result_db.scalars().first()
+    now = datetime.datetime.now(datetime.timezone.utc)
+    if not task_status:
+        task_status = TaskStatus(
+            task_id=task_id,
+            task_name=task_name,
+            related_location_id=location_id,
+            status=status,
+            created_at=now,
+            started_at=now if started else None,
+            finished_at=now if finished else None,
+            error=error,
+            result=result,
+        )
+        session.add(task_status)
+    else:
+        task_status.status = status
+        if started:
+            task_status.started_at = now
+        if finished:
+            task_status.finished_at = now
+        if error:
+            task_status.error = error
+        if result:
+            task_status.result = result
+    await session.commit()
+
+
+@app.task(name="fetch_and_store_weather", bind=True)
+def fetch_and_store_weather(self, location_id: int, latitude: float, longitude: float):
     import asyncio
 
-    asyncio.run(_fetch_and_store_weather(location_id, latitude, longitude))
+    task_id = self.request.id
+
+    async def main():
+        async with async_session_maker() as session:
+            try:
+                await create_or_update_task_status(
+                    session,
+                    task_id,
+                    "fetch_and_store_weather",
+                    location_id,
+                    TaskStatusEnum.started,
+                    started=True,
+                )
+                await _fetch_and_store_weather(location_id, latitude, longitude)
+                await create_or_update_task_status(
+                    session,
+                    task_id,
+                    "fetch_and_store_weather",
+                    location_id,
+                    TaskStatusEnum.success,
+                    finished=True,
+                )
+            except Exception as e:
+                await create_or_update_task_status(
+                    session,
+                    task_id,
+                    "fetch_and_store_weather",
+                    location_id,
+                    TaskStatusEnum.failure,
+                    error=str(e),
+                    finished=True,
+                )
+                raise
+
+    asyncio.run(main())
 
 
 async def _fetch_and_store_weather(location_id: int, latitude: float, longitude: float):
