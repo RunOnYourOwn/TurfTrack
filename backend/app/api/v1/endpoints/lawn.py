@@ -2,12 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
+from sqlalchemy import exists
 from app.core.database import get_db
 from app.models.lawn import Lawn, GrassType, WeatherFetchFrequency
 from app.schemas.lawn import LawnCreate, LawnRead, LawnUpdate
 from typing import List
 from app.utils.location import get_or_create_location
 from app.tasks.weather import fetch_and_store_weather
+from app.models.daily_weather import DailyWeather
+import logging
 
 router = APIRouter(prefix="/lawns", tags=["lawns"])
 
@@ -51,10 +54,21 @@ async def create_lawn(lawn: LawnCreate, db: AsyncSession = Depends(get_db)):
     db.add(db_lawn)
     await db.commit()
     await db.refresh(db_lawn)
-    # Trigger weather fetch task if enabled
-    if db_lawn.weather_enabled:
+    # Trigger weather fetch task if enabled and no weather data exists for this location
+    weather_exists = await db.execute(
+        select(exists().where(DailyWeather.location_id == location.id))
+    )
+    logger = logging.getLogger("turftrack.lawn")
+    if db_lawn.weather_enabled and not weather_exists.scalar():
+        logger.info(
+            f"No weather data found for location_id={location.id}. Triggering fetch_and_store_weather."
+        )
         fetch_and_store_weather.delay(
             location.id, location.latitude, location.longitude
+        )
+    else:
+        logger.info(
+            f"Weather data already exists for location_id={location.id}. No fetch needed."
         )
     return LawnRead(
         id=db_lawn.id,
@@ -127,6 +141,22 @@ async def update_lawn(
     await db.commit()
     await db.refresh(db_lawn)
     location = db_lawn.location
+    # Trigger weather fetch task if enabled and no weather data exists for this location
+    weather_exists = await db.execute(
+        select(exists().where(DailyWeather.location_id == location.id))
+    )
+    logger = logging.getLogger("turftrack.lawn")
+    if db_lawn.weather_enabled and not weather_exists.scalar():
+        logger.info(
+            f"No weather data found for location_id={location.id}. Triggering fetch_and_store_weather."
+        )
+        fetch_and_store_weather.delay(
+            location.id, location.latitude, location.longitude
+        )
+    else:
+        logger.info(
+            f"Weather data already exists for location_id={location.id}. No fetch needed."
+        )
     return LawnRead(
         id=db_lawn.id,
         name=db_lawn.name,

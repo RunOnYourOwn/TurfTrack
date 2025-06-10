@@ -24,7 +24,6 @@ import * as React from "react";
 import { PencilIcon, Trash2Icon } from "lucide-react";
 import {
   AlertDialog,
-  AlertDialogTrigger,
   AlertDialogContent,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -257,13 +256,13 @@ export default function Lawns() {
   }
 
   return (
-    <div className="p-4 min-h-screen bg-muted/50 flex flex-col items-center">
-      <Card className="w-full shadow-lg">
+    <div className="p-4 min-h-screen bg-muted/50 w-full">
+      <Card className="min-h-[500px] w-full shadow-lg">
         <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
           <CardTitle className="text-2xl font-bold">Lawns</CardTitle>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button variant="default" size="sm" className="ml-auto">
+              <Button variant="default" size="sm">
                 + Add Lawn
               </Button>
             </DialogTrigger>
@@ -467,7 +466,13 @@ export default function Lawns() {
             </DialogContent>
           </Dialog>
         </CardHeader>
-        <CardContent>
+        <CardContent
+          className={
+            !lawns || lawns.length === 0
+              ? "min-h-[400px] flex flex-col items-center justify-center"
+              : ""
+          }
+        >
           {isLoading ? (
             <div className="py-8 text-center text-muted-foreground">
               Loading lawns...
@@ -477,8 +482,11 @@ export default function Lawns() {
               Error loading lawns: {(error as Error).message}
             </div>
           ) : !lawns || lawns.length === 0 ? (
-            <div className="py-8 text-center text-muted-foreground">
-              No lawns found.
+            <div className="flex flex-col items-center">
+              <span className="text-4xl mb-2">🌱</span>
+              <span className="text-muted-foreground text-lg">
+                No lawns found.
+              </span>
             </div>
           ) : (
             <div className="overflow-x-auto">

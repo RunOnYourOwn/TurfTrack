@@ -4,6 +4,8 @@ from app.core.database import async_session_maker
 from app.utils.weather import upsert_daily_weather
 from app.models.daily_weather import WeatherType
 import openmeteo_requests
+from app.models.lawn import Lawn
+from sqlalchemy.future import select
 
 
 @app.task(name="fetch_and_store_weather")
@@ -108,3 +110,89 @@ def _extract_weather_data(daily, i):
         "et0_evapotranspiration_mm": daily.Variables(7).ValuesAsNumpy()[i],
         "et0_evapotranspiration_in": daily.Variables(7).ValuesAsNumpy()[i] / 25.4,
     }
+
+
+@app.task(name="update_weather_for_all_lawns")
+def update_weather_for_all_lawns():
+    import asyncio
+
+    asyncio.run(_update_weather_for_all_lawns())
+
+
+async def _update_weather_for_all_lawns():
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(Lawn).where(Lawn.weather_enabled.is_(True))
+        )
+        lawns = result.scalars().all()
+        for lawn in lawns:
+            location = lawn.location
+            if location:
+                await _update_recent_weather_for_location(
+                    location.id, location.latitude, location.longitude
+                )
+
+
+async def _update_recent_weather_for_location(
+    location_id: int, latitude: float, longitude: float
+):
+    async with async_session_maker() as session:
+        om = openmeteo_requests.Client()
+        # Fetch only yesterday's historical data
+        today = datetime.date.today()
+        yesterday = today - datetime.timedelta(days=1)
+        params_hist = {
+            "latitude": latitude,
+            "longitude": longitude,
+            "start_date": yesterday.isoformat(),
+            "end_date": yesterday.isoformat(),
+            "daily": [
+                "temperature_2m_max",
+                "temperature_2m_min",
+                "precipitation_sum",
+                "precipitation_probability_max",
+                "wind_speed_10m_max",
+                "wind_gusts_10m_max",
+                "wind_direction_10m_dominant",
+                "et0_fao_evapotranspiration",
+            ],
+            "timezone": "auto",
+        }
+        responses_hist = om.weather_api(
+            "https://api.open-meteo.com/v1/forecast", params=params_hist
+        )
+        response_hist = responses_hist[0]
+        daily_hist = response_hist.Daily()
+        for i, date in enumerate(_get_dates(daily_hist)):
+            data = _extract_weather_data(daily_hist, i)
+            await upsert_daily_weather(
+                session, location_id, date, WeatherType.historical, data
+            )
+
+        # Fetch forecast (next 16 days)
+        params_forecast = {
+            "latitude": latitude,
+            "longitude": longitude,
+            "forecast_days": 16,
+            "daily": [
+                "temperature_2m_max",
+                "temperature_2m_min",
+                "precipitation_sum",
+                "precipitation_probability_max",
+                "wind_speed_10m_max",
+                "wind_gusts_10m_max",
+                "wind_direction_10m_dominant",
+                "et0_fao_evapotranspiration",
+            ],
+            "timezone": "auto",
+        }
+        responses_forecast = om.weather_api(
+            "https://api.open-meteo.com/v1/forecast", params=params_forecast
+        )
+        response_forecast = responses_forecast[0]
+        daily_forecast = response_forecast.Daily()
+        for i, date in enumerate(_get_dates(daily_forecast)):
+            data = _extract_weather_data(daily_forecast, i)
+            await upsert_daily_weather(
+                session, location_id, date, WeatherType.forecast, data
+            )
