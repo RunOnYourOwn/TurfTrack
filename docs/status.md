@@ -5,6 +5,7 @@
 - Core backend and frontend integration (weather, lawns, deduplication)
 - Weather data deduplication and scheduled updates implemented
 - Documentation and refactoring
+- Task status API endpoints exposed and ready for frontend integration
 
 ## Completed Items
 
@@ -17,6 +18,7 @@
 - Weather data ingestion and deduplication (no duplicate fetches for same location)
 - Celery Beat and Worker setup for scheduled and manual weather updates
 - Logging for weather fetch logic and deduplication
+- Task status API endpoints exposed and ready for frontend integration
 
 ## In Progress
 
@@ -45,3 +47,4 @@
 
 - Weather data is now robustly deduplicated and scheduled for daily updates
 - System is ready for further analytics and user-facing features
+- Task status API endpoints are now exposed and ready for frontend integration

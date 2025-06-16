@@ -53,6 +53,12 @@ const navigationItems = [
     icon: BarChartIcon,
     description: "Analytics and reports",
   },
+  {
+    title: "Task Monitor",
+    url: "/tasks",
+    icon: ClipboardListIcon,
+    description: "Monitor background tasks",
+  },
 ];
 
 function CollapseButton() {

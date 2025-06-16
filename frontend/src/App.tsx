@@ -5,6 +5,7 @@ import Lawns from "@/pages/Lawns";
 import Products from "@/pages/Products";
 import Applications from "@/pages/Applications";
 import Reports from "@/pages/Reports";
+import TaskMonitor from "@/pages/TaskMonitor";
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
           <Route path="/products" element={<Products />} />
           <Route path="/applications" element={<Applications />} />
           <Route path="/reports" element={<Reports />} />
+          <Route path="/tasks" element={<TaskMonitor />} />
         </Routes>
       </AppLayout>
     </BrowserRouter>
