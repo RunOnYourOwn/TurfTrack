@@ -36,6 +36,12 @@ const navigationItems = [
     description: "Manage your lawns",
   },
   {
+    title: "GDD",
+    url: "/gdd",
+    icon: LeafIcon,
+    description: "Manage your lawns",
+  },
+  {
     title: "Products",
     url: "/products",
     icon: PackageIcon,

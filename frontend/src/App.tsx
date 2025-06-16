@@ -6,6 +6,7 @@ import Products from "@/pages/Products";
 import Applications from "@/pages/Applications";
 import Reports from "@/pages/Reports";
 import TaskMonitor from "@/pages/TaskMonitor";
+import GDD from "@/pages/GDD";
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
           <Route path="/applications" element={<Applications />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/tasks" element={<TaskMonitor />} />
+          <Route path="/gdd" element={<GDD />} />
         </Routes>
       </AppLayout>
     </BrowserRouter>
