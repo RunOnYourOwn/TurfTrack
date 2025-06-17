@@ -5,6 +5,8 @@ from app.core.database import get_db
 from app.models.task_status import TaskStatus
 from app.schemas.task_status import TaskStatusRead, TaskStatusList
 from typing import List, Optional
+from app.tasks.weather import update_weather_for_all_lawns
+from fastapi.responses import JSONResponse
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -34,3 +36,9 @@ async def get_task(task_id: str, db: AsyncSession = Depends(get_db)):
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
+
+
+@router.post("/trigger-weather-update", tags=["tasks"])
+def trigger_weather_update():
+    task = update_weather_for_all_lawns.delay()
+    return JSONResponse({"task_id": task.id, "status": "started"})

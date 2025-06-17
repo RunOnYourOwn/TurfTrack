@@ -41,3 +41,4 @@ Thumbs.db
 *.lock
 
 .DS_Store
+backend/app/core/__pycache__/database.cpython-312.pyc

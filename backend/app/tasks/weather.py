@@ -1,12 +1,71 @@
 import datetime
 from app.celery_app import app
-from app.core.database import async_session_maker
-from app.utils.weather import upsert_daily_weather
+from app.core.database import async_session_maker, SessionLocal
+from app.utils.weather import upsert_daily_weather, upsert_daily_weather_sync
 from app.models.daily_weather import WeatherType
 import openmeteo_requests
 from app.models.lawn import Lawn
 from sqlalchemy.future import select
 from app.models.task_status import TaskStatus, TaskStatusEnum
+import asyncio
+from sqlalchemy import and_, insert, update, text
+from sqlalchemy.dialects.postgresql import insert
+from app.models.daily_weather import DailyWeather
+from sqlalchemy.orm import Session
+from app.models.location import Location
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def create_or_update_task_status_sync(
+    session: Session,
+    task_id: str,
+    task_name: str,
+    location_id: int,
+    status: TaskStatusEnum,
+    started: bool = False,
+    finished: bool = False,
+    error: str = None,
+):
+    # Check if record exists
+    stmt = select(TaskStatus).where(
+        and_(
+            TaskStatus.task_id == task_id,
+            TaskStatus.task_name == task_name,
+            TaskStatus.related_location_id == location_id,
+        )
+    )
+    result = session.execute(stmt)
+    existing_status = result.scalar_one_or_none()
+
+    if existing_status:
+        # Update existing record
+        existing_status.status = status
+        if started:
+            existing_status.started_at = datetime.datetime.now(datetime.timezone.utc)
+        if finished:
+            existing_status.finished_at = datetime.datetime.now(datetime.timezone.utc)
+        if error:
+            existing_status.error = error
+    else:
+        # Create new record
+        new_status = TaskStatus(
+            task_id=task_id,
+            task_name=task_name,
+            related_location_id=location_id,
+            status=status,
+            started_at=datetime.datetime.now(datetime.timezone.utc)
+            if started
+            else None,
+            finished_at=datetime.datetime.now(datetime.timezone.utc)
+            if finished
+            else None,
+            error=error,
+        )
+        session.add(new_status)
+
+    session.commit()
 
 
 async def create_or_update_task_status(
@@ -53,8 +112,6 @@ async def create_or_update_task_status(
 
 @app.task(name="fetch_and_store_weather", bind=True)
 def fetch_and_store_weather(self, location_id: int, latitude: float, longitude: float):
-    import asyncio
-
     task_id = self.request.id
 
     async def main():
@@ -170,50 +227,30 @@ def _get_dates(daily):
 
 
 def _extract_weather_data(daily, i):
-    # Extract and convert all required fields for upsert
     return {
-        "temperature_max_c": daily.Variables(0).ValuesAsNumpy()[i],
-        "temperature_max_f": daily.Variables(0).ValuesAsNumpy()[i] * 9.0 / 5.0 + 32.0,
-        "temperature_min_c": daily.Variables(1).ValuesAsNumpy()[i],
-        "temperature_min_f": daily.Variables(1).ValuesAsNumpy()[i] * 9.0 / 5.0 + 32.0,
-        "precipitation_mm": daily.Variables(2).ValuesAsNumpy()[i],
-        "precipitation_in": daily.Variables(2).ValuesAsNumpy()[i] / 25.4,
-        "precipitation_probability_max": daily.Variables(3).ValuesAsNumpy()[i],
-        "wind_speed_max_ms": daily.Variables(4).ValuesAsNumpy()[i],
-        "wind_speed_max_mph": daily.Variables(4).ValuesAsNumpy()[i] * 2.23694,
-        "wind_gusts_max_ms": daily.Variables(5).ValuesAsNumpy()[i],
-        "wind_gusts_max_mph": daily.Variables(5).ValuesAsNumpy()[i] * 2.23694,
-        "wind_direction_dominant_deg": daily.Variables(6).ValuesAsNumpy()[i],
-        "et0_evapotranspiration_mm": daily.Variables(7).ValuesAsNumpy()[i],
-        "et0_evapotranspiration_in": daily.Variables(7).ValuesAsNumpy()[i] / 25.4,
+        "temperature_max_c": float(daily.Variables(0).ValuesAsNumpy()[i]),
+        "temperature_max_f": float(daily.Variables(0).ValuesAsNumpy()[i] * 9 / 5 + 32),
+        "temperature_min_c": float(daily.Variables(1).ValuesAsNumpy()[i]),
+        "temperature_min_f": float(daily.Variables(1).ValuesAsNumpy()[i] * 9 / 5 + 32),
+        "precipitation_mm": float(daily.Variables(2).ValuesAsNumpy()[i]),
+        "precipitation_in": float(daily.Variables(2).ValuesAsNumpy()[i] / 25.4),
+        "precipitation_probability_max": float(daily.Variables(3).ValuesAsNumpy()[i]),
+        "wind_speed_max_ms": float(daily.Variables(4).ValuesAsNumpy()[i]),
+        "wind_speed_max_mph": float(daily.Variables(4).ValuesAsNumpy()[i] * 2.23694),
+        "wind_gusts_max_ms": float(daily.Variables(5).ValuesAsNumpy()[i]),
+        "wind_gusts_max_mph": float(daily.Variables(5).ValuesAsNumpy()[i] * 2.23694),
+        "wind_direction_dominant_deg": float(daily.Variables(6).ValuesAsNumpy()[i]),
+        "et0_evapotranspiration_mm": float(daily.Variables(7).ValuesAsNumpy()[i]),
+        "et0_evapotranspiration_in": float(
+            daily.Variables(7).ValuesAsNumpy()[i] / 25.4
+        ),
     }
 
 
-@app.task(name="update_weather_for_all_lawns")
-def update_weather_for_all_lawns():
-    import asyncio
-
-    asyncio.run(_update_weather_for_all_lawns())
-
-
-async def _update_weather_for_all_lawns():
-    async with async_session_maker() as session:
-        result = await session.execute(
-            select(Lawn).where(Lawn.weather_enabled.is_(True))
-        )
-        lawns = result.scalars().all()
-        for lawn in lawns:
-            location = lawn.location
-            if location:
-                await _update_recent_weather_for_location(
-                    location.id, location.latitude, location.longitude
-                )
-
-
-async def _update_recent_weather_for_location(
+def _update_recent_weather_for_location_sync(
     location_id: int, latitude: float, longitude: float
 ):
-    async with async_session_maker() as session:
+    with SessionLocal() as session:
         om = openmeteo_requests.Client()
         # Fetch only yesterday's historical data
         today = datetime.date.today()
@@ -242,7 +279,7 @@ async def _update_recent_weather_for_location(
         daily_hist = response_hist.Daily()
         for i, date in enumerate(_get_dates(daily_hist)):
             data = _extract_weather_data(daily_hist, i)
-            await upsert_daily_weather(
+            upsert_daily_weather_sync(
                 session, location_id, date, WeatherType.historical, data
             )
 
@@ -270,6 +307,50 @@ async def _update_recent_weather_for_location(
         daily_forecast = response_forecast.Daily()
         for i, date in enumerate(_get_dates(daily_forecast)):
             data = _extract_weather_data(daily_forecast, i)
-            await upsert_daily_weather(
+            upsert_daily_weather_sync(
                 session, location_id, date, WeatherType.forecast, data
             )
+
+
+@app.task(name="update_weather_for_all_lawns", bind=True)
+def update_weather_for_all_lawns(self):
+    task_id = self.request.id
+    with SessionLocal() as session:
+        result = session.execute(select(Lawn).where(Lawn.weather_enabled.is_(True)))
+        lawns = result.scalars().all()
+        for lawn in lawns:
+            location = lawn.location
+            if location:
+                try:
+                    create_or_update_task_status_sync(
+                        session,
+                        task_id,
+                        "update_recent_weather_for_location",
+                        location.id,
+                        TaskStatusEnum.started,
+                        started=True,
+                    )
+                    _update_recent_weather_for_location_sync(
+                        location.id,
+                        location.latitude,
+                        location.longitude,
+                    )
+                    create_or_update_task_status_sync(
+                        session,
+                        task_id,
+                        "update_recent_weather_for_location",
+                        location.id,
+                        TaskStatusEnum.success,
+                        finished=True,
+                    )
+                except Exception as e:
+                    create_or_update_task_status_sync(
+                        session,
+                        task_id,
+                        "update_recent_weather_for_location",
+                        location.id,
+                        TaskStatusEnum.failure,
+                        error=str(e),
+                        finished=True,
+                    )
+                    raise
