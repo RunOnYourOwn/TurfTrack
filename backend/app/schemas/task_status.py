@@ -26,6 +26,7 @@ class TaskStatusList(BaseModel):
     status: str
     started_at: Optional[datetime]
     finished_at: Optional[datetime]
+    result: Optional[str]
     error: Optional[str]
 
     model_config = {"from_attributes": True}

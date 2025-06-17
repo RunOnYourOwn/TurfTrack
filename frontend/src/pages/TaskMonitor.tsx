@@ -23,6 +23,7 @@ interface TaskStatus {
   started_at: string;
   finished_at: string;
   error?: string | null;
+  result?: string | null;
 }
 
 const fetchTaskStatus = async (): Promise<TaskStatus[]> => {
@@ -58,6 +59,7 @@ export default function TaskMonitor() {
                 <TableHead>Started At</TableHead>
                 <TableHead>Finished At</TableHead>
                 <TableHead>Error</TableHead>
+                <TableHead>Result</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -78,6 +80,7 @@ export default function TaskMonitor() {
                       : "-"}
                   </TableCell>
                   <TableCell>{task.error || "-"}</TableCell>
+                  <TableCell>{task.result || "-"}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

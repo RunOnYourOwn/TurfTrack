@@ -13,6 +13,8 @@ from app.models.daily_weather import DailyWeather
 from app.models.location import Location
 from app.models.task_status import TaskStatus
 import logging
+import uuid
+import datetime
 
 router = APIRouter(prefix="/lawns", tags=["lawns"])
 
@@ -72,6 +74,22 @@ async def create_lawn(lawn: LawnCreate, db: AsyncSession = Depends(get_db)):
         logger.info(
             f"Weather data already exists for location_id={location.id}. No fetch needed."
         )
+        # Create a TaskStatus record to indicate weather already exists
+        from app.models.task_status import TaskStatus, TaskStatusEnum
+
+        now = datetime.datetime.now(datetime.timezone.utc)
+        task_status = TaskStatus(
+            task_id=str(uuid.uuid4()),
+            task_name="fetch_and_store_weather",
+            related_location_id=location.id,
+            status=TaskStatusEnum.success,
+            created_at=now,
+            started_at=now,
+            finished_at=now,
+            result="Weather data for this location already exists. No new fetch was needed.",
+        )
+        db.add(task_status)
+        await db.commit()
     return LawnRead(
         id=db_lawn.id,
         name=db_lawn.name,
