@@ -34,8 +34,12 @@
 
 - [ ] Implement GDD calculation service (in progress)
 - [ ] Create GDD prediction models (in progress)
-- [ ] Set up GDD data collection tasks
-- [ ] Implement GDD history tracking
+- [ ] Set up GDD data collection and storage tasks
+- [ ] Implement GDD history and forecast tracking
+- [ ] Add GDD model management (create, edit, delete, per lawn)
+- [ ] Add GDD data cleanup on lawn/location deletion
+- [ ] Build GDD visualization UI (cumulative line, daily bar, forecast distinction)
+- [ ] Add GDD export functionality (future)
 
 ## Phase 3: Frontend Development
 

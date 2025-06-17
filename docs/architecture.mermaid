@@ -28,6 +28,7 @@ graph TB
         Applications[Applications Table]
         WeatherData[Weather Data Table]
         GDDModels[GDD Models Table]
+        GDDValues[GDD Values Table]
         TaskStatusTable[Task Status Table]
         DB --> Products
         DB --> Lawns
@@ -35,9 +36,12 @@ graph TB
         DB --> Applications
         DB --> WeatherData
         DB --> GDDModels
+        DB --> GDDValues
         DB --> TaskStatusTable
         Lawns --> Locations
         WeatherData --> Locations
+        GDDModels --> Lawns
+        GDDValues --> GDDModels
         Tasks --> TaskStatusTable
     end
 
@@ -71,5 +75,5 @@ graph TB
     class Weather external
     class Redis,Celery,Beat tasks
 
-    %% Note: WeatherData is deduplicated per Location, not per Lawn. Beat schedules daily updates.
-    %% Task Status tracking is now implemented for monitoring weather updates.
+    %% Note: WeatherData and GDDValues are deduplicated per Location, not per Lawn. Beat schedules daily updates. GDD data is cleaned up on lawn/location deletion.
+    %% Task Status tracking is now implemented for monitoring weather updates and GDD calculations.

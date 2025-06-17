@@ -103,13 +103,46 @@
 
 - id: UUID (primary key)
 - lawn_id: UUID (foreign key)
+- name: String (user-defined)
 - base_temp: Float
-- upper_temp: Float
+- unit: Enum (C/F)
 - start_date: DateTime
-- current_gdd: Float
-- predicted_gdd: JSONB
+- threshold: Float
+- reset_on_threshold: Boolean
 - created_at: DateTime
 - updated_at: DateTime
+
+### GDD Values
+
+- id: UUID (primary key)
+- gdd_model_id: UUID (foreign key)
+- date: DateTime
+- daily_gdd: Float
+- cumulative_gdd: Float
+- is_forecast: Boolean
+
+#### GDD Calculation Logic
+
+- On model create/update, backend calculates and stores all GDD values (historical + forecast) for the model using location weather data.
+- If reset_on_threshold is true, cumulative GDD resets to zero the day after threshold is met.
+- Supports recalculation on unit, threshold, or start date change.
+- Only one GDD model is shown per graph at a time.
+- GDD data is deleted when a lawn is deleted and it's the last lawn for a location.
+
+#### API Endpoints
+
+- CRUD for GDD models
+- Fetch all GDD values for a model (for graphing)
+- (Optional) Force recalculation endpoint
+
+#### Frontend/UX
+
+- UI for GDD model management (create, edit, delete, per lawn)
+- Graph: cumulative GDD (line), daily GDD (bar), forecast in a different color
+- Professional, modern look matching current palette
+- Export functionality (CSV, PDF, etc.) is a future enhancement
+- Only one model shown per graph at a time
+- Recommend a modern React graphing library (e.g., Chart.js, Recharts, or Visx)
 
 ## API Endpoints
 

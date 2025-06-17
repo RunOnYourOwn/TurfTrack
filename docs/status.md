@@ -25,16 +25,18 @@
 
 ## In Progress
 
-- GDD calculation service
+- GDD calculation service (model management, calculation, storage, and UI/UX in progress)
+- GDD data cleanup on lawn/location deletion
 - Advanced analytics and reporting
 - More frontend features and polish
 
 ## Next Steps
 
-1. Implement GDD calculations and UI
-2. Add advanced analytics and reporting
-3. Continue frontend enhancements
-4. Expand test coverage
+1. Implement GDD calculations, model management, and UI
+2. Add GDD graphing (cumulative line, daily bar, forecast distinction)
+3. Add advanced analytics and reporting
+4. Continue frontend enhancements
+5. Expand test coverage
 
 ## Known Issues
 
@@ -52,3 +54,8 @@
 - System is ready for further analytics and user-facing features
 - Task status API endpoints are now exposed and ready for frontend integration
 - Weather data updates are now atomic and race-condition free
+- GDD models are user-defined per lawn, use location weather data, and support custom base temp, units, start date, threshold, and reset logic
+- GDD values are stored in the database for performance and historical/forecast analysis
+- GDD data is deleted when a lawn is deleted and it's the last lawn for a location
+- UI will be professional, modern, and match the current palette
+- Export functionality for GDD data is planned for the future
