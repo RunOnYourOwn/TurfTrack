@@ -2,4 +2,5 @@
 from .lawn import Lawn, WeatherFetchFrequency, GrassType
 from .location import Location
 from .daily_weather import DailyWeather
-from .task_status import TaskStatus, TaskStatusEnum  # <-- Add this line
+from .task_status import TaskStatus, TaskStatusEnum
+from .gdd import GDDModel, GDDValue

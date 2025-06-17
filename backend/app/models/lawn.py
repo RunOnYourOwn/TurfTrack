@@ -41,3 +41,7 @@ class Lawn(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow
     )
+
+    gdd_models = relationship(
+        "GDDModel", back_populates="lawn", cascade="all, delete-orphan"
+    )

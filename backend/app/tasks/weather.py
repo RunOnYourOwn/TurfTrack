@@ -149,9 +149,9 @@ def _fetch_and_store_weather_sync(
     location_id: int, latitude: float, longitude: float, session
 ):
     om = openmeteo_requests.Client()
-    # Fetch historical (past 30 days)
+    # Fetch historical (past 60 days)
     today = datetime.date.today()
-    start_hist = today - datetime.timedelta(days=30)
+    start_hist = today - datetime.timedelta(days=60)
     end_hist = today - datetime.timedelta(days=2)
     params_hist = {
         "latitude": latitude,
