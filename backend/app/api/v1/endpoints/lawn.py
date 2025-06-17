@@ -10,6 +10,8 @@ from typing import List
 from app.utils.location import get_or_create_location
 from app.tasks.weather import fetch_and_store_weather
 from app.models.daily_weather import DailyWeather
+from app.models.location import Location
+from app.models.task_status import TaskStatus
 import logging
 
 router = APIRouter(prefix="/lawns", tags=["lawns"])
@@ -175,8 +177,39 @@ async def update_lawn(
 
 @router.delete("/{lawn_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_lawn(lawn_id: int, db: AsyncSession = Depends(get_db)):
-    db_lawn = await db.get(Lawn, lawn_id)
+    # Get the lawn with its location
+    result = await db.execute(
+        select(Lawn).options(selectinload(Lawn.location)).where(Lawn.id == lawn_id)
+    )
+    db_lawn = result.scalars().first()
     if not db_lawn:
         raise HTTPException(status_code=404, detail="Lawn not found")
+
+    # Store location_id for later use
+    location_id = db_lawn.location_id
+
+    # Delete the lawn
     await db.delete(db_lawn)
     await db.commit()
+
+    # Check if this was the last lawn using this location
+    result = await db.execute(select(Lawn).where(Lawn.location_id == location_id))
+    remaining_lawns = result.scalars().all()
+
+    if not remaining_lawns:
+        # This was the last lawn, delete location and weather data
+        # First delete all weather data for this location
+        await db.execute(
+            DailyWeather.__table__.delete().where(
+                DailyWeather.location_id == location_id
+            )
+        )
+        # Then delete all task_status records for this location
+        await db.execute(
+            TaskStatus.__table__.delete().where(
+                TaskStatus.related_location_id == location_id
+            )
+        )
+        # Then delete the location
+        await db.execute(Location.__table__.delete().where(Location.id == location_id))
+        await db.commit()

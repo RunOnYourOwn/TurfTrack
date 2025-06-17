@@ -19,6 +19,9 @@
 - Celery Beat and Worker setup for scheduled and manual weather updates
 - Logging for weather fetch logic and deduplication
 - Task status API endpoints exposed and ready for frontend integration
+- Robust weather data upsert with atomic operations
+- Fixed race conditions in weather data updates
+- Implemented proper error handling for weather tasks
 
 ## In Progress
 
@@ -48,3 +51,4 @@
 - Weather data is now robustly deduplicated and scheduled for daily updates
 - System is ready for further analytics and user-facing features
 - Task status API endpoints are now exposed and ready for frontend integration
+- Weather data updates are now atomic and race-condition free

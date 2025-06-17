@@ -113,105 +113,102 @@ async def create_or_update_task_status(
 @app.task(name="fetch_and_store_weather", bind=True)
 def fetch_and_store_weather(self, location_id: int, latitude: float, longitude: float):
     task_id = self.request.id
-
-    async def main():
-        async with async_session_maker() as session:
-            try:
-                await create_or_update_task_status(
-                    session,
-                    task_id,
-                    "fetch_and_store_weather",
-                    location_id,
-                    TaskStatusEnum.started,
-                    started=True,
-                )
-                await _fetch_and_store_weather(location_id, latitude, longitude)
-                await create_or_update_task_status(
-                    session,
-                    task_id,
-                    "fetch_and_store_weather",
-                    location_id,
-                    TaskStatusEnum.success,
-                    finished=True,
-                )
-            except Exception as e:
-                await create_or_update_task_status(
-                    session,
-                    task_id,
-                    "fetch_and_store_weather",
-                    location_id,
-                    TaskStatusEnum.failure,
-                    error=str(e),
-                    finished=True,
-                )
-                raise
-
-    asyncio.run(main())
-
-
-async def _fetch_and_store_weather(location_id: int, latitude: float, longitude: float):
-    async with async_session_maker() as session:
-        om = openmeteo_requests.Client()
-        # Fetch historical (past 30 days)
-        today = datetime.date.today()
-        start_hist = today - datetime.timedelta(days=30)
-        end_hist = today - datetime.timedelta(days=2)
-        params_hist = {
-            "latitude": latitude,
-            "longitude": longitude,
-            "start_date": start_hist.isoformat(),
-            "end_date": end_hist.isoformat(),
-            "daily": [
-                "temperature_2m_max",
-                "temperature_2m_min",
-                "precipitation_sum",
-                "precipitation_probability_max",
-                "wind_speed_10m_max",
-                "wind_gusts_10m_max",
-                "wind_direction_10m_dominant",
-                "et0_fao_evapotranspiration",
-            ],
-            "timezone": "auto",
-        }
-        responses_hist = om.weather_api(
-            "https://api.open-meteo.com/v1/forecast", params=params_hist
-        )
-        response_hist = responses_hist[0]
-        daily_hist = response_hist.Daily()
-        # Build and upsert historical data
-        for i, date in enumerate(_get_dates(daily_hist)):
-            data = _extract_weather_data(daily_hist, i)
-            await upsert_daily_weather(
-                session, location_id, date, WeatherType.historical, data
+    with SessionLocal() as session:
+        try:
+            create_or_update_task_status_sync(
+                session,
+                task_id,
+                "fetch_and_store_weather",
+                location_id,
+                TaskStatusEnum.started,
+                started=True,
             )
-
-        # Fetch forecast (next 16 days)
-        params_forecast = {
-            "latitude": latitude,
-            "longitude": longitude,
-            "forecast_days": 16,
-            "daily": [
-                "temperature_2m_max",
-                "temperature_2m_min",
-                "precipitation_sum",
-                "precipitation_probability_max",
-                "wind_speed_10m_max",
-                "wind_gusts_10m_max",
-                "wind_direction_10m_dominant",
-                "et0_fao_evapotranspiration",
-            ],
-            "timezone": "auto",
-        }
-        responses_forecast = om.weather_api(
-            "https://api.open-meteo.com/v1/forecast", params=params_forecast
-        )
-        response_forecast = responses_forecast[0]
-        daily_forecast = response_forecast.Daily()
-        for i, date in enumerate(_get_dates(daily_forecast)):
-            data = _extract_weather_data(daily_forecast, i)
-            await upsert_daily_weather(
-                session, location_id, date, WeatherType.forecast, data
+            _fetch_and_store_weather_sync(location_id, latitude, longitude, session)
+            create_or_update_task_status_sync(
+                session,
+                task_id,
+                "fetch_and_store_weather",
+                location_id,
+                TaskStatusEnum.success,
+                finished=True,
             )
+        except Exception as e:
+            create_or_update_task_status_sync(
+                session,
+                task_id,
+                "fetch_and_store_weather",
+                location_id,
+                TaskStatusEnum.failure,
+                error=str(e),
+                finished=True,
+            )
+            raise
+
+
+def _fetch_and_store_weather_sync(
+    location_id: int, latitude: float, longitude: float, session
+):
+    om = openmeteo_requests.Client()
+    # Fetch historical (past 30 days)
+    today = datetime.date.today()
+    start_hist = today - datetime.timedelta(days=30)
+    end_hist = today - datetime.timedelta(days=2)
+    params_hist = {
+        "latitude": latitude,
+        "longitude": longitude,
+        "start_date": start_hist.isoformat(),
+        "end_date": end_hist.isoformat(),
+        "daily": [
+            "temperature_2m_max",
+            "temperature_2m_min",
+            "precipitation_sum",
+            "precipitation_probability_max",
+            "wind_speed_10m_max",
+            "wind_gusts_10m_max",
+            "wind_direction_10m_dominant",
+            "et0_fao_evapotranspiration",
+        ],
+        "timezone": "auto",
+    }
+    responses_hist = om.weather_api(
+        "https://api.open-meteo.com/v1/forecast", params=params_hist
+    )
+    response_hist = responses_hist[0]
+    daily_hist = response_hist.Daily()
+    # Build and upsert historical data
+    for i, date in enumerate(_get_dates(daily_hist)):
+        data = _extract_weather_data(daily_hist, i)
+        upsert_daily_weather_sync(
+            session, location_id, date, WeatherType.historical, data
+        )
+
+    # Fetch forecast (next 16 days)
+    params_forecast = {
+        "latitude": latitude,
+        "longitude": longitude,
+        "forecast_days": 16,
+        "daily": [
+            "temperature_2m_max",
+            "temperature_2m_min",
+            "precipitation_sum",
+            "precipitation_probability_max",
+            "wind_speed_10m_max",
+            "wind_gusts_10m_max",
+            "wind_direction_10m_dominant",
+            "et0_fao_evapotranspiration",
+        ],
+        "timezone": "auto",
+    }
+    responses_forecast = om.weather_api(
+        "https://api.open-meteo.com/v1/forecast", params=params_forecast
+    )
+    response_forecast = responses_forecast[0]
+    daily_forecast = response_forecast.Daily()
+    for i, date in enumerate(_get_dates(daily_forecast)):
+        data = _extract_weather_data(daily_forecast, i)
+        upsert_daily_weather_sync(
+            session, location_id, date, WeatherType.forecast, data
+        )
 
 
 def _get_dates(daily):

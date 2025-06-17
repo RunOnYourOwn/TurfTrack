@@ -10,7 +10,9 @@ graph TB
     subgraph Backend
         API[FastAPI Backend]
         Tasks[Celery Tasks]
+        TaskStatus[Task Status API]
         API --> Tasks
+        Tasks --> TaskStatus
     end
 
     subgraph External Services
@@ -26,14 +28,17 @@ graph TB
         Applications[Applications Table]
         WeatherData[Weather Data Table]
         GDDModels[GDD Models Table]
+        TaskStatusTable[Task Status Table]
         DB --> Products
         DB --> Lawns
         DB --> Locations
         DB --> Applications
         DB --> WeatherData
         DB --> GDDModels
+        DB --> TaskStatusTable
         Lawns --> Locations
         WeatherData --> Locations
+        Tasks --> TaskStatusTable
     end
 
     subgraph Task Processing
@@ -52,6 +57,7 @@ graph TB
     Beat --> Tasks
     API --> Weather
     Tasks --> Weather
+    TaskStatus --> TaskStatusTable
 
     classDef frontend fill:#f9f,stroke:#333,stroke-width:2px
     classDef backend fill:#bbf,stroke:#333,stroke-width:2px
@@ -60,9 +66,10 @@ graph TB
     classDef tasks fill:#fbf,stroke:#333,stroke-width:2px
 
     class UI,Components,State frontend
-    class API backend
-    class DB,Products,Lawns,Applications,WeatherData,GDDModels,Locations database
+    class API,Tasks,TaskStatus backend
+    class DB,Products,Lawns,Applications,WeatherData,GDDModels,Locations,TaskStatusTable database
     class Weather external
     class Redis,Celery,Beat tasks
 
     %% Note: WeatherData is deduplicated per Location, not per Lawn. Beat schedules daily updates.
+    %% Task Status tracking is now implemented for monitoring weather updates.

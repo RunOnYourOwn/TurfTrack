@@ -97,6 +97,7 @@
 - humidity: Float
 - wind_speed: Float
 - created_at: DateTime
+- Unique constraint on (date, location_id, type)
 
 ### GDD Models
 
@@ -147,6 +148,8 @@
 - Weather data is fetched and upserted per unique location
 - No duplicate fetches for same location
 - Scheduled Celery Beat task updates all locations daily at 3am Central (09:00 UTC)
+- Atomic upsert operations prevent race conditions
+- Proper error handling and task status tracking
 
 ## GDD Calculation Methodology
 
@@ -172,6 +175,8 @@ Where:
 - Daily weather data from OpenMeteo API
 - Historical data storage for analysis
 - Predictive modeling for future GDD calculations
+- Atomic upsert operations for data consistency
+- Race condition prevention in concurrent updates
 
 ## Task Processing
 
@@ -187,6 +192,7 @@ Where:
 - Weather data processing
 - GDD model updates
 - Analytics calculations
+- Task status tracking and monitoring
 
 ## Security Considerations
 
@@ -201,12 +207,13 @@ Where:
 - Optimized GDD calculations
 - Efficient database queries
 - Background processing for heavy computations
+- Atomic database operations for data consistency
 
 ## Data Fetching and API Integration
 
-- All frontend API requests are now handled via Axios, using a generic fetcher utility in `src/lib/fetcher.ts`.
-- React Query is used for caching, background updates, and UI state management.
-- Lawns CRUD UI is fully integrated with the backend, supporting create, read, update, and delete operations via Axios and React Query.
+- All frontend API requests are now handled via Axios, using a generic fetcher utility in `src/lib/fetcher.ts`
+- React Query is used for caching, background updates, and UI state management
+- Lawns CRUD UI is fully integrated with the backend, supporting create, read, update, and delete operations via Axios and React Query
 
 ## Weather Data Deduplication & Scheduling
 
@@ -214,9 +221,12 @@ Where:
 - Weather data is stored per location, not per lawn
 - Celery Beat runs a daily job to update the latest historical and forecast data for all locations
 - Logging is in place to track deduplication and fetch logic
+- Atomic upsert operations prevent race conditions
+- Task status tracking provides visibility into update operations
 
 ## Frontend Integration
 
 - React Query and Axios handle all CRUD and weather data fetching
 - UI is built with shadcn/ui components
 - Weather data is displayed per lawn, but deduplicated at the backend
+- Task status tracking is ready for frontend integration
