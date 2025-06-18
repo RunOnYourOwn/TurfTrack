@@ -10,6 +10,7 @@ from app.schemas.gdd import (
     GDDModelRead,
     GDDModelWithValues,
     GDDResetRead,
+    GDDValueRead,
 )
 from typing import List
 from starlette.concurrency import run_in_threadpool
@@ -18,7 +19,7 @@ from app.utils.gdd import (
     manual_gdd_reset_sync,
 )
 from datetime import date as datetime_date
-from app.models.gdd import GDDReset, ResetType
+from app.models.gdd import GDDReset, ResetType, GDDValue
 
 router = APIRouter(prefix="/gdd_models", tags=["gdd"])
 
@@ -149,3 +150,16 @@ async def list_gdd_resets(model_id: int, db: AsyncSession = Depends(get_db)):
         .order_by(GDDReset.reset_date.asc())
     )
     return result.scalars().all()
+
+
+@router.get("/{model_id}/runs/{run_number}/values", response_model=List[GDDValueRead])
+async def get_gdd_values_for_run(
+    model_id: int, run_number: int, db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(
+        select(GDDValue)
+        .where(GDDValue.gdd_model_id == model_id, GDDValue.run == run_number)
+        .order_by(GDDValue.date.asc())
+    )
+    values = result.scalars().all()
+    return values
