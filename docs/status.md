@@ -6,6 +6,7 @@
 - Weather data deduplication and scheduled updates implemented
 - Documentation and refactoring
 - Task status API endpoints exposed and ready for frontend integration
+- Full add/edit/delete functionality for products is now implemented in the frontend, using a reusable grouped ProductForm component, robust error handling, and modern UI/UX.
 
 ## Completed Items
 
@@ -26,6 +27,7 @@
 - GDD models feature (model management, calculation, analytics, UI/UX) complete
 - Task monitoring for weather and GDD recalculation jobs
 - MVP achieved: System is robust, user-friendly, and production-ready
+- Products CRUD UI (add, edit, delete) is now complete and robust, with grouped nutrient fields and read-only scraping info.
 
 ## In Progress
 

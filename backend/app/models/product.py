@@ -22,7 +22,6 @@ class Product(Base):
     zn_pct: Mapped[float] = mapped_column(Float, default=0.0)
     weight_lbs: Mapped[float] = mapped_column(Float, nullable=True)
     cost_per_bag: Mapped[float | None] = mapped_column(Float, nullable=True)
-    cost_per_lb_n: Mapped[float | None] = mapped_column(Float, nullable=True)
     sgn: Mapped[str] = mapped_column(String(32), nullable=True)
     product_link: Mapped[str] = mapped_column(String(512), nullable=True)
     label: Mapped[str] = mapped_column(String(512), nullable=True)
