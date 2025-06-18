@@ -22,6 +22,7 @@
 - Robust weather data upsert with atomic operations
 - Fixed race conditions in weather data updates
 - Implemented proper error handling for weather tasks
+- Added TaskStatus tracking to GDD recalculation Celery task (enables monitoring of GDD recalculation jobs in Task Monitor UI)
 
 ## In Progress
 

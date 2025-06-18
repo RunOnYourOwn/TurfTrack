@@ -14,6 +14,9 @@ from app.models.daily_weather import DailyWeather
 from sqlalchemy.orm import Session
 from app.models.location import Location
 import logging
+from app.models.gdd import GDDModel
+from app.utils.gdd import calculate_and_store_gdd_values_sync_segmented
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -321,6 +324,11 @@ def _update_recent_weather_for_location_sync(
         )
         session.commit()
 
+        # Trigger GDD recalculation for this location
+        from app.tasks.weather import recalculate_gdd_for_location
+
+        recalculate_gdd_for_location.delay(location_id)
+
 
 @app.task(name="update_weather_for_all_lawns", bind=True)
 def update_weather_for_all_lawns(self):
@@ -364,3 +372,50 @@ def update_weather_for_all_lawns(self):
                         finished=True,
                     )
                     raise
+
+
+@app.task(name="recalculate_gdd_for_location")
+def recalculate_gdd_for_location(location_id: int):
+    with SessionLocal() as session:
+        task_id = str(uuid.uuid4())
+        from app.tasks.weather import create_or_update_task_status_sync
+
+        # Start status
+        create_or_update_task_status_sync(
+            session,
+            task_id,
+            "recalculate_gdd_for_location",
+            location_id,
+            TaskStatusEnum.started,
+            started=True,
+        )
+        try:
+            lawns = session.query(Lawn).filter(Lawn.location_id == location_id).all()
+            for lawn in lawns:
+                models = (
+                    session.query(GDDModel).filter(GDDModel.lawn_id == lawn.id).all()
+                )
+                for model in models:
+                    calculate_and_store_gdd_values_sync_segmented(
+                        session, model.id, location_id
+                    )
+            # Success status
+            create_or_update_task_status_sync(
+                session,
+                task_id,
+                "recalculate_gdd_for_location",
+                location_id,
+                TaskStatusEnum.success,
+                finished=True,
+            )
+        except Exception as e:
+            create_or_update_task_status_sync(
+                session,
+                task_id,
+                "recalculate_gdd_for_location",
+                location_id,
+                TaskStatusEnum.failure,
+                error=str(e),
+                finished=True,
+            )
+            raise
