@@ -43,6 +43,24 @@ import {
 } from "recharts";
 import { toast } from "sonner";
 
+const TrashIcon = () => (
+  <svg
+    width="16"
+    height="16"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={2}
+    className="text-destructive hover:text-destructive/80"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M6 7h12M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2m3 0v12a2 2 0 01-2 2H8a2 2 0 01-2-2V7h12z"
+    />
+  </svg>
+);
+
 export default function GDD() {
   const queryClient = useQueryClient();
   const [selectedLawnId, setSelectedLawnId] = React.useState<string | null>(
@@ -734,34 +752,112 @@ export default function GDD() {
                           <th className="px-4 py-2 text-left font-semibold">
                             Type
                           </th>
+                          <th className="px-4 py-2 text-left font-semibold">
+                            Actions
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
-                        {resetHistory.map((reset: any, idx: number) => (
-                          <tr
-                            key={reset.id}
-                            className={
-                              (reset.run_number === selectedRun
-                                ? "bg-blue-100 dark:bg-blue-900/40" // highlight selected
-                                : idx % 2 === 0
-                                ? "bg-white"
-                                : "bg-muted/30") +
-                              " hover:bg-muted/60 transition cursor-pointer"
-                            }
-                            onClick={() => setSelectedRun(reset.run_number)}
-                          >
-                            <td className="px-4 py-2 border-b whitespace-nowrap font-medium">
-                              {reset.reset_date}
-                            </td>
-                            <td className="px-4 py-2 border-b whitespace-nowrap">
-                              {reset.run_number}
-                            </td>
-                            <td className="px-4 py-2 border-b whitespace-nowrap capitalize">
-                              {reset.reset_type.charAt(0).toUpperCase() +
-                                reset.reset_type.slice(1)}
-                            </td>
-                          </tr>
-                        ))}
+                        {resetHistory.map((reset: any, idx: number) => {
+                          const isInitial = idx === 0;
+                          return (
+                            <tr
+                              key={reset.id}
+                              className={
+                                (reset.run_number === selectedRun
+                                  ? "bg-blue-100 dark:bg-blue-900/40"
+                                  : idx % 2 === 0
+                                  ? "bg-white"
+                                  : "bg-muted/30") +
+                                " hover:bg-muted/60 transition cursor-pointer"
+                              }
+                              onClick={() => setSelectedRun(reset.run_number)}
+                            >
+                              <td className="px-4 py-2 border-b whitespace-nowrap font-medium">
+                                {reset.reset_date}
+                              </td>
+                              <td className="px-4 py-2 border-b whitespace-nowrap">
+                                {reset.run_number}
+                              </td>
+                              <td className="px-4 py-2 border-b whitespace-nowrap capitalize">
+                                {reset.reset_type.charAt(0).toUpperCase() +
+                                  reset.reset_type.slice(1)}
+                              </td>
+                              <td className="px-4 py-2 border-b text-right">
+                                {!isInitial && (
+                                  <Dialog>
+                                    <DialogTrigger asChild>
+                                      <button
+                                        className="p-1 rounded hover:bg-destructive/10 focus:outline-none"
+                                        title="Delete Reset"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <TrashIcon />
+                                      </button>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                      <DialogHeader>
+                                        <DialogTitle>Delete Reset</DialogTitle>
+                                        <DialogDescription>
+                                          Are you sure you want to delete this
+                                          reset? This will recalculate all GDD
+                                          values and runs after this date.
+                                        </DialogDescription>
+                                      </DialogHeader>
+                                      <DialogFooter>
+                                        <Button
+                                          variant="destructive"
+                                          onClick={async () => {
+                                            try {
+                                              await fetcher(
+                                                `/api/v1/gdd_models/${selectedModel.id}/resets/${reset.id}`,
+                                                { method: "DELETE" }
+                                              );
+                                              toast.success(
+                                                "Reset deleted and GDD values recalculated."
+                                              );
+                                              queryClient.invalidateQueries({
+                                                queryKey: [
+                                                  "gddResets",
+                                                  selectedModel.id,
+                                                ],
+                                              });
+                                              queryClient.invalidateQueries({
+                                                queryKey: [
+                                                  "gddValues",
+                                                  selectedModel.id,
+                                                  selectedRun,
+                                                ],
+                                              });
+                                              queryClient.invalidateQueries({
+                                                queryKey: [
+                                                  "gddModels",
+                                                  selectedLawnId,
+                                                ],
+                                              });
+                                            } catch (err: any) {
+                                              toast.error(
+                                                err.message ||
+                                                  "Failed to delete reset."
+                                              );
+                                            }
+                                          }}
+                                        >
+                                          Confirm Delete
+                                        </Button>
+                                        <DialogClose asChild>
+                                          <Button variant="ghost">
+                                            Cancel
+                                          </Button>
+                                        </DialogClose>
+                                      </DialogFooter>
+                                    </DialogContent>
+                                  </Dialog>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

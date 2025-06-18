@@ -163,3 +163,42 @@ async def get_gdd_values_for_run(
     )
     values = result.scalars().all()
     return values
+
+
+@router.delete("/{model_id}/resets/{reset_id}", status_code=status.HTTP_200_OK)
+async def delete_gdd_reset(
+    model_id: int, reset_id: int, db: AsyncSession = Depends(get_db)
+):
+    # Fetch the reset to delete
+    reset = await db.get(GDDReset, reset_id)
+    if not reset or reset.gdd_model_id != model_id:
+        raise HTTPException(status_code=404, detail="Reset not found")
+    # Prevent deleting the initial reset (earliest reset for the model)
+    result = await db.execute(
+        select(GDDReset)
+        .where(GDDReset.gdd_model_id == model_id)
+        .order_by(GDDReset.reset_date.asc())
+    )
+    resets = result.scalars().all()
+    if resets and resets[0].id == reset_id:
+        raise HTTPException(status_code=400, detail="Cannot delete the initial reset.")
+    # Delete the reset
+    await db.delete(reset)
+    await db.commit()
+    # Recalculate GDD values and threshold resets
+    model = await db.get(GDDModel, model_id)
+    if not model:
+        raise HTTPException(status_code=404, detail="GDD model not found")
+    lawn = await db.get(Lawn, model.lawn_id)
+    if not lawn:
+        raise HTTPException(status_code=404, detail="Lawn not found for GDD model.")
+
+    # Run recalculation in threadpool (sync)
+    def sync_calc():
+        with SessionLocal() as sync_session:
+            calculate_and_store_gdd_values_sync_segmented(
+                sync_session, model_id, lawn.location_id
+            )
+
+    await run_in_threadpool(sync_calc)
+    return {"message": "Reset deleted and GDD values recalculated."}
