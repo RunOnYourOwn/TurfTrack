@@ -308,6 +308,19 @@ def _update_recent_weather_for_location_sync(
                 session, location_id, date, WeatherType.forecast, data
             )
 
+        # Extra safety: Remove any forecast where a historical exists for the same date/location
+        session.execute(
+            text("""
+                DELETE FROM daily_weather f
+                USING daily_weather h
+                WHERE f.date = h.date
+                  AND f.location_id = h.location_id
+                  AND f.type = 'forecast'
+                  AND h.type = 'historical'
+            """)
+        )
+        session.commit()
+
 
 @app.task(name="update_weather_for_all_lawns", bind=True)
 def update_weather_for_all_lawns(self):

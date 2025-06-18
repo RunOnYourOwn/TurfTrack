@@ -31,7 +31,7 @@ async def upsert_daily_weather(
             DailyWeather.__table__.delete().where(
                 (DailyWeather.location_id == location_id)
                 & (DailyWeather.date == date)
-                & (DailyWeather.type == WeatherType.forecast)
+                & (DailyWeather.type == WeatherType.forecast.value)
             )
         )
         await session.commit()
