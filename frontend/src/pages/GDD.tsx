@@ -115,10 +115,14 @@ export default function GDD() {
 
   const [selectedRun, setSelectedRun] = useState<number | null>(null);
 
-  // When the sheet opens or resetHistory changes, select the most recent run by default
+  // Ensure selectedRun is always valid after resetHistory changes
   React.useEffect(() => {
     if (sheetOpen && resetHistory && resetHistory.length > 0) {
-      setSelectedRun(resetHistory[resetHistory.length - 1].run_number);
+      // If the current selectedRun is not in the new resetHistory, default to the latest run
+      const runNumbers = resetHistory.map((r: any) => r.run_number);
+      if (!selectedRun || !runNumbers.includes(selectedRun)) {
+        setSelectedRun(resetHistory[resetHistory.length - 1].run_number);
+      }
     }
   }, [sheetOpen, resetHistory]);
 
@@ -208,9 +212,19 @@ export default function GDD() {
       );
       setResetDialogOpen(false);
       // Refresh reset history and GDD values
-      queryClient.invalidateQueries({
+      await queryClient.invalidateQueries({
         queryKey: ["gddResets", selectedModel.id],
       });
+      await queryClient.invalidateQueries({
+        queryKey: ["gddValues", selectedModel.id],
+      });
+      // After reset history is updated, set selectedRun to the latest run
+      // Use a timeout to ensure state is updated after query refetch
+      setTimeout(() => {
+        if (resetHistory && resetHistory.length > 0) {
+          setSelectedRun(resetHistory[resetHistory.length - 1].run_number);
+        }
+      }, 100);
       queryClient.invalidateQueries({
         queryKey: ["gddModels", selectedLawnId],
       });

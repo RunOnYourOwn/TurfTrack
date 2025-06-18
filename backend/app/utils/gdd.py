@@ -203,6 +203,11 @@ def calculate_and_store_gdd_values_sync_segmented(
         .order_by(GDDReset.reset_date.asc())
         .all()
     )
+    # Reassign run_number sequentially by date
+    for idx, reset in enumerate(resets):
+        reset.run_number = idx + 1
+    session.commit()
+
     values_to_insert = []
     for i, reset in enumerate(resets):
         run_number = reset.run_number
@@ -228,7 +233,10 @@ def calculate_and_store_gdd_values_sync_segmented(
                 else None
             )
             if daily_gdd is not None:
-                cumulative = daily_gdd if j == 0 else cumulative + daily_gdd
+                if j == 0:
+                    cumulative = 0.0  # Reset cumulative to 0 on reset date
+                else:
+                    cumulative += daily_gdd
             values_to_insert.append(
                 GDDValue(
                     gdd_model_id=gdd_model_id,
