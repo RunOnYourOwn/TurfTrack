@@ -32,6 +32,17 @@ import {
 } from "@/components/ui/sheet";
 import { useState } from "react";
 import { format } from "date-fns";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+  ReferenceLine,
+  Legend,
+} from "recharts";
 
 export default function GDD() {
   const queryClient = useQueryClient();
@@ -102,6 +113,32 @@ export default function GDD() {
   );
   const [resetSubmitting, setResetSubmitting] = useState(false);
   const [resetErrorMsg, setResetErrorMsg] = useState<string | null>(null);
+
+  const [selectedRun, setSelectedRun] = useState<number | null>(null);
+
+  // When the sheet opens or resetHistory changes, select the most recent run by default
+  React.useEffect(() => {
+    if (sheetOpen && resetHistory && resetHistory.length > 0) {
+      setSelectedRun(resetHistory[resetHistory.length - 1].run_number);
+    }
+  }, [sheetOpen, resetHistory]);
+
+  // Fetch GDD values for the selected run
+  const {
+    data: gddValues,
+    isLoading: gddValuesLoading,
+    error: gddValuesError,
+  } = useQuery({
+    queryKey: ["gddValues", selectedModel?.id, selectedRun],
+    queryFn: () =>
+      selectedModel?.id && selectedRun != null
+        ? fetcher(
+            `/api/v1/gdd_models/${selectedModel.id}/runs/${selectedRun}/values`
+          )
+        : Promise.resolve([]),
+    enabled: !!selectedModel && selectedRun != null,
+    staleTime: 5 * 60 * 1000,
+  });
 
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value, type, checked } = e.target;
@@ -437,7 +474,11 @@ export default function GDD() {
       </Card>
       {/* GDD Model Details Drawer */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="right" className="w-[480px] max-w-full">
+        <SheetContent
+          side="right"
+          className="!w-[500] !max-w-none"
+          style={{ width: 500, maxWidth: "none" }}
+        >
           <SheetHeader>
             <SheetTitle>GDD Model Details</SheetTitle>
             <SheetDescription>
@@ -465,10 +506,90 @@ export default function GDD() {
                   <dd>{selectedModel.reset_on_threshold ? "Yes" : "No"}</dd>
                 </dl>
               </section>
-              <section>
-                <h3 className="text-lg font-semibold mb-2">Analytics</h3>
-                <div className="text-muted-foreground text-center">
-                  [GDD Value Graph coming soon]
+              <section className="bg-muted/50 rounded-lg p-4 shadow">
+                <h3 className="text-lg font-semibold mb-2">Graph</h3>
+                <div className="min-h-[220px] flex items-center justify-center">
+                  {gddValuesLoading ? (
+                    <span className="text-muted-foreground">
+                      Loading GDD values...
+                    </span>
+                  ) : gddValuesError ? (
+                    <span className="text-red-500">
+                      Error loading GDD values
+                    </span>
+                  ) : !gddValues || gddValues.length === 0 ? (
+                    <span className="text-muted-foreground">
+                      No GDD values for this run.
+                    </span>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <LineChart
+                        data={gddValues}
+                        margin={{ top: 16, right: 24, left: 0, bottom: 8 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                        <XAxis
+                          dataKey="date"
+                          tick={{ fontSize: 12, fill: "#6b7280" }}
+                          axisLine={false}
+                          tickLine={false}
+                          tickCount={6}
+                          interval="preserveStartEnd"
+                        />
+                        <YAxis
+                          tick={{ fontSize: 12, fill: "#6b7280" }}
+                          axisLine={false}
+                          tickLine={false}
+                          tickCount={6}
+                          domain={[
+                            0,
+                            (dataMax: number) =>
+                              selectedModel?.threshold
+                                ? Math.max(
+                                    dataMax,
+                                    selectedModel.threshold * 1.1
+                                  )
+                                : dataMax,
+                          ]}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            fontSize: 13,
+                            borderRadius: 8,
+                            background: "#fff",
+                            border: "1px solid #e5e7eb",
+                            color: "#111",
+                          }}
+                          labelStyle={{ color: "#2563eb", fontWeight: 500 }}
+                          formatter={(value: any) => value.toFixed(2)}
+                          labelFormatter={(v) => `Date: ${v}`}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="cumulative_gdd"
+                          stroke="#2563eb"
+                          strokeWidth={2}
+                          dot={false}
+                          name="Cumulative GDD"
+                        />
+                        {selectedModel?.threshold && (
+                          <ReferenceLine
+                            y={selectedModel.threshold}
+                            stroke="#ef4444"
+                            strokeDasharray="6 3"
+                            ifOverflow="visible"
+                            label={{
+                              value: "Threshold",
+                              position: "top",
+                              fill: "#ef4444",
+                              fontSize: 12,
+                              fontWeight: 600,
+                            }}
+                          />
+                        )}
+                      </LineChart>
+                    </ResponsiveContainer>
+                  )}
                 </div>
               </section>
               <section className="bg-muted/50 rounded-lg p-4 shadow">
@@ -575,10 +696,14 @@ export default function GDD() {
                           <tr
                             key={reset.id}
                             className={
-                              idx % 2 === 0
-                                ? "bg-white hover:bg-muted/60 transition"
-                                : "bg-muted/30 hover:bg-muted/60 transition"
+                              (reset.run_number === selectedRun
+                                ? "bg-blue-100 dark:bg-blue-900/40" // highlight selected
+                                : idx % 2 === 0
+                                ? "bg-white"
+                                : "bg-muted/30") +
+                              " hover:bg-muted/60 transition cursor-pointer"
                             }
+                            onClick={() => setSelectedRun(reset.run_number)}
                           >
                             <td className="px-4 py-2 border-b whitespace-nowrap font-medium">
                               {reset.reset_date}

@@ -82,21 +82,21 @@ services:
     restart: unless-stopped
 
   # Flower for monitoring Celery tasks (optional)
-  flower:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    command: celery --broker=redis://redis:6379/0 -A app.celery_app flower --port=5555
-    ports:
-      - "5555:5555"
-    volumes:
-      - ./backend:/app
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-    depends_on:
-      - redis
-      - celery_worker
-    restart: unless-stopped
+  # flower:
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile
+  #   command: celery --broker=redis://redis:6379/0 -A app.celery_app flower --port=5555
+  #   ports:
+  #     - "5555:5555"
+  #   volumes:
+  #     - ./backend:/app
+  #   environment:
+  #     - REDIS_URL=redis://redis:6379/0
+  #   depends_on:
+  #     - redis
+  #     - celery_worker
+  #   restart: unless-stopped
 
   api:
     build:
