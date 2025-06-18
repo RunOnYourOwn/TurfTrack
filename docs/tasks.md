@@ -32,13 +32,13 @@
 
 ### GDD Calculations
 
-- [ ] Implement GDD calculation service (in progress)
-- [ ] Create GDD prediction models (in progress)
-- [ ] Set up GDD data collection and storage tasks
-- [ ] Implement GDD history and forecast tracking
-- [ ] Add GDD model management (create, edit, delete, per lawn)
-- [ ] Add GDD data cleanup on lawn/location deletion
-- [ ] Build GDD visualization UI (cumulative line, daily bar, forecast distinction)
+- [x] Implement GDD calculation service
+- [x] Create GDD prediction models
+- [x] Set up GDD data collection and storage tasks
+- [x] Implement GDD history and forecast tracking
+- [x] Add GDD model management (create, edit, delete, per lawn)
+- [x] Add GDD data cleanup on lawn/location deletion
+- [x] Build GDD visualization UI (cumulative line, daily bar, forecast distinction)
 - [ ] Add GDD export functionality (future)
 
 ## Phase 3: Frontend Development
@@ -100,9 +100,12 @@
 - [ ] Team/company management
 - [ ] Advanced analytics
 - [ ] Integration with other weather services
+- [ ] Add GDD export functionality
+- [ ] Add 'lawn_name' and 'next_threshold_date' to GDD models API and frontend table for improved analytics and clarity
 
 ## Notes
 
+- MVP achieved: GDD models, analytics, weather sync, and task monitoring are complete and robust
 - Weather data deduplication and scheduled updates are fully implemented and tested
 - Weather data updates are now atomic and race-condition free
 - Task status tracking is implemented and ready for frontend integration

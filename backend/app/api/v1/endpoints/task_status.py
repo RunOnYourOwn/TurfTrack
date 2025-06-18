@@ -10,6 +10,8 @@ from fastapi.responses import JSONResponse
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
+# TODO: Future enhancement: Add location/lawn/model display fields to task status API responses for better context in the Task Monitor UI.
+
 
 @router.get("/", response_model=List[TaskStatusList])
 async def list_tasks(

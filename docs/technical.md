@@ -99,7 +99,7 @@
 - created_at: DateTime
 - Unique constraint on (date, location_id, type)
 
-### GDD Models
+### GDD Models (MVP Complete)
 
 - id: UUID (primary key)
 - lawn_id: UUID (foreign key)
@@ -111,6 +111,7 @@
 - reset_on_threshold: Boolean
 - created_at: DateTime
 - updated_at: DateTime
+- (Planned) API will include 'lawn_name' and 'next_threshold_date' fields for each model for analytics and clarity.
 
 ### GDD Values
 
@@ -134,6 +135,7 @@
 - CRUD for GDD models
 - Fetch all GDD values for a model (for graphing)
 - (Optional) Force recalculation endpoint
+- (Planned) GDD models API will return 'lawn_name' and 'next_threshold_date' for each model.
 
 #### Frontend/UX
 
@@ -143,6 +145,11 @@
 - Export functionality (CSV, PDF, etc.) is a future enhancement
 - Only one model shown per graph at a time
 - Recommend a modern React graphing library (e.g., Chart.js, Recharts, or Visx)
+
+## MVP Status
+
+- GDD models, analytics, weather sync, and task monitoring are complete and robust
+- System is production-ready; future enhancements are documented in tasks and technical docs
 
 ## API Endpoints
 
