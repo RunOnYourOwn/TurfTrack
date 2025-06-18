@@ -389,7 +389,7 @@ export default function Products() {
                       className="px-1 py-1 font-semibold cursor-pointer select-none"
                       onClick={() => handleSort("cost_per_lb_n")}
                     >
-                      Cost/lb N{" "}
+                      Cost/lb{" "}
                       {sortBy === "cost_per_lb_n" &&
                         (sortDir === "asc" ? (
                           <ChevronUp className="inline w-3 h-3" />

@@ -2,6 +2,7 @@ from datetime import datetime
 from sqlalchemy import String, DateTime, Float, Integer
 from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
+from sqlalchemy import Computed
 
 
 class Product(Base):
@@ -31,6 +32,9 @@ class Product(Base):
     water_insol_nitrogen: Mapped[float] = mapped_column(Float, nullable=True)
     other_water_soluble: Mapped[float] = mapped_column(Float, nullable=True)
     slowly_available_from: Mapped[str] = mapped_column(String(255), nullable=True)
+    cost_per_lb_n: Mapped[float] = mapped_column(
+        Float, Computed("cost_per_bag / weight_lbs", persisted=True), nullable=True
+    )
     last_scraped_price: Mapped[float] = mapped_column(Float, nullable=True)
     last_scraped_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
