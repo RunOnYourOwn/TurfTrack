@@ -92,8 +92,25 @@ def manual_gdd_reset_sync(
     """
     Perform a manual reset: insert a new GDDReset row for the reset date and incremented run_number.
     The recalculation function will handle value segmentation and cumulative GDD.
+    Handles edge cases: removes duplicate resets for the date, deletes all future resets, prevents manual reset before initial.
     """
     from app.models.gdd import GDDReset, ResetType
+
+    # Prevent manual reset before initial reset/start date
+    initial_reset = (
+        session.query(GDDReset)
+        .filter(GDDReset.gdd_model_id == gdd_model_id)
+        .order_by(GDDReset.reset_date.asc())
+        .first()
+    )
+    if initial_reset and reset_date < initial_reset.reset_date:
+        raise ValueError("Cannot add manual reset before initial reset/start date.")
+
+    # Remove any existing reset for this date
+    session.query(GDDReset).filter(
+        GDDReset.gdd_model_id == gdd_model_id, GDDReset.reset_date == reset_date
+    ).delete()
+    session.commit()
 
     # Find current max run_number in gdd_resets
     max_run = (
@@ -111,6 +128,12 @@ def manual_gdd_reset_sync(
         reset_type=ResetType.manual,
     )
     session.add(new_reset)
+    session.commit()
+
+    # Delete all future resets after the manual reset date
+    session.query(GDDReset).filter(
+        GDDReset.gdd_model_id == gdd_model_id, GDDReset.reset_date > reset_date
+    ).delete()
     session.commit()
     return 1
 
@@ -191,6 +214,9 @@ def calculate_and_store_gdd_values_sync_segmented(
                     new_resets.append(new_reset)
                 cumulative = 0.0  # Reset cumulative for new run
         session.commit()
+    else:
+        # If not reset_on_threshold, do not insert any threshold resets after the latest manual reset
+        pass  # No-op: all future GDD values will be assigned to the latest run
 
     # Remove all existing GDD values for this model (for full recalculation)
     session.query(GDDValue).filter(GDDValue.gdd_model_id == gdd_model_id).delete()
