@@ -25,6 +25,7 @@ class ResetType(enum.Enum):
     manual = "manual"
     threshold = "threshold"
     initial = "initial"
+    application = "application"
 
 
 class GDDModel(Base):

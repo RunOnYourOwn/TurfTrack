@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from app.core.database import get_db
+from sqlalchemy import func
+from app.core.database import get_db, SessionLocal
 from app.models.application import Application
 from app.schemas.application import (
     ApplicationCreate,
@@ -9,6 +10,8 @@ from app.schemas.application import (
     ApplicationRead,
 )
 from typing import List, Optional
+from app.models.gdd import GDDReset, ResetType, GDDModel
+from app.utils.gdd import calculate_and_store_gdd_values_sync_segmented
 
 router = APIRouter(prefix="/applications", tags=["applications"])
 
@@ -43,12 +46,56 @@ async def create_application(
     for lawn_id in lawn_ids:
         app_data = application_in.dict(exclude_unset=True, exclude={"lawn_ids"})
         app_data["lawn_id"] = lawn_id
+        if app_data.get("tied_gdd_model_id") in (0, "0"):
+            app_data["tied_gdd_model_id"] = None
         db_app = Application(**app_data)
         db.add(db_app)
         created_apps.append(db_app)
     await db.commit()
     for db_app in created_apps:
         await db.refresh(db_app)
+        # GDD reset and recalculation logic
+        if db_app.tied_gdd_model_id:
+            # Remove any existing reset for this date
+            await db.execute(
+                GDDReset.__table__.delete().where(
+                    (GDDReset.gdd_model_id == db_app.tied_gdd_model_id)
+                    & (GDDReset.reset_date == db_app.application_date)
+                )
+            )
+            await db.commit()
+            # Find current max run_number in gdd_resets
+            result = await db.execute(
+                select(func.max(GDDReset.run_number)).where(
+                    GDDReset.gdd_model_id == db_app.tied_gdd_model_id
+                )
+            )
+            max_run = result.scalar() or 0
+            next_run = max_run + 1
+            # Insert new application reset
+            reset = GDDReset(
+                gdd_model_id=db_app.tied_gdd_model_id,
+                reset_date=db_app.application_date,
+                run_number=next_run,
+                reset_type=ResetType.application,
+            )
+            db.add(reset)
+            await db.commit()
+            # Delete all future resets after the application reset date
+            await db.execute(
+                GDDReset.__table__.delete().where(
+                    (GDDReset.gdd_model_id == db_app.tied_gdd_model_id)
+                    & (GDDReset.reset_date > db_app.application_date)
+                )
+            )
+            await db.commit()
+            # Recalculate GDD values (sync version, so use a sync session)
+            with SessionLocal() as sync_session:
+                gdd_model = sync_session.get(GDDModel, db_app.tied_gdd_model_id)
+                if gdd_model:
+                    calculate_and_store_gdd_values_sync_segmented(
+                        sync_session, gdd_model.id, gdd_model.lawn.location_id
+                    )
     return created_apps
 
 
