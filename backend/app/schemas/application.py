@@ -39,6 +39,7 @@ class ApplicationBase(BaseModel):
 
 class ApplicationCreate(ApplicationBase):
     lawn_ids: Optional[List[int]] = None  # For batch apply
+    lawn_id: Optional[int] = None  # Make this optional!
 
 
 class ApplicationUpdate(BaseModel):
@@ -55,6 +56,18 @@ class ApplicationRead(ApplicationBase):
     id: int
     created_at: datetime
     updated_at: datetime
+    n_applied: Optional[float] = None
+    p_applied: Optional[float] = None
+    k_applied: Optional[float] = None
+    ca_applied: Optional[float] = None
+    mg_applied: Optional[float] = None
+    s_applied: Optional[float] = None
+    fe_applied: Optional[float] = None
+    cu_applied: Optional[float] = None
+    mn_applied: Optional[float] = None
+    b_applied: Optional[float] = None
+    zn_applied: Optional[float] = None
+    cost_applied: Optional[float] = None
 
     class Config:
         orm_mode = True

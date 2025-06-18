@@ -33,7 +33,22 @@ class Product(Base):
     other_water_soluble: Mapped[float] = mapped_column(Float, nullable=True)
     slowly_available_from: Mapped[str] = mapped_column(String(255), nullable=True)
     cost_per_lb_n: Mapped[float] = mapped_column(
-        Float, Computed("cost_per_bag / weight_lbs", persisted=True), nullable=True
+        Float,
+        Computed(
+            "CASE WHEN n_pct IS NOT NULL AND n_pct != 0 AND weight_lbs IS NOT NULL AND weight_lbs != 0 "
+            "THEN cost_per_bag / ((n_pct / 100) * weight_lbs) ELSE NULL END",
+            persisted=True,
+        ),
+        nullable=True,
+    )
+    cost_per_lb: Mapped[float] = mapped_column(
+        Float,
+        Computed(
+            "CASE WHEN weight_lbs IS NOT NULL AND weight_lbs != 0 "
+            "THEN cost_per_bag / weight_lbs ELSE NULL END",
+            persisted=True,
+        ),
+        nullable=True,
     )
     last_scraped_price: Mapped[float] = mapped_column(Float, nullable=True)
     last_scraped_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)

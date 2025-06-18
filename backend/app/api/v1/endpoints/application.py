@@ -12,6 +12,9 @@ from app.schemas.application import (
 from typing import List, Optional
 from app.models.gdd import GDDReset, ResetType, GDDModel
 from app.utils.gdd import calculate_and_store_gdd_values_sync_segmented
+from app.utils.application import calculate_application_results
+from app.models.lawn import Lawn
+from app.models.product import Product
 
 router = APIRouter(prefix="/applications", tags=["applications"])
 
@@ -41,7 +44,13 @@ async def get_application(application_id: int, db: AsyncSession = Depends(get_db
 async def create_application(
     application_in: ApplicationCreate, db: AsyncSession = Depends(get_db)
 ):
-    lawn_ids = application_in.lawn_ids or [application_in.lawn_id]
+    lawn_ids = application_in.lawn_ids or (
+        [application_in.lawn_id] if application_in.lawn_id is not None else None
+    )
+    if not lawn_ids:
+        raise HTTPException(
+            status_code=400, detail="Must provide at least one lawn_id or lawn_ids"
+        )
     created_apps = []
     for lawn_id in lawn_ids:
         app_data = application_in.dict(exclude_unset=True, exclude={"lawn_ids"})
@@ -49,6 +58,13 @@ async def create_application(
         if app_data.get("tied_gdd_model_id") in (0, "0"):
             app_data["tied_gdd_model_id"] = None
         db_app = Application(**app_data)
+        # Fetch product and lawn for calculations
+        product = await db.get(Product, db_app.product_id)
+        lawn = await db.get(Lawn, db_app.lawn_id)
+        if product and lawn:
+            results = calculate_application_results(db_app, product, lawn)
+            for k, v in results.items():
+                setattr(db_app, k, v)
         db.add(db_app)
         created_apps.append(db_app)
     await db.commit()
@@ -108,6 +124,13 @@ async def update_application(
         raise HTTPException(status_code=404, detail="Application not found")
     for field, value in update.dict(exclude_unset=True).items():
         setattr(db_app, field, value)
+    # Fetch product and lawn for calculations
+    product = await db.get(Product, db_app.product_id)
+    lawn = await db.get(Lawn, db_app.lawn_id)
+    if product and lawn:
+        results = calculate_application_results(db_app, product, lawn)
+        for k, v in results.items():
+            setattr(db_app, k, v)
     await db.commit()
     await db.refresh(db_app)
     return db_app

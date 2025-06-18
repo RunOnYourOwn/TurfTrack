@@ -385,18 +385,6 @@ export default function Products() {
                           <ChevronDown className="inline w-3 h-3" />
                         ))}
                     </th>
-                    <th
-                      className="px-1 py-1 font-semibold cursor-pointer select-none"
-                      onClick={() => handleSort("cost_per_lb_n")}
-                    >
-                      Cost/lb{" "}
-                      {sortBy === "cost_per_lb_n" &&
-                        (sortDir === "asc" ? (
-                          <ChevronUp className="inline w-3 h-3" />
-                        ) : (
-                          <ChevronDown className="inline w-3 h-3" />
-                        ))}
-                    </th>
                     <th className="px-1 py-1 font-semibold">Product Link</th>
                     <th className="px-1 py-1 font-semibold">Edit</th>
                     <th className="px-1 py-1 font-semibold">Delete</th>
@@ -451,18 +439,6 @@ export default function Products() {
                         {product.cost_per_bag !== null &&
                         product.cost_per_bag !== undefined
                           ? Number(product.cost_per_bag).toLocaleString(
-                              undefined,
-                              {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              }
-                            )
-                          : ""}
-                      </td>
-                      <td className="px-1 py-1 border-b text-right">
-                        {product.cost_per_lb_n !== null &&
-                        product.cost_per_lb_n !== undefined
-                          ? Number(product.cost_per_lb_n).toLocaleString(
                               undefined,
                               {
                                 minimumFractionDigits: 2,

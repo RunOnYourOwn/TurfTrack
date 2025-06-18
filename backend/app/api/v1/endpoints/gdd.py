@@ -71,6 +71,12 @@ async def list_gdd_models(lawn_id: int, db: AsyncSession = Depends(get_db)):
     return result.scalars().all()
 
 
+@router.get("/", response_model=List[GDDModelRead])
+async def list_all_gdd_models(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(GDDModel))
+    return result.scalars().all()
+
+
 @router.get("/{model_id}", response_model=GDDModelWithValues)
 async def get_gdd_model_with_values(model_id: int, db: AsyncSession = Depends(get_db)):
     result = await db.execute(

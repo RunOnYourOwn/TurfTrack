@@ -47,6 +47,18 @@ class Application(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
+    cost_applied: Mapped[float | None] = mapped_column(Float, nullable=True)
+    n_applied: Mapped[float | None] = mapped_column(Float, nullable=True)
+    p_applied: Mapped[float | None] = mapped_column(Float, nullable=True)
+    k_applied: Mapped[float | None] = mapped_column(Float, nullable=True)
+    ca_applied: Mapped[float | None] = mapped_column(Float, nullable=True)
+    mg_applied: Mapped[float | None] = mapped_column(Float, nullable=True)
+    s_applied: Mapped[float | None] = mapped_column(Float, nullable=True)
+    fe_applied: Mapped[float | None] = mapped_column(Float, nullable=True)
+    cu_applied: Mapped[float | None] = mapped_column(Float, nullable=True)
+    mn_applied: Mapped[float | None] = mapped_column(Float, nullable=True)
+    b_applied: Mapped[float | None] = mapped_column(Float, nullable=True)
+    zn_applied: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     lawn = relationship("Lawn")
     product = relationship("Product")

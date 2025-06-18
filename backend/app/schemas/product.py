@@ -90,6 +90,7 @@ class ProductUpdate(BaseModel):
 class ProductRead(ProductBase):
     id: int
     cost_per_lb_n: Optional[float] = None
+    cost_per_lb: Optional[float] = None
     created_at: datetime
     updated_at: datetime
 
