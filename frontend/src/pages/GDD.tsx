@@ -21,6 +21,17 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  Sheet,
+  SheetTrigger,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetClose,
+} from "@/components/ui/sheet";
+import { useState } from "react";
+import { format } from "date-fns";
 
 export default function GDD() {
   const queryClient = useQueryClient();
@@ -66,6 +77,31 @@ export default function GDD() {
     enabled: !!selectedLawnId,
     staleTime: 5 * 60 * 1000,
   });
+
+  const [selectedModel, setSelectedModel] = React.useState<any | null>(null);
+  const [sheetOpen, setSheetOpen] = React.useState(false);
+
+  // Fetch reset history for the selected model
+  const {
+    data: resetHistory,
+    isLoading: resetLoading,
+    error: resetError,
+  } = useQuery({
+    queryKey: ["gddResets", selectedModel?.id],
+    queryFn: () =>
+      selectedModel?.id
+        ? fetcher(`/api/v1/gdd_models/${selectedModel.id}/resets`)
+        : Promise.resolve([]),
+    enabled: !!selectedModel,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [resetDate, setResetDate] = useState(() =>
+    format(new Date(), "yyyy-MM-dd")
+  );
+  const [resetSubmitting, setResetSubmitting] = useState(false);
+  const [resetErrorMsg, setResetErrorMsg] = useState<string | null>(null);
 
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value, type, checked } = e.target;
@@ -117,6 +153,32 @@ export default function GDD() {
       setFormError(err.message || "Failed to add GDD model");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleManualReset() {
+    if (!selectedModel) return;
+    setResetSubmitting(true);
+    setResetErrorMsg(null);
+    try {
+      await fetcher(
+        `/api/v1/gdd_models/${selectedModel.id}/reset?reset_date=${resetDate}`,
+        {
+          method: "POST",
+        }
+      );
+      setResetDialogOpen(false);
+      // Refresh reset history and GDD values
+      queryClient.invalidateQueries({
+        queryKey: ["gddResets", selectedModel.id],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["gddModels", selectedLawnId],
+      });
+    } catch (err: any) {
+      setResetErrorMsg(err.message || "Failed to reset GDD model");
+    } finally {
+      setResetSubmitting(false);
     }
   }
 
@@ -333,9 +395,13 @@ export default function GDD() {
                       key={model.id}
                       className={
                         idx % 2 === 0
-                          ? "bg-white hover:bg-muted/60 transition"
-                          : "bg-muted/30 hover:bg-muted/60 transition"
+                          ? "bg-white hover:bg-muted/60 transition cursor-pointer"
+                          : "bg-muted/30 hover:bg-muted/60 transition cursor-pointer"
                       }
+                      onClick={() => {
+                        setSelectedModel(model);
+                        setSheetOpen(true);
+                      }}
                     >
                       <td className="px-4 py-2 border-b whitespace-nowrap">
                         {model.name}
@@ -369,6 +435,177 @@ export default function GDD() {
           )}
         </CardContent>
       </Card>
+      {/* GDD Model Details Drawer */}
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent side="right" className="w-[480px] max-w-full">
+          <SheetHeader>
+            <SheetTitle>GDD Model Details</SheetTitle>
+            <SheetDescription>
+              {selectedModel
+                ? `Details for ${selectedModel.name}`
+                : "No model selected."}
+            </SheetDescription>
+          </SheetHeader>
+          {selectedModel && (
+            <div className="mt-4 space-y-6">
+              <section className="bg-muted/50 rounded-lg p-4 shadow">
+                <h3 className="text-lg font-semibold mb-2">Model Info</h3>
+                <dl className="grid grid-cols-2 gap-x-2 gap-y-1">
+                  <dt className="text-muted-foreground">Name</dt>
+                  <dd className="font-medium">{selectedModel.name}</dd>
+                  <dt className="text-muted-foreground">Base Temp</dt>
+                  <dd>{selectedModel.base_temp}</dd>
+                  <dt className="text-muted-foreground">Unit</dt>
+                  <dd>{selectedModel.unit}</dd>
+                  <dt className="text-muted-foreground">Start Date</dt>
+                  <dd>{selectedModel.start_date}</dd>
+                  <dt className="text-muted-foreground">Threshold</dt>
+                  <dd>{selectedModel.threshold}</dd>
+                  <dt className="text-muted-foreground">Reset on Threshold</dt>
+                  <dd>{selectedModel.reset_on_threshold ? "Yes" : "No"}</dd>
+                </dl>
+              </section>
+              <section>
+                <h3 className="text-lg font-semibold mb-2">Analytics</h3>
+                <div className="text-muted-foreground text-center">
+                  [GDD Value Graph coming soon]
+                </div>
+              </section>
+              <section className="bg-muted/50 rounded-lg p-4 shadow">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-lg font-semibold">Reset History</h3>
+                  <Dialog
+                    open={resetDialogOpen}
+                    onOpenChange={setResetDialogOpen}
+                  >
+                    <DialogTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!selectedModel}
+                      >
+                        Manual Reset
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Manual Reset</DialogTitle>
+                        <DialogDescription>
+                          Select a date to manually reset this GDD model. This
+                          will start a new run from the selected date.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          handleManualReset();
+                        }}
+                        className="space-y-4"
+                      >
+                        <div>
+                          <label
+                            htmlFor="reset_date"
+                            className="block text-sm font-medium mb-1"
+                          >
+                            Reset Date
+                          </label>
+                          <Input
+                            id="reset_date"
+                            name="reset_date"
+                            type="date"
+                            value={resetDate}
+                            onChange={(e) => setResetDate(e.target.value)}
+                            required
+                            disabled={resetSubmitting}
+                          />
+                        </div>
+                        {resetErrorMsg && (
+                          <div className="text-red-500 text-sm">
+                            {resetErrorMsg}
+                          </div>
+                        )}
+                        <DialogFooter>
+                          <Button type="submit" disabled={resetSubmitting}>
+                            {resetSubmitting ? "Resetting..." : "Confirm Reset"}
+                          </Button>
+                          <DialogClose asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              disabled={resetSubmitting}
+                            >
+                              Cancel
+                            </Button>
+                          </DialogClose>
+                        </DialogFooter>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+                {resetLoading ? (
+                  <div className="text-muted-foreground text-center">
+                    Loading reset history...
+                  </div>
+                ) : resetError ? (
+                  <div className="text-red-500 text-center">
+                    Error loading reset history
+                  </div>
+                ) : !resetHistory || resetHistory.length === 0 ? (
+                  <div className="text-muted-foreground text-center">
+                    No resets found for this model.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full border-separate border-spacing-0 rounded-lg overflow-hidden bg-background text-sm">
+                      <thead>
+                        <tr className="bg-muted">
+                          <th className="px-4 py-2 text-left font-semibold">
+                            Date
+                          </th>
+                          <th className="px-4 py-2 text-left font-semibold">
+                            Run #
+                          </th>
+                          <th className="px-4 py-2 text-left font-semibold">
+                            Type
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {resetHistory.map((reset: any, idx: number) => (
+                          <tr
+                            key={reset.id}
+                            className={
+                              idx % 2 === 0
+                                ? "bg-white hover:bg-muted/60 transition"
+                                : "bg-muted/30 hover:bg-muted/60 transition"
+                            }
+                          >
+                            <td className="px-4 py-2 border-b whitespace-nowrap font-medium">
+                              {reset.reset_date}
+                            </td>
+                            <td className="px-4 py-2 border-b whitespace-nowrap">
+                              {reset.run_number}
+                            </td>
+                            <td className="px-4 py-2 border-b whitespace-nowrap capitalize">
+                              {reset.reset_type.charAt(0).toUpperCase() +
+                                reset.reset_type.slice(1)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </section>
+            </div>
+          )}
+          <SheetClose asChild>
+            <Button className="absolute top-4 right-4" variant="ghost">
+              Close
+            </Button>
+          </SheetClose>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
