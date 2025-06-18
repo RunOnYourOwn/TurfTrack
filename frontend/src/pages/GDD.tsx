@@ -256,6 +256,20 @@ export default function GDD() {
     }
   }
 
+  // Calculate maxY and ticks for even Y axis spacing
+  const maxY = selectedModel?.threshold
+    ? Math.max(
+        gddValues && gddValues.length > 0
+          ? Math.max(...gddValues.map((v: any) => v.cumulative_gdd || 0))
+          : 0,
+        selectedModel.threshold * 1.1
+      )
+    : gddValues && gddValues.length > 0
+    ? Math.max(...gddValues.map((v: any) => v.cumulative_gdd || 0))
+    : 100;
+  const step = Math.ceil(maxY / 5 / 10) * 10 || 10; // round to nearest 10
+  const ticks = Array.from({ length: 6 }, (_, i) => i * step);
+
   return (
     <div className="p-4 min-h-screen bg-muted/50 w-full">
       <Card className="min-h-[400px] w-full shadow-lg">
@@ -577,17 +591,11 @@ export default function GDD() {
                           tick={{ fontSize: 12, fill: "#6b7280" }}
                           axisLine={false}
                           tickLine={false}
-                          tickCount={6}
-                          domain={[
-                            0,
-                            (dataMax: number) =>
-                              selectedModel?.threshold
-                                ? Math.max(
-                                    dataMax,
-                                    selectedModel.threshold * 1.1
-                                  )
-                                : dataMax,
-                          ]}
+                          domain={[0, maxY]}
+                          tickFormatter={(value) =>
+                            Number(value).toLocaleString()
+                          }
+                          ticks={ticks}
                         />
                         <Tooltip
                           contentStyle={{
