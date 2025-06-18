@@ -7,6 +7,7 @@ import Applications from "@/pages/Applications";
 import Reports from "@/pages/Reports";
 import TaskMonitor from "@/pages/TaskMonitor";
 import GDD from "@/pages/GDD";
+import { Toaster } from "@/components/ui/sonner";
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
           <Route path="/gdd" element={<GDD />} />
         </Routes>
       </AppLayout>
+      <Toaster richColors position="top-right" />
     </BrowserRouter>
   );
 }

@@ -23,7 +23,6 @@ import {
 import { Input } from "@/components/ui/input";
 import {
   Sheet,
-  SheetTrigger,
   SheetContent,
   SheetHeader,
   SheetTitle,
@@ -41,8 +40,8 @@ import {
   ResponsiveContainer,
   CartesianGrid,
   ReferenceLine,
-  Legend,
 } from "recharts";
+import { toast } from "sonner";
 
 export default function GDD() {
   const queryClient = useQueryClient();
@@ -140,6 +139,9 @@ export default function GDD() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value, type, checked } = e.target;
     setForm((f) => ({
@@ -216,6 +218,27 @@ export default function GDD() {
       setResetErrorMsg(err.message || "Failed to reset GDD model");
     } finally {
       setResetSubmitting(false);
+    }
+  }
+
+  async function handleDeleteModel() {
+    if (!selectedModel) return;
+    setDeleting(true);
+    try {
+      await fetcher(`/api/v1/gdd_models/${selectedModel.id}`, {
+        method: "DELETE",
+      });
+      setSheetOpen(false);
+      setSelectedModel(null);
+      queryClient.invalidateQueries({
+        queryKey: ["gddModels", selectedLawnId],
+      });
+      toast.success(`GDD model '${selectedModel.name}' was deleted.`);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete GDD model.");
+    } finally {
+      setDeleting(false);
+      setDeleteDialogOpen(false);
     }
   }
 
@@ -724,6 +747,39 @@ export default function GDD() {
               </section>
             </div>
           )}
+          <div className="mt-6 flex justify-end">
+            <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="destructive" disabled={deleting} size="sm">
+                  Delete Model
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Delete GDD Model</DialogTitle>
+                  <DialogDescription>
+                    Are you sure you want to delete the model{" "}
+                    <span className="font-semibold">{selectedModel?.name}</span>
+                    ? This action cannot be undone.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button
+                    variant="destructive"
+                    onClick={handleDeleteModel}
+                    disabled={deleting}
+                  >
+                    {deleting ? "Deleting..." : "Confirm Delete"}
+                  </Button>
+                  <DialogClose asChild>
+                    <Button variant="ghost" disabled={deleting}>
+                      Cancel
+                    </Button>
+                  </DialogClose>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
           <SheetClose asChild>
             <Button className="absolute top-4 right-4" variant="ghost">
               Close
