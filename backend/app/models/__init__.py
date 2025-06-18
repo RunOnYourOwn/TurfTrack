@@ -5,3 +5,4 @@ from .daily_weather import DailyWeather
 from .task_status import TaskStatus, TaskStatusEnum
 from .gdd import GDDModel, GDDValue
 from .product import Product
+from .application import Application, ApplicationStatus, ApplicationUnit
