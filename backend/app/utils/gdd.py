@@ -184,7 +184,6 @@ def calculate_and_store_gdd_values_sync_segmented(
         values_to_insert = []
         threshold_reset_needed = False
         threshold_reset_date = None
-        is_first_day = True
 
         for w in weather_rows:
             # Get parameters effective for this date
@@ -206,21 +205,24 @@ def calculate_and_store_gdd_values_sync_segmented(
             else:
                 daily_gdd = max(0.0, ((tmax + tmin) / 2) - date_params["base_temp"])
 
-                # On the first day of a run, we start with cumulative = 0
-                # On subsequent days, we add the daily_gdd to cumulative
-                if not is_first_day:
+                # If this is the start of a threshold reset run, cumulative stays at 0
+                if resets[i].reset_type == ResetType.threshold and w.date == start_date:
+                    cumulative = 0
+                else:
+                    # Add daily_gdd to cumulative
                     cumulative += daily_gdd
 
-                # Check for threshold reset
-                # Only check on the last/current run and if we haven't already found a reset point
-                if (
-                    date_params["reset_on_threshold"]
-                    and cumulative >= date_params["threshold"]
-                    and i == len(resets) - 1
-                    and not threshold_reset_needed
-                ):
-                    threshold_reset_needed = True
-                    threshold_reset_date = w.date
+                    # Check for threshold reset
+                    # Only check on the last/current run and if we haven't already found a reset point
+                    if (
+                        date_params["reset_on_threshold"]
+                        and cumulative >= date_params["threshold"]
+                        and i == len(resets) - 1
+                        and not threshold_reset_needed
+                    ):
+                        threshold_reset_needed = True
+                        # Set reset date to the next day
+                        threshold_reset_date = w.date + datetime.timedelta(days=1)
 
             values_to_insert.append(
                 GDDValue(
@@ -233,14 +235,6 @@ def calculate_and_store_gdd_values_sync_segmented(
                 )
             )
 
-            # After the first day, start including daily_gdd in cumulative
-            if is_first_day:
-                is_first_day = False
-                if daily_gdd is not None:
-                    cumulative = (
-                        daily_gdd  # Set initial cumulative to first day's daily_gdd
-                    )
-
         # Bulk insert values for this segment
         if values_to_insert:
             session.bulk_save_objects(values_to_insert)
@@ -251,7 +245,7 @@ def calculate_and_store_gdd_values_sync_segmented(
             # Add a new threshold reset
             new_reset = GDDReset(
                 gdd_model_id=gdd_model_id,
-                reset_date=threshold_reset_date,
+                reset_date=threshold_reset_date,  # This is now the day after crossing
                 run_number=run_number + 1,
                 reset_type=ResetType.threshold,
             )
