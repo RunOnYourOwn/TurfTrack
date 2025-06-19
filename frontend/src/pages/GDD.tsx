@@ -289,8 +289,8 @@ export default function GDD() {
   const ticks = Array.from({ length: 6 }, (_, i) => i * step);
 
   return (
-    <div className="p-4 min-h-screen bg-muted/50 w-full">
-      <Card className="min-h-[400px] w-full shadow-lg">
+    <div className="p-4 min-h-screen bg-muted/50 dark:bg-gray-950 w-full">
+      <Card className="min-h-[400px] w-full shadow-lg bg-white dark:bg-gray-900 text-black dark:text-white">
         <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
           <CardTitle className="text-2xl font-bold">GDD Models</CardTitle>
           <Dialog open={open} onOpenChange={setOpen}>
@@ -476,7 +476,7 @@ export default function GDD() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full border-separate border-spacing-0 rounded-lg overflow-hidden bg-background">
+              <table className="min-w-full border-separate border-spacing-0 rounded-lg overflow-hidden bg-background dark:bg-gray-900 text-black dark:text-white">
                 <thead>
                   <tr className="bg-muted">
                     <th className="px-4 py-2 text-left font-semibold">Name</th>
@@ -501,8 +501,8 @@ export default function GDD() {
                       key={model.id}
                       className={
                         idx % 2 === 0
-                          ? "bg-white hover:bg-muted/60 transition cursor-pointer"
-                          : "bg-muted/30 hover:bg-muted/60 transition cursor-pointer"
+                          ? "bg-white dark:bg-gray-800 hover:bg-muted/60 dark:hover:bg-gray-700 transition cursor-pointer"
+                          : "bg-muted/30 dark:bg-gray-900 hover:bg-muted/60 dark:hover:bg-gray-800 transition cursor-pointer"
                       }
                       onClick={() => {
                         setSelectedModel(model);
@@ -558,7 +558,7 @@ export default function GDD() {
           </SheetHeader>
           {selectedModel && (
             <div className="mt-4 space-y-6">
-              <section className="bg-muted/50 rounded-lg p-4 shadow">
+              <section className="bg-muted/50 dark:bg-gray-900 rounded-lg p-4 shadow">
                 <h3 className="text-lg font-semibold mb-2">Model Info</h3>
                 <dl className="grid grid-cols-2 gap-x-2 gap-y-1">
                   <dt className="text-muted-foreground">Name</dt>
@@ -575,7 +575,7 @@ export default function GDD() {
                   <dd>{selectedModel.reset_on_threshold ? "Yes" : "No"}</dd>
                 </dl>
               </section>
-              <section className="bg-muted/50 rounded-lg p-4 shadow">
+              <section className="bg-muted/50 dark:bg-gray-900 rounded-lg p-4 shadow">
                 <h3 className="text-lg font-semibold mb-2">Graph</h3>
                 <div className="min-h-[220px] flex items-center justify-center">
                   {gddValuesLoading ? (
@@ -655,7 +655,7 @@ export default function GDD() {
                   )}
                 </div>
               </section>
-              <section className="bg-muted/50 rounded-lg p-4 shadow">
+              <section className="bg-muted/50 dark:bg-gray-900 rounded-lg p-4 shadow">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-lg font-semibold">Reset History</h3>
                   <Dialog
@@ -740,7 +740,7 @@ export default function GDD() {
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="min-w-full border-separate border-spacing-0 rounded-lg overflow-hidden bg-background text-sm">
+                    <table className="min-w-full border-separate border-spacing-0 rounded-lg overflow-hidden bg-background dark:bg-gray-900 text-sm text-black dark:text-white">
                       <thead>
                         <tr className="bg-muted">
                           <th className="px-4 py-2 text-left font-semibold">
@@ -767,9 +767,9 @@ export default function GDD() {
                                 (reset.run_number === selectedRun
                                   ? "bg-blue-100 dark:bg-blue-900/40"
                                   : idx % 2 === 0
-                                  ? "bg-white"
-                                  : "bg-muted/30") +
-                                " hover:bg-muted/60 transition cursor-pointer"
+                                  ? "bg-white dark:bg-gray-800"
+                                  : "bg-muted/30 dark:bg-gray-900") +
+                                " hover:bg-muted/60 dark:hover:bg-gray-800 transition cursor-pointer"
                               }
                               onClick={() => setSelectedRun(reset.run_number)}
                             >

@@ -21,6 +21,7 @@ import {
   ChevronRightIcon,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
+import { useTheme } from "../../ThemeProvider";
 
 const navigationItems = [
   {
@@ -84,6 +85,19 @@ function CollapseButton() {
   );
 }
 
+function DarkModeToggle() {
+  const { theme, setTheme } = useTheme();
+  return (
+    <button
+      onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+      className="mt-4 px-3 py-2 rounded bg-muted hover:bg-accent text-xs"
+      aria-label="Toggle dark mode"
+    >
+      {theme === "dark" ? "🌙 Dark" : "☀️ Light"}
+    </button>
+  );
+}
+
 export function AppSidebar() {
   const location = useLocation();
   const { state } = useSidebar();
@@ -142,6 +156,7 @@ export function AppSidebar() {
             </span>
           )}
         </SidebarFooter>
+        <DarkModeToggle />
       </div>
     </Sidebar>
   );

@@ -1,0 +1,200 @@
+/* Dark mode overrides for react-date-range */
+.dark .rdrCalendarWrapper,
+.dark .rdrDateDisplay,
+.dark .rdrMonthAndYearWrapper,
+.dark .rdrMonth,
+.dark .rdrWeekDays,
+.dark .rdrDays,
+.dark .rdrDay,
+.dark .rdrDayNumber span,
+.dark .rdrDateDisplayItem,
+.dark .rdrDateDisplayItem input,
+.dark .rdrMonthAndYearPickers select {
+  background: #0f1116 !important;
+  color: #fff !important;
+  border-color: #1f2937 !important;
+}
+
+.dark .rdrCalendarWrapper {
+  background: #0f1116 !important;
+  border: 1px solid #1f2937 !important;
+  padding: 0 !important;
+}
+
+.dark .rdrMonthsVertical {
+  background: #0f1116 !important;
+}
+
+.dark .rdrMonth {
+  padding: 0 !important;
+  background: #0f1116 !important;
+}
+
+.dark .rdrDateRangeWrapper {
+  background: #0f1116 !important;
+  border-radius: 6px !important;
+  overflow: hidden !important;
+}
+
+.dark .rdrDateDisplay {
+  margin: 0 !important;
+  background: #0f1116 !important;
+  border-bottom: 1px solid #1f2937 !important;
+}
+
+.dark .rdrDateDisplayItem {
+  background: #1a1e24 !important;
+  border: 1px solid #1f2937 !important;
+  color: #fff !important;
+  border-radius: 4px !important;
+}
+
+.dark .rdrDateDisplayItem input {
+  background: transparent !important;
+  color: #fff !important;
+}
+
+.dark .rdrDateDisplayItemActive {
+  border-color: #2563eb !important;
+}
+
+.dark .rdrMonthAndYearWrapper {
+  background: #0f1116 !important;
+  border-bottom: 1px solid #1f2937 !important;
+  padding-top: 8px !important;
+}
+
+.dark .rdrMonthAndYearPickers {
+  color: #fff !important;
+}
+
+.dark .rdrMonthAndYearPickers select {
+  background: #1a1e24 !important;
+  color: #fff !important;
+  border: 1px solid #1f2937 !important;
+}
+
+.dark .rdrWeekDays {
+  background: #0f1116 !important;
+}
+
+.dark .rdrWeekDay {
+  color: #9ca3af !important;
+  font-weight: 500 !important;
+}
+
+.dark .rdrDays {
+  background: #0f1116 !important;
+}
+
+.dark .rdrDay {
+  background: transparent !important;
+  color: #fff !important;
+  margin: 0 !important;
+  border: none !important;
+}
+
+.dark .rdrDayNumber {
+  color: #fff !important;
+}
+
+.dark .rdrDayToday .rdrDayNumber span {
+  border-color: #2563eb !important;
+  color: #2563eb !important;
+}
+
+.dark .rdrDayToday .rdrDayNumber span:after {
+  background: #2563eb !important;
+}
+
+.dark .rdrDaySelected,
+.dark .rdrDayStartPreview,
+.dark .rdrDayEndPreview,
+.dark .rdrDayInPreview,
+.dark .rdrDayStartPreview.rdrDayEndPreview {
+  background: #2563eb !important;
+  color: #fff !important;
+}
+
+.dark .rdrDaySelected .rdrDayNumber span,
+.dark .rdrDayStartPreview .rdrDayNumber span,
+.dark .rdrDayEndPreview .rdrDayNumber span,
+.dark .rdrDayInPreview .rdrDayNumber span {
+  color: #fff !important;
+}
+
+.dark .rdrDayDisabled {
+  background: transparent !important;
+}
+
+.dark .rdrDayDisabled span {
+  color: #4b5563 !important;
+}
+
+.dark .rdrDayHovered {
+  background: #1f2937 !important;
+}
+
+.dark .rdrDayHovered .rdrDayNumber span {
+  color: #fff !important;
+}
+
+.dark .rdrMonthPicker,
+.dark .rdrYearPicker {
+  background: #1a1e24 !important;
+  color: #fff !important;
+  border: 1px solid #1f2937 !important;
+}
+
+.dark .rdrMonthPicker option,
+.dark .rdrYearPicker option {
+  background: #1a1e24 !important;
+  color: #fff !important;
+}
+
+.dark .rdrNextPrevButton {
+  background: #1a1e24 !important;
+  border: 1px solid #1f2937 !important;
+  color: #fff !important;
+  margin: 0 8px !important;
+}
+
+.dark .rdrNextPrevButton:hover {
+  background: #1f2937 !important;
+}
+
+.dark .rdrPprevButton i,
+.dark .rdrNextButton i {
+  border-color: #fff !important;
+}
+
+.dark .rdrMonthName {
+  color: #9ca3af !important;
+  font-weight: 500 !important;
+  padding: 8px !important;
+}
+
+/* Fix any remaining gaps */
+.dark .rdrDefinedRangesWrapper {
+  background: #0f1116 !important;
+  border-right: 1px solid #1f2937 !important;
+}
+
+.dark .rdrStaticRange,
+.dark .rdrStaticRangeLabel {
+  background: #0f1116 !important;
+  color: #fff !important;
+}
+
+.dark .rdrInputRangeInput {
+  background: #1a1e24 !important;
+  color: #fff !important;
+  border: 1px solid #1f2937 !important;
+}
+
+.dark .rdrDayStartOfMonth .rdrDayInPreview,
+.dark .rdrDayStartOfMonth .rdrDayEndPreview,
+.dark .rdrDayStartOfWeek .rdrDayInPreview,
+.dark .rdrDayStartOfWeek .rdrDayEndPreview {
+  border-radius: 0 !important;
+}

@@ -42,16 +42,16 @@ export default function TaskMonitor() {
   if (error) return <div>Error loading task status</div>;
 
   return (
-    <div className="container mx-auto p-4">
+    <div className="p-4 min-h-screen bg-muted/50 dark:bg-gray-950 w-full flex flex-col">
       <h1 className="text-2xl font-bold mb-4">Task Monitor</h1>
-      <Card>
+      <Card className="bg-white dark:bg-gray-900 text-black dark:text-white w-full max-w-none shadow-lg flex flex-col">
         <CardHeader>
           <CardTitle>Task Status</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
+          <Table className="bg-background dark:bg-gray-900 text-black dark:text-white">
             <TableHeader>
-              <TableRow>
+              <TableRow className="bg-muted dark:bg-gray-800">
                 <TableHead>ID</TableHead>
                 <TableHead>Task ID</TableHead>
                 <TableHead>Task Name</TableHead>
@@ -63,8 +63,16 @@ export default function TaskMonitor() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data?.map((task) => (
-                <TableRow key={task.id}>
+              {data?.map((task, idx) => (
+                <TableRow
+                  key={task.id}
+                  className={
+                    (idx % 2 === 0
+                      ? "bg-white dark:bg-gray-800"
+                      : "bg-muted/30 dark:bg-gray-900") +
+                    " border-b last:border-b-0 group hover:bg-muted/50 dark:hover:bg-gray-800"
+                  }
+                >
                   <TableCell>{task.id}</TableCell>
                   <TableCell>{task.task_id}</TableCell>
                   <TableCell>{task.task_name}</TableCell>

@@ -23,6 +23,7 @@ import {
 } from "date-fns";
 import "react-date-range/dist/styles.css";
 import "react-date-range/dist/theme/default.css";
+import "../react-date-range-dark.css";
 
 // List of available nutrients (field, label)
 const NUTRIENTS = [
@@ -39,6 +40,99 @@ const NUTRIENTS = [
   { field: "zn_applied", label: "Zn" },
   { field: "cost_applied", label: "Cost" },
 ];
+
+// React Select shared styles
+const selectStyles = {
+  control: (base: any) => ({
+    ...base,
+    minHeight: 36,
+    borderRadius: 6,
+    backgroundColor: "var(--background)",
+    borderColor: "var(--border)",
+    boxShadow: "none",
+    "&:hover": {
+      borderColor: "var(--border)",
+    },
+  }),
+  menu: (base: any) => ({
+    ...base,
+    backgroundColor: "var(--background)",
+    border: "1px solid var(--border)",
+    boxShadow:
+      "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
+  }),
+  option: (base: any, state: any) => ({
+    ...base,
+    backgroundColor: state.isSelected
+      ? "var(--muted)"
+      : state.isFocused
+      ? "var(--muted)"
+      : "var(--background)",
+    color: "var(--foreground)",
+    "&:active": {
+      backgroundColor: "var(--muted)",
+    },
+    "&:hover": {
+      backgroundColor: "var(--muted)",
+    },
+  }),
+  singleValue: (base: any) => ({
+    ...base,
+    color: "var(--foreground)",
+  }),
+  input: (base: any) => ({
+    ...base,
+    color: "var(--foreground)",
+  }),
+  placeholder: (base: any) => ({
+    ...base,
+    color: "var(--muted-foreground)",
+  }),
+  multiValue: (base: any) => ({
+    ...base,
+    backgroundColor: "var(--muted)",
+    borderRadius: 4,
+  }),
+  multiValueLabel: (base: any) => ({
+    ...base,
+    color: "var(--foreground)",
+    fontWeight: 500,
+  }),
+  multiValueRemove: (base: any) => ({
+    ...base,
+    color: "var(--foreground)",
+    ":hover": {
+      backgroundColor: "var(--destructive)",
+      color: "var(--destructive-foreground)",
+    },
+  }),
+  valueContainer: (base: any) => ({
+    ...base,
+    padding: "2px 8px",
+  }),
+  dropdownIndicator: (base: any) => ({
+    ...base,
+    color: "var(--muted-foreground)",
+    ":hover": {
+      color: "var(--foreground)",
+    },
+  }),
+  clearIndicator: (base: any) => ({
+    ...base,
+    color: "var(--muted-foreground)",
+    ":hover": {
+      color: "var(--foreground)",
+    },
+  }),
+  container: (base: any) => ({
+    ...base,
+    backgroundColor: "var(--background)",
+  }),
+  indicatorSeparator: (base: any) => ({
+    ...base,
+    backgroundColor: "var(--border)",
+  }),
+};
 
 export default function Reports() {
   // State for filters
@@ -163,8 +257,8 @@ export default function Reports() {
   }
 
   return (
-    <div className="min-h-screen bg-muted/50 w-full py-4">
-      <div className="px-6 flex flex-col gap-6 w-full pl-4">
+    <div className="min-h-screen bg-muted/50 dark:bg-gray-950 w-full py-4">
+      <div className="px-6 flex flex-col gap-6 w-full pl-4 dark:text-white">
         <h1 className="text-2xl font-bold mb-2">Reports</h1>
         {/* Filters */}
         <div className="flex flex-wrap gap-4 mb-6 items-end">
@@ -191,18 +285,7 @@ export default function Reports() {
               onChange={(opt: any) => setSelectedLawn(opt?.value)}
               isDisabled={lawnsLoading}
               classNamePrefix="react-select"
-              styles={{
-                control: (base) => ({
-                  ...base,
-                  minHeight: 36,
-                  borderRadius: 6,
-                }),
-                valueContainer: (base) => ({ ...base, padding: "2px 6px" }),
-                option: (base, state) => ({
-                  ...base,
-                  fontWeight: state.isSelected ? 600 : 400,
-                }),
-              }}
+              styles={selectStyles}
               menuPlacement="auto"
               placeholder="Select lawn..."
             />
@@ -231,24 +314,7 @@ export default function Reports() {
                 setSelectedNutrients(opts.map((o: any) => o.value))
               }
               classNamePrefix="react-select"
-              styles={{
-                control: (base) => ({
-                  ...base,
-                  minHeight: 36,
-                  borderRadius: 6,
-                }),
-                valueContainer: (base) => ({ ...base, padding: "2px 6px" }),
-                multiValue: (base) => ({
-                  ...base,
-                  borderRadius: 4,
-                  background: "#f3f4f6",
-                }),
-                multiValueLabel: (base) => ({ ...base, fontWeight: 500 }),
-                option: (base, state) => ({
-                  ...base,
-                  fontWeight: state.isSelected ? 600 : 400,
-                }),
-              }}
+              styles={selectStyles}
               menuPlacement="auto"
               placeholder="Select nutrients..."
             />
@@ -257,7 +323,7 @@ export default function Reports() {
         {/* Chart */}
         <div className="mb-8 w-full">
           <h2 className="text-lg font-semibold mb-2">Cumulative Over Time</h2>
-          <div className="bg-white rounded shadow p-4 w-full">
+          <div className="bg-white dark:bg-gray-900 rounded shadow p-4 w-full text-black dark:text-white">
             <ResponsiveContainer width="100%" height={400}>
               <LineChart
                 data={chartData}
@@ -309,8 +375,8 @@ export default function Reports() {
         {/* Table */}
         <div className="w-full">
           <h2 className="text-lg font-semibold mb-2">Application History</h2>
-          <div className="overflow-x-auto w-full">
-            <table className="min-w-full border-separate border-spacing-0 rounded-lg overflow-hidden bg-background text-xs">
+          <div className="overflow-x-auto w-full bg-white dark:bg-gray-900 rounded shadow">
+            <table className="min-w-full border-separate border-spacing-0 rounded-lg overflow-hidden bg-background dark:bg-gray-900 text-xs text-black dark:text-white">
               <thead>
                 <tr className="bg-muted">
                   <th className="px-2 py-1 text-left font-semibold">Date</th>
@@ -326,10 +392,15 @@ export default function Reports() {
               </thead>
               <tbody>
                 {Array.isArray(filteredApps) &&
-                  filteredApps.map((app: any) => (
+                  filteredApps.map((app: any, idx: number) => (
                     <tr
                       key={app.id}
-                      className="border-b last:border-b-0 group hover:bg-muted/50"
+                      className={
+                        "border-b last:border-b-0 group hover:bg-muted/50 dark:hover:bg-gray-800 " +
+                        (idx % 2 === 0
+                          ? "bg-white dark:bg-gray-800"
+                          : "bg-muted/30 dark:bg-gray-900")
+                      }
                     >
                       <td className="px-2 py-1 border-b whitespace-nowrap font-medium">
                         {app.application_date}
@@ -448,14 +519,14 @@ function DateRangePopover({
     <div className="relative" ref={ref}>
       <button
         type="button"
-        className="border rounded px-2 py-1 w-full text-left bg-white min-h-[36px]"
+        className="border rounded px-2 py-1 w-full text-left bg-white dark:bg-gray-800 text-black dark:text-white border-gray-300 dark:border-gray-700 min-h-[36px]"
         onClick={() => setOpen((o) => !o)}
       >
         {display}
       </button>
       {open && (
         <div
-          className="absolute z-50 mt-2 bg-white border rounded shadow-lg p-4"
+          className="absolute z-50 mt-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded shadow-lg p-4 text-black dark:text-white"
           style={{ minWidth: 320 }}
         >
           <DateRange
@@ -484,7 +555,7 @@ function DateRangePopover({
               <button
                 key={preset.label}
                 type="button"
-                className="text-xs px-2 py-1 rounded border bg-muted hover:bg-muted/70"
+                className="text-xs px-2 py-1 rounded border bg-muted dark:bg-gray-700 dark:text-white hover:bg-muted/70 dark:hover:bg-gray-600 border-gray-300 dark:border-gray-700"
                 onClick={() => {
                   if (preset.range) setDateRange(preset.range);
                   else setDateRange(null);
@@ -497,7 +568,7 @@ function DateRangePopover({
             {(dateRange?.start || dateRange?.end) && (
               <button
                 type="button"
-                className="text-xs px-2 py-1 rounded border bg-muted hover:bg-muted/70"
+                className="text-xs px-2 py-1 rounded border bg-muted dark:bg-gray-700 dark:text-white hover:bg-muted/70 dark:hover:bg-gray-600 border-gray-300 dark:border-gray-700"
                 onClick={() => {
                   setDateRange(null);
                   setOpen(false);

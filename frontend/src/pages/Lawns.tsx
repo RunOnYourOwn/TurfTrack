@@ -256,8 +256,8 @@ export default function Lawns() {
   }
 
   return (
-    <div className="p-4 min-h-screen bg-muted/50 w-full">
-      <Card className="min-h-[500px] w-full shadow-lg">
+    <div className="p-4 min-h-screen bg-muted/50 dark:bg-gray-950 w-full">
+      <Card className="min-h-[500px] w-full shadow-lg bg-white dark:bg-gray-900 text-black dark:text-white">
         <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
           <CardTitle className="text-2xl font-bold">Lawns</CardTitle>
           <Dialog open={open} onOpenChange={setOpen}>
@@ -490,7 +490,7 @@ export default function Lawns() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full border-separate border-spacing-0 rounded-lg overflow-hidden bg-background">
+              <table className="min-w-full border-separate border-spacing-0 rounded-lg overflow-hidden bg-background dark:bg-gray-900 text-black dark:text-white">
                 <thead>
                   <tr className="bg-muted">
                     <th className="px-4 py-2 text-left font-semibold">Name</th>
@@ -516,8 +516,8 @@ export default function Lawns() {
                       key={lawn.id}
                       className={
                         idx % 2 === 0
-                          ? "bg-white hover:bg-muted/60 transition"
-                          : "bg-muted/30 hover:bg-muted/60 transition"
+                          ? "bg-white dark:bg-gray-800 hover:bg-muted/60 dark:hover:bg-gray-700 transition"
+                          : "bg-muted/30 dark:bg-gray-900 hover:bg-muted/60 dark:hover:bg-gray-800 transition"
                       }
                     >
                       <td className="px-4 py-2 border-b whitespace-nowrap">

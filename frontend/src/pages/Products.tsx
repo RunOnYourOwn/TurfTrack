@@ -140,8 +140,8 @@ export default function Products() {
   }
 
   return (
-    <div className="p-4 min-h-screen bg-muted/50 w-full">
-      <Card className="min-h-[500px] w-full shadow-lg">
+    <div className="p-4 min-h-screen bg-muted/50 dark:bg-gray-950 w-full">
+      <Card className="min-h-[500px] w-full shadow-lg bg-white dark:bg-gray-900 text-black dark:text-white">
         <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
           <CardTitle className="text-2xl font-bold">Products</CardTitle>
           <div className="flex items-center gap-2">
@@ -214,7 +214,7 @@ export default function Products() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full border-separate border-spacing-0 rounded-lg overflow-hidden bg-background text-xs">
+              <table className="min-w-full border-separate border-spacing-0 rounded-lg overflow-hidden bg-background dark:bg-gray-900 text-xs text-black dark:text-white">
                 <thead>
                   <tr className="bg-muted">
                     <th
@@ -391,10 +391,15 @@ export default function Products() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredProducts.map((product: any) => (
+                  {filteredProducts.map((product: any, idx: number) => (
                     <tr
                       key={product.id}
-                      className="border-b last:border-b-0 group hover:bg-muted/50"
+                      className={
+                        "border-b last:border-b-0 group hover:bg-muted/50 dark:hover:bg-gray-800 " +
+                        (idx % 2 === 0
+                          ? "bg-white dark:bg-gray-800"
+                          : "bg-muted/30 dark:bg-gray-900")
+                      }
                     >
                       <td className="px-2 py-1 border-b whitespace-nowrap font-medium">
                         {product.name}
