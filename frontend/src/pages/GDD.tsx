@@ -833,7 +833,7 @@ export default function GDD() {
                           - {reset.reset_type}
                         </div>
                       </div>
-                      {reset.reset_type === "Manual" && (
+                      {reset.reset_type === "manual" && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();

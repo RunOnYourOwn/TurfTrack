@@ -211,8 +211,8 @@ def calculate_and_store_gdd_values_sync_segmented(
             else:
                 daily_gdd = max(0.0, ((tmax + tmin) / 2) - date_params["base_temp"])
 
-                # If this is the start of a threshold reset run, cumulative stays at 0
-                if resets[i].reset_type == ResetType.threshold and w.date == start_date:
+                # Always start a new run with cumulative at 0
+                if w.date == start_date:
                     cumulative = 0
                 else:
                     # Add daily_gdd to cumulative
