@@ -4,17 +4,19 @@ import { AppSidebar } from "@/components/ui/AppSidebar";
 
 function SidebarWithContent({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen bg-muted/50 dark:bg-gray-900">
-      <AppSidebar />
-      <main
-        className="min-w-0"
-        style={{
-          width: "calc(100vw - var(--sidebar-width))",
-          maxWidth: "none",
-        }}
-      >
-        {children}
-      </main>
+    <div className="fixed inset-0 bg-background">
+      <div className="flex min-h-screen">
+        <AppSidebar />
+        <main
+          className="min-w-0 bg-background"
+          style={{
+            width: "calc(100vw - var(--sidebar-width))",
+            maxWidth: "none",
+          }}
+        >
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

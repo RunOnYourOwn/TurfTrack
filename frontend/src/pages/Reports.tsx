@@ -257,7 +257,7 @@ export default function Reports() {
   }
 
   return (
-    <div className="min-h-screen bg-muted/50 dark:bg-gray-950 w-full py-4">
+    <div className="min-h-screen bg-background w-full py-4">
       <div className="px-6 flex flex-col gap-6 w-full pl-4 dark:text-white">
         <h1 className="text-2xl font-bold mb-2">Reports</h1>
         {/* Filters */}

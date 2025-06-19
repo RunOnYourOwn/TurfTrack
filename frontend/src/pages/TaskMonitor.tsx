@@ -42,7 +42,7 @@ export default function TaskMonitor() {
   if (error) return <div>Error loading task status</div>;
 
   return (
-    <div className="p-4 min-h-screen bg-muted/50 dark:bg-gray-950 w-full flex flex-col">
+    <div className="p-4 min-h-screen bg-background w-full flex flex-col">
       <h1 className="text-2xl font-bold mb-4">Task Monitor</h1>
       <Card className="bg-white dark:bg-gray-900 text-black dark:text-white w-full max-w-none shadow-lg flex flex-col">
         <CardHeader>

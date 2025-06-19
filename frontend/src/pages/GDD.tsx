@@ -289,7 +289,7 @@ export default function GDD() {
   const ticks = Array.from({ length: 6 }, (_, i) => i * step);
 
   return (
-    <div className="p-4 min-h-screen bg-muted/50 dark:bg-gray-950 w-full">
+    <div className="p-4 min-h-screen bg-background w-full">
       <Card className="min-h-[400px] w-full shadow-lg bg-white dark:bg-gray-900 text-black dark:text-white">
         <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
           <CardTitle className="text-2xl font-bold">GDD Models</CardTitle>
