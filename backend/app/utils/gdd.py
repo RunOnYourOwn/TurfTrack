@@ -94,8 +94,14 @@ def manual_gdd_reset_sync(
     Perform a manual reset: insert a new GDDReset row for the reset date and incremented run_number.
     The recalculation function will handle value segmentation and cumulative GDD.
     Handles edge cases: removes duplicate resets for the date, deletes all future resets, prevents manual reset before initial.
+
+    Note: reset_date is the date you want the new run to START ON. The actual reset will be created
+    for the day before, so that the new run starts on the requested date.
     """
     from app.models.gdd import GDDReset, ResetType
+
+    # Adjust reset date to be the after before (since reset date marks the end of previous run)
+    actual_reset_date = reset_date + datetime.timedelta(days=1)
 
     # Prevent manual reset before initial reset/start date
     initial_reset = (
@@ -104,12 +110,12 @@ def manual_gdd_reset_sync(
         .order_by(GDDReset.reset_date.asc())
         .first()
     )
-    if initial_reset and reset_date < initial_reset.reset_date:
+    if initial_reset and actual_reset_date < initial_reset.reset_date:
         raise ValueError("Cannot add manual reset before initial reset/start date.")
 
     # Remove any existing reset for this date
     session.query(GDDReset).filter(
-        GDDReset.gdd_model_id == gdd_model_id, GDDReset.reset_date == reset_date
+        GDDReset.gdd_model_id == gdd_model_id, GDDReset.reset_date == actual_reset_date
     ).delete()
     session.commit()
 
@@ -124,7 +130,7 @@ def manual_gdd_reset_sync(
     # Insert new manual reset
     new_reset = GDDReset(
         gdd_model_id=gdd_model_id,
-        reset_date=reset_date,
+        reset_date=actual_reset_date,
         run_number=next_run,
         reset_type=ResetType.manual,
     )
@@ -133,7 +139,7 @@ def manual_gdd_reset_sync(
 
     # Delete all future resets after the manual reset date
     session.query(GDDReset).filter(
-        GDDReset.gdd_model_id == gdd_model_id, GDDReset.reset_date > reset_date
+        GDDReset.gdd_model_id == gdd_model_id, GDDReset.reset_date > actual_reset_date
     ).delete()
     session.commit()
     return 1
