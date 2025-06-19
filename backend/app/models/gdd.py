@@ -56,6 +56,32 @@ class GDDModel(Base):
     resets = relationship(
         "GDDReset", back_populates="gdd_model", cascade="all, delete-orphan"
     )
+    parameter_history = relationship(
+        "GDDModelParameters", back_populates="gdd_model", cascade="all, delete-orphan"
+    )
+
+
+class GDDModelParameters(Base):
+    __tablename__ = "gdd_model_parameters"
+    __table_args__ = (
+        UniqueConstraint(
+            "gdd_model_id", "effective_from", name="uix_gdd_model_effective_from"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    gdd_model_id: Mapped[int] = mapped_column(
+        ForeignKey("gdd_models.id"), nullable=False
+    )
+    base_temp: Mapped[float] = mapped_column(Float, nullable=False)
+    threshold: Mapped[float] = mapped_column(Float, nullable=False)
+    reset_on_threshold: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    effective_from: Mapped[Date] = mapped_column(Date, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow
+    )
+
+    gdd_model = relationship("GDDModel", back_populates="parameter_history")
 
 
 class GDDValue(Base):

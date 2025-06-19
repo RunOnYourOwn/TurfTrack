@@ -43,6 +43,85 @@ const STATUS_OPTIONS = [
   { value: "skipped", label: "Skipped" },
 ];
 
+const selectStyles = {
+  control: (base: any) => ({
+    ...base,
+    minHeight: 36,
+    borderRadius: 6,
+    backgroundColor: "var(--card)",
+    borderColor: "var(--border)",
+    boxShadow: "none",
+    "&:hover": {
+      borderColor: "var(--border)",
+    },
+  }),
+  menu: (base: any) => ({
+    ...base,
+    backgroundColor: "var(--card)",
+    border: "1px solid var(--border)",
+    boxShadow:
+      "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
+  }),
+  option: (base: any, state: any) => ({
+    ...base,
+    backgroundColor: state.isSelected
+      ? "var(--accent)"
+      : state.isFocused
+      ? "var(--accent)"
+      : "var(--card)",
+    color:
+      state.isSelected || state.isFocused
+        ? "var(--accent-foreground)"
+        : "var(--foreground)",
+    "&:active": {
+      backgroundColor: "var(--accent)",
+    },
+  }),
+  singleValue: (base: any) => ({
+    ...base,
+    color: "var(--foreground)",
+  }),
+  multiValue: (base: any) => ({
+    ...base,
+    backgroundColor: "var(--accent)",
+    color: "var(--accent-foreground)",
+  }),
+  multiValueLabel: (base: any) => ({
+    ...base,
+    color: "var(--accent-foreground)",
+  }),
+  multiValueRemove: (base: any) => ({
+    ...base,
+    color: "var(--accent-foreground)",
+    "&:hover": {
+      backgroundColor: "var(--destructive)",
+      color: "var(--destructive-foreground)",
+    },
+  }),
+  input: (base: any) => ({
+    ...base,
+    color: "var(--foreground)",
+  }),
+  placeholder: (base: any) => ({
+    ...base,
+    color: "var(--muted-foreground)",
+  }),
+  clearIndicator: (base: any) => ({
+    ...base,
+    color: "var(--muted-foreground)",
+    "&:hover": {
+      color: "var(--foreground)",
+    },
+  }),
+  dropdownIndicator: (base: any) => ({
+    ...base,
+    color: "var(--muted-foreground)",
+    "&:hover": {
+      color: "var(--foreground)",
+    },
+  }),
+};
+
 export function ApplicationForm({
   initialValues = {},
   mode,
@@ -159,20 +238,7 @@ export function ApplicationForm({
             }}
             isDisabled={submitting}
             classNamePrefix="react-select"
-            styles={{
-              control: (base) => ({ ...base, minHeight: 36, borderRadius: 6 }),
-              valueContainer: (base) => ({ ...base, padding: "2px 6px" }),
-              multiValue: (base) => ({
-                ...base,
-                borderRadius: 4,
-                background: "#f3f4f6",
-              }),
-              multiValueLabel: (base) => ({ ...base, fontWeight: 500 }),
-              option: (base, state) => ({
-                ...base,
-                fontWeight: state.isSelected ? 600 : 400,
-              }),
-            }}
+            styles={selectStyles}
             placeholder="Select lawn(s)..."
             required={(form.lawn_ids || []).length === 0}
           />
@@ -184,25 +250,35 @@ export function ApplicationForm({
           >
             Product
           </label>
-          <select
-            id="product_id"
+          <Select
+            inputId="product_id"
             name="product_id"
-            value={form.product_id}
-            onChange={handleChange}
-            required
-            disabled={submitting}
-            className="w-full border rounded px-2 py-1"
-          >
-            <option value="">Select product</option>
-            {products
+            options={products
               .slice()
               .sort((a, b) => a.name.localeCompare(b.name))
-              .map((product) => (
-                <option key={product.id} value={product.id}>
-                  {product.name}
-                </option>
-              ))}
-          </select>
+              .map((product) => ({
+                value: product.id,
+                label: product.name,
+              }))}
+            value={
+              form.product_id
+                ? products
+                    .filter((p) => p.id === form.product_id)
+                    .map((p) => ({ value: p.id, label: p.name }))
+                : null
+            }
+            onChange={(opt) => {
+              setForm((f) => ({
+                ...f,
+                product_id: opt?.value ?? "",
+              }));
+            }}
+            isDisabled={submitting}
+            classNamePrefix="react-select"
+            styles={selectStyles}
+            placeholder="Select product..."
+            required
+          />
         </div>
         <div>
           <label
@@ -241,101 +317,108 @@ export function ApplicationForm({
           <label className="block text-sm font-medium mb-1" htmlFor="unit">
             Unit
           </label>
-          <select
-            id="unit"
+          <Select
+            inputId="unit"
             name="unit"
-            value={form.unit}
-            onChange={handleChange}
+            options={UNIT_OPTIONS}
+            value={UNIT_OPTIONS.find((opt) => opt.value === form.unit)}
+            onChange={(opt) => {
+              setForm((f) => ({
+                ...f,
+                unit: opt?.value ?? "lbs",
+              }));
+            }}
+            isDisabled={submitting}
+            classNamePrefix="react-select"
+            styles={selectStyles}
             required
-            disabled={submitting}
-            className="w-full border rounded px-2 py-1"
-          >
-            {UNIT_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+          />
         </div>
         <div>
           <label className="block text-sm font-medium mb-1" htmlFor="status">
             Status
           </label>
-          <select
-            id="status"
+          <Select
+            inputId="status"
             name="status"
-            value={form.status}
-            onChange={handleChange}
+            options={STATUS_OPTIONS}
+            value={STATUS_OPTIONS.find((opt) => opt.value === form.status)}
+            onChange={(opt) => {
+              setForm((f) => ({
+                ...f,
+                status: opt?.value ?? "planned",
+              }));
+            }}
+            isDisabled={submitting}
+            classNamePrefix="react-select"
+            styles={selectStyles}
             required
-            disabled={submitting}
-            className="w-full border rounded px-2 py-1"
-          >
-            {STATUS_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="col-span-2">
-          <label className="block text-sm font-medium mb-1" htmlFor="notes">
-            Notes
-          </label>
-          <textarea
-            id="notes"
-            name="notes"
-            value={form.notes}
-            onChange={handleChange}
-            disabled={submitting}
-            className="w-full border rounded px-2 py-1 min-h-[60px]"
           />
         </div>
-        <div className="col-span-2">
+      </div>
+      <div>
+        <label className="block text-sm font-medium mb-1" htmlFor="notes">
+          Notes
+        </label>
+        <textarea
+          id="notes"
+          name="notes"
+          value={form.notes}
+          onChange={handleChange}
+          disabled={submitting}
+          className="w-full border rounded px-2 py-1 bg-card text-foreground border-border"
+          rows={3}
+        />
+      </div>
+      {form.lawn_ids?.length === 1 && (
+        <div>
           <label
             className="block text-sm font-medium mb-1"
             htmlFor="tied_gdd_model_id"
           >
             GDD Model (optional)
           </label>
-          <select
-            id="tied_gdd_model_id"
+          <Select
+            inputId="tied_gdd_model_id"
             name="tied_gdd_model_id"
-            value={form.tied_gdd_model_id}
-            onChange={handleChange}
-            disabled={submitting}
-            className="w-full border rounded px-2 py-1"
-          >
-            <option value="">None</option>
-            {gddModels.map((model) => {
-              const lawn = lawns.find((l) => l.id === model.lawn_id);
-              const label = lawn ? `${lawn.name} – ${model.name}` : model.name;
-              return (
-                <option key={model.id} value={model.id}>
-                  {label}
-                </option>
-              );
-            })}
-          </select>
+            options={[
+              { value: "", label: "None" },
+              ...gddModels
+                .filter((m) => m.lawn_id === form.lawn_ids![0])
+                .map((m) => ({ value: m.id, label: m.name })),
+            ]}
+            value={
+              form.tied_gdd_model_id
+                ? gddModels
+                    .filter((m) => m.id === form.tied_gdd_model_id)
+                    .map((m) => ({ value: m.id, label: m.name }))[0]
+                : { value: "", label: "None" }
+            }
+            onChange={(opt) => {
+              setForm((f) => ({
+                ...f,
+                tied_gdd_model_id:
+                  opt?.value === "" ? "" : Number(opt?.value) ?? "",
+              }));
+            }}
+            isDisabled={submitting}
+            classNamePrefix="react-select"
+            styles={selectStyles}
+          />
         </div>
-      </div>
+      )}
       {error && <div className="text-red-500 text-sm">{error}</div>}
-      <div className="flex gap-2 justify-end">
+      <div className="flex justify-end gap-2">
         <Button
           type="button"
-          variant="ghost"
+          variant="outline"
           onClick={onCancel}
           disabled={submitting}
         >
           Cancel
         </Button>
         <Button type="submit" disabled={submitting}>
-          {submitting
-            ? mode === "add"
-              ? "Adding..."
-              : "Saving..."
-            : mode === "add"
-            ? "Add Application"
-            : "Save Changes"}
+          {mode === "add" ? "Add Application" : "Save Changes"}
         </Button>
       </div>
     </form>

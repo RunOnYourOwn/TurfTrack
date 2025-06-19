@@ -24,6 +24,7 @@ import {
 import "react-date-range/dist/styles.css";
 import "react-date-range/dist/theme/default.css";
 import "../react-date-range-dark.css";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 // List of available nutrients (field, label)
 const NUTRIENTS = [
@@ -47,7 +48,7 @@ const selectStyles = {
     ...base,
     minHeight: 36,
     borderRadius: 6,
-    backgroundColor: "var(--background)",
+    backgroundColor: "var(--card)",
     borderColor: "var(--border)",
     boxShadow: "none",
     "&:hover": {
@@ -56,7 +57,7 @@ const selectStyles = {
   }),
   menu: (base: any) => ({
     ...base,
-    backgroundColor: "var(--background)",
+    backgroundColor: "var(--card)",
     border: "1px solid var(--border)",
     boxShadow:
       "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
@@ -64,21 +65,38 @@ const selectStyles = {
   option: (base: any, state: any) => ({
     ...base,
     backgroundColor: state.isSelected
-      ? "var(--muted)"
+      ? "var(--accent)"
       : state.isFocused
-      ? "var(--muted)"
-      : "var(--background)",
-    color: "var(--foreground)",
+      ? "var(--accent)"
+      : "var(--card)",
+    color:
+      state.isSelected || state.isFocused
+        ? "var(--accent-foreground)"
+        : "var(--foreground)",
     "&:active": {
-      backgroundColor: "var(--muted)",
-    },
-    "&:hover": {
-      backgroundColor: "var(--muted)",
+      backgroundColor: "var(--accent)",
     },
   }),
   singleValue: (base: any) => ({
     ...base,
     color: "var(--foreground)",
+  }),
+  multiValue: (base: any) => ({
+    ...base,
+    backgroundColor: "var(--accent)",
+    color: "var(--accent-foreground)",
+  }),
+  multiValueLabel: (base: any) => ({
+    ...base,
+    color: "var(--accent-foreground)",
+  }),
+  multiValueRemove: (base: any) => ({
+    ...base,
+    color: "var(--accent-foreground)",
+    "&:hover": {
+      backgroundColor: "var(--destructive)",
+      color: "var(--destructive-foreground)",
+    },
   }),
   input: (base: any) => ({
     ...base,
@@ -88,49 +106,19 @@ const selectStyles = {
     ...base,
     color: "var(--muted-foreground)",
   }),
-  multiValue: (base: any) => ({
+  clearIndicator: (base: any) => ({
     ...base,
-    backgroundColor: "var(--muted)",
-    borderRadius: 4,
-  }),
-  multiValueLabel: (base: any) => ({
-    ...base,
-    color: "var(--foreground)",
-    fontWeight: 500,
-  }),
-  multiValueRemove: (base: any) => ({
-    ...base,
-    color: "var(--foreground)",
-    ":hover": {
-      backgroundColor: "var(--destructive)",
-      color: "var(--destructive-foreground)",
+    color: "var(--muted-foreground)",
+    "&:hover": {
+      color: "var(--foreground)",
     },
-  }),
-  valueContainer: (base: any) => ({
-    ...base,
-    padding: "2px 8px",
   }),
   dropdownIndicator: (base: any) => ({
     ...base,
     color: "var(--muted-foreground)",
-    ":hover": {
+    "&:hover": {
       color: "var(--foreground)",
     },
-  }),
-  clearIndicator: (base: any) => ({
-    ...base,
-    color: "var(--muted-foreground)",
-    ":hover": {
-      color: "var(--foreground)",
-    },
-  }),
-  container: (base: any) => ({
-    ...base,
-    backgroundColor: "var(--background)",
-  }),
-  indicatorSeparator: (base: any) => ({
-    ...base,
-    backgroundColor: "var(--border)",
   }),
 };
 
@@ -257,190 +245,207 @@ export default function Reports() {
   }
 
   return (
-    <div className="min-h-screen bg-background w-full py-4">
-      <div className="px-6 flex flex-col gap-6 w-full pl-4 dark:text-white">
-        <h1 className="text-2xl font-bold mb-2">Reports</h1>
-        {/* Filters */}
-        <div className="flex flex-wrap gap-4 mb-6 items-end">
-          {/* Lawn selector (no All Lawns) */}
-          <div className="min-w-[180px] flex-1">
-            <label className="block text-sm font-medium mb-1">Lawn</label>
-            <Select
-              isSearchable
-              options={
-                Array.isArray(lawns)
-                  ? lawns.map((l: any) => ({
-                      value: String(l.id),
-                      label: l.name,
-                    }))
-                  : []
-              }
-              value={
-                Array.isArray(lawns)
-                  ? lawns
-                      .filter((l: any) => String(l.id) === selectedLawn)
-                      .map((l: any) => ({ value: String(l.id), label: l.name }))
-                  : []
-              }
-              onChange={(opt: any) => setSelectedLawn(opt?.value)}
-              isDisabled={lawnsLoading}
-              classNamePrefix="react-select"
-              styles={selectStyles}
-              menuPlacement="auto"
-              placeholder="Select lawn..."
-            />
+    <div className="p-4 min-h-screen bg-background w-full">
+      <Card className="min-h-[500px] w-full shadow-lg bg-white dark:bg-gray-900 text-black dark:text-white">
+        <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
+          <CardTitle className="text-2xl font-bold">Reports</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {/* Filters */}
+          <div className="flex flex-wrap gap-4 mb-6 items-end">
+            {/* Lawn selector */}
+            <div className="min-w-[180px] flex-1">
+              <label className="block text-sm font-medium mb-1">Lawn</label>
+              <Select
+                isSearchable
+                options={
+                  Array.isArray(lawns)
+                    ? lawns.map((l: any) => ({
+                        value: String(l.id),
+                        label: l.name,
+                      }))
+                    : []
+                }
+                value={
+                  Array.isArray(lawns)
+                    ? lawns
+                        .filter((l: any) => String(l.id) === selectedLawn)
+                        .map((l: any) => ({
+                          value: String(l.id),
+                          label: l.name,
+                        }))
+                    : []
+                }
+                onChange={(opt: any) => setSelectedLawn(opt?.value)}
+                isDisabled={lawnsLoading}
+                classNamePrefix="react-select"
+                styles={selectStyles}
+                menuPlacement="auto"
+                placeholder="Select lawn..."
+              />
+            </div>
+            {/* Date range picker */}
+            <div className="flex flex-col min-w-[260px] flex-1 relative">
+              <label className="block text-sm font-medium mb-1">
+                Date Range
+              </label>
+              <DateRangePopover
+                dateRange={dateRange}
+                setDateRange={setDateRange}
+              />
+            </div>
+            {/* Nutrient multi-select */}
+            <div className="min-w-[180px] flex-1">
+              <label className="block text-sm font-medium mb-1">
+                Nutrients
+              </label>
+              <Select
+                isMulti
+                options={NUTRIENTS.map((n) => ({
+                  value: n.field,
+                  label: n.label,
+                }))}
+                value={NUTRIENTS.filter((n) =>
+                  selectedNutrients.includes(n.field)
+                ).map((n) => ({ value: n.field, label: n.label }))}
+                onChange={(opts) =>
+                  setSelectedNutrients(opts.map((o: any) => o.value))
+                }
+                classNamePrefix="react-select"
+                styles={selectStyles}
+                menuPlacement="auto"
+                placeholder="Select nutrients..."
+              />
+            </div>
           </div>
-          {/* Date range picker with react-date-range */}
-          <div className="flex flex-col min-w-[260px] flex-1 relative">
-            <label className="block text-sm font-medium mb-1">Date Range</label>
-            <DateRangePopover
-              dateRange={dateRange}
-              setDateRange={setDateRange}
-            />
-          </div>
-          {/* Nutrient multi-select using react-select */}
-          <div className="min-w-[180px] flex-1">
-            <label className="block text-sm font-medium mb-1">Nutrients</label>
-            <Select
-              isMulti
-              options={NUTRIENTS.map((n) => ({
-                value: n.field,
-                label: n.label,
-              }))}
-              value={NUTRIENTS.filter((n) =>
-                selectedNutrients.includes(n.field)
-              ).map((n) => ({ value: n.field, label: n.label }))}
-              onChange={(opts) =>
-                setSelectedNutrients(opts.map((o: any) => o.value))
-              }
-              classNamePrefix="react-select"
-              styles={selectStyles}
-              menuPlacement="auto"
-              placeholder="Select nutrients..."
-            />
-          </div>
-        </div>
-        {/* Chart */}
-        <div className="mb-8 w-full">
-          <h2 className="text-lg font-semibold mb-2">Cumulative Over Time</h2>
-          <div className="bg-white dark:bg-gray-900 rounded shadow p-4 w-full text-black dark:text-white">
-            <ResponsiveContainer width="100%" height={400}>
-              <LineChart
-                data={chartData}
-                margin={{ top: 16, right: 24, left: 0, bottom: 8 }}
-              >
-                <XAxis dataKey="date" />
-                <YAxis
-                  tickFormatter={(v) => v.toFixed(2)}
-                  domain={[0, "auto"]}
-                />
-                <Tooltip
-                  formatter={(value: any, name: string) =>
-                    typeof value === "number" ? value.toFixed(2) : value
-                  }
-                />
-                <Legend />
-                {selectedNutrients.map((nutrient, idx) => (
-                  <Line
-                    key={nutrient}
-                    type="monotone"
-                    dataKey={nutrient}
-                    stroke={
-                      [
-                        "#2563eb", // blue
-                        "#eab308", // yellow
-                        "#ef4444", // red
-                        "#10b981", // green
-                        "#a21caf", // purple
-                        "#f59e42", // orange
-                        "#6366f1", // indigo
-                        "#f43f5e", // pink
-                        "#84cc16", // lime
-                        "#0ea5e9", // sky
-                        "#d97706", // amber
-                        "#64748b", // slate
-                      ][idx % 12]
-                    }
-                    dot={false}
-                    name={
-                      NUTRIENTS.find((n) => n.field === nutrient)?.label ||
-                      nutrient
+
+          {/* Chart */}
+          <div className="mb-8">
+            <h2 className="text-lg font-semibold mb-2">Cumulative Over Time</h2>
+            <div className="bg-background dark:bg-gray-900 rounded shadow p-4 w-full">
+              <ResponsiveContainer width="100%" height={400}>
+                <LineChart
+                  data={chartData}
+                  margin={{ top: 16, right: 24, left: 0, bottom: 8 }}
+                >
+                  <XAxis dataKey="date" />
+                  <YAxis
+                    tickFormatter={(v) => v.toFixed(2)}
+                    domain={[0, "auto"]}
+                  />
+                  <Tooltip
+                    formatter={(value: any, name: string) =>
+                      typeof value === "number" ? value.toFixed(2) : value
                     }
                   />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-        {/* Table */}
-        <div className="w-full">
-          <h2 className="text-lg font-semibold mb-2">Application History</h2>
-          <div className="overflow-x-auto w-full bg-white dark:bg-gray-900 rounded shadow">
-            <table className="min-w-full border-separate border-spacing-0 rounded-lg overflow-hidden bg-background dark:bg-gray-900 text-xs text-black dark:text-white">
-              <thead>
-                <tr className="bg-muted">
-                  <th className="px-2 py-1 text-left font-semibold">Date</th>
-                  <th className="px-2 py-1 text-left font-semibold">Lawn</th>
-                  <th className="px-2 py-1 text-left font-semibold">Product</th>
-                  <th className="px-2 py-1 text-left font-semibold">N</th>
-                  <th className="px-2 py-1 text-left font-semibold">P</th>
-                  <th className="px-2 py-1 text-left font-semibold">K</th>
-                  <th className="px-2 py-1 text-left font-semibold">Cost</th>
-                  <th className="px-2 py-1 text-left font-semibold">Status</th>
-                  <th className="px-2 py-1 text-left font-semibold">Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Array.isArray(filteredApps) &&
-                  filteredApps.map((app: any, idx: number) => (
-                    <tr
-                      key={app.id}
-                      className={
-                        "border-b last:border-b-0 group hover:bg-muted/50 dark:hover:bg-gray-800 " +
-                        (idx % 2 === 0
-                          ? "bg-white dark:bg-gray-800"
-                          : "bg-muted/30 dark:bg-gray-900")
+                  <Legend />
+                  {selectedNutrients.map((nutrient, idx) => (
+                    <Line
+                      key={nutrient}
+                      type="monotone"
+                      dataKey={nutrient}
+                      stroke={
+                        [
+                          "#2563eb", // blue
+                          "#eab308", // yellow
+                          "#ef4444", // red
+                          "#10b981", // green
+                          "#a21caf", // purple
+                          "#f59e42", // orange
+                          "#6366f1", // indigo
+                          "#f43f5e", // pink
+                          "#84cc16", // lime
+                          "#0ea5e9", // sky
+                          "#d97706", // amber
+                          "#64748b", // slate
+                        ][idx % 12]
                       }
-                    >
-                      <td className="px-2 py-1 border-b whitespace-nowrap font-medium">
-                        {app.application_date}
-                      </td>
-                      <td className="px-2 py-1 border-b whitespace-nowrap">
-                        {Array.isArray(lawns)
-                          ? lawns.find((l: any) => l.id === app.lawn_id)
-                              ?.name || app.lawn_id
-                          : app.lawn_id}
-                      </td>
-                      <td className="px-2 py-1 border-b whitespace-nowrap">
-                        {productMap[app.product_id]?.name || app.product_id}
-                      </td>
-                      <td className="px-2 py-1 border-b text-right">
-                        {app.n_applied?.toFixed(2)}
-                      </td>
-                      <td className="px-2 py-1 border-b text-right">
-                        {app.p_applied?.toFixed(2)}
-                      </td>
-                      <td className="px-2 py-1 border-b text-right">
-                        {app.k_applied?.toFixed(2)}
-                      </td>
-                      <td className="px-2 py-1 border-b text-right">
-                        {app.cost_applied
-                          ? `$${app.cost_applied.toFixed(2)}`
-                          : ""}
-                      </td>
-                      <td className="px-2 py-1 border-b whitespace-nowrap capitalize">
-                        {app.status}
-                      </td>
-                      <td className="px-2 py-1 border-b whitespace-nowrap">
-                        {app.notes}
-                      </td>
-                    </tr>
+                      dot={false}
+                      name={
+                        NUTRIENTS.find((n) => n.field === nutrient)?.label ||
+                        nutrient
+                      }
+                    />
                   ))}
-              </tbody>
-            </table>
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-        </div>
-      </div>
+
+          {/* Application History */}
+          <div>
+            <h2 className="text-lg font-semibold mb-2">Application History</h2>
+            <div className="overflow-x-auto">
+              <table className="min-w-full border-separate border-spacing-0 rounded-lg overflow-hidden bg-background dark:bg-gray-900 text-xs text-black dark:text-white">
+                <thead>
+                  <tr className="bg-muted">
+                    <th className="px-2 py-1 text-left font-semibold">Date</th>
+                    <th className="px-2 py-1 text-left font-semibold">Lawn</th>
+                    <th className="px-2 py-1 text-left font-semibold">
+                      Product
+                    </th>
+                    <th className="px-2 py-1 text-left font-semibold">N</th>
+                    <th className="px-2 py-1 text-left font-semibold">P</th>
+                    <th className="px-2 py-1 text-left font-semibold">K</th>
+                    <th className="px-2 py-1 text-left font-semibold">Cost</th>
+                    <th className="px-2 py-1 text-left font-semibold">
+                      Status
+                    </th>
+                    <th className="px-2 py-1 text-left font-semibold">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Array.isArray(filteredApps) &&
+                    filteredApps.map((app: any, idx: number) => (
+                      <tr
+                        key={app.id}
+                        className={
+                          "border-b last:border-b-0 group hover:bg-muted/50 dark:hover:bg-gray-800 " +
+                          (idx % 2 === 0
+                            ? "bg-white dark:bg-gray-800"
+                            : "bg-muted/30 dark:bg-gray-900")
+                        }
+                      >
+                        <td className="px-2 py-1 border-b whitespace-nowrap font-medium">
+                          {app.application_date}
+                        </td>
+                        <td className="px-2 py-1 border-b whitespace-nowrap">
+                          {Array.isArray(lawns)
+                            ? lawns.find((l: any) => l.id === app.lawn_id)
+                                ?.name || app.lawn_id
+                            : app.lawn_id}
+                        </td>
+                        <td className="px-2 py-1 border-b whitespace-nowrap">
+                          {productMap[app.product_id]?.name || app.product_id}
+                        </td>
+                        <td className="px-2 py-1 border-b text-right">
+                          {app.n_applied?.toFixed(2)}
+                        </td>
+                        <td className="px-2 py-1 border-b text-right">
+                          {app.p_applied?.toFixed(2)}
+                        </td>
+                        <td className="px-2 py-1 border-b text-right">
+                          {app.k_applied?.toFixed(2)}
+                        </td>
+                        <td className="px-2 py-1 border-b text-right">
+                          {app.cost_applied
+                            ? `$${app.cost_applied.toFixed(2)}`
+                            : ""}
+                        </td>
+                        <td className="px-2 py-1 border-b whitespace-nowrap capitalize">
+                          {app.status}
+                        </td>
+                        <td className="px-2 py-1 border-b whitespace-nowrap">
+                          {app.notes}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

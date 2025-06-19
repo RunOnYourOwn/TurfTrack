@@ -1,8 +1,9 @@
 import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import select
-from app.models.gdd import GDDModel, GDDValue, GDDReset, ResetType
+from app.models.gdd import GDDModel, GDDValue, GDDReset, ResetType, GDDModelParameters
 from app.models.daily_weather import DailyWeather, WeatherType
+from app.models.lawn import Lawn
 
 
 def calculate_and_store_gdd_values_sync(
@@ -143,7 +144,7 @@ def calculate_and_store_gdd_values_sync_segmented(
 ):
     """
     Calculate and store daily/cumulative GDD values for a GDD model, segmented by runs using the gdd_resets table.
-    Handles both manual and threshold resets robustly.
+    Handles both manual and threshold resets robustly. Uses parameter history for date-specific calculations.
     """
     gdd_model = session.get(GDDModel, gdd_model_id)
     if not gdd_model:
@@ -159,110 +160,72 @@ def calculate_and_store_gdd_values_sync_segmented(
     if not resets:
         raise ValueError("No resets found for this GDD model")
 
-    # Prepare weather data
-    weather_q = (
-        session.query(DailyWeather)
-        .filter(
-            DailyWeather.location_id == location_id,
-            DailyWeather.date >= gdd_model.start_date,
-        )
-        .order_by(DailyWeather.date.asc())
-    )
-    weather_rows = weather_q.all()
-    if not weather_rows:
-        return 0
-
-    # --- Pass 1: Insert threshold resets if needed ---
-    max_run = max([r.run_number for r in resets]) if resets else 1
-    new_resets = []
-    if gdd_model.reset_on_threshold:
-        cumulative = 0.0
-        run_number = max_run
-        for w in weather_rows:
-            if gdd_model.unit.value == "C":
-                tmax = w.temperature_max_c
-                tmin = w.temperature_min_c
-            else:
-                tmax = w.temperature_max_f
-                tmin = w.temperature_min_f
-            daily_gdd = (
-                max(0.0, ((tmax + tmin) / 2) - gdd_model.base_temp)
-                if tmax is not None and tmin is not None
-                else None
-            )
-            if daily_gdd is not None:
-                cumulative += daily_gdd
-            if cumulative >= gdd_model.threshold:
-                exists = (
-                    session.query(GDDReset)
-                    .filter_by(
-                        gdd_model_id=gdd_model_id,
-                        reset_date=w.date,
-                        reset_type=ResetType.threshold,
-                    )
-                    .first()
-                )
-                if not exists:
-                    run_number += 1
-                    new_reset = GDDReset(
-                        gdd_model_id=gdd_model_id,
-                        reset_date=w.date,
-                        run_number=run_number,
-                        reset_type=ResetType.threshold,
-                    )
-                    session.add(new_reset)
-                    new_resets.append(new_reset)
-                cumulative = 0.0  # Reset cumulative for new run
-        session.commit()
-    else:
-        # If not reset_on_threshold, do not insert any threshold resets after the latest manual reset
-        pass  # No-op: all future GDD values will be assigned to the latest run
-
-    # Remove all existing GDD values for this model (for full recalculation)
+    # Clear existing GDD values
     session.query(GDDValue).filter(GDDValue.gdd_model_id == gdd_model_id).delete()
     session.commit()
 
-    # --- Pass 2: Re-fetch resets and segment/calculate ---
-    resets = (
-        session.query(GDDReset)
-        .filter(GDDReset.gdd_model_id == gdd_model_id)
-        .order_by(GDDReset.reset_date.asc())
-        .all()
-    )
-    # Reassign run_number sequentially by date
-    for idx, reset in enumerate(resets):
-        reset.run_number = idx + 1
-    session.commit()
-
-    values_to_insert = []
-    for i, reset in enumerate(resets):
-        run_number = reset.run_number
-        start_date = reset.reset_date
+    # Process each segment between resets
+    for i in range(len(resets)):
+        start_date = resets[i].reset_date
         end_date = resets[i + 1].reset_date if i + 1 < len(resets) else None
+        run_number = resets[i].run_number
 
-        segment = [
-            w
-            for w in weather_rows
-            if w.date >= start_date and (end_date is None or w.date < end_date)
-        ]
+        # Get weather data for this segment
+        weather_q = session.query(DailyWeather).filter(
+            DailyWeather.location_id == location_id,
+            DailyWeather.date >= start_date,
+        )
+        if end_date:
+            weather_q = weather_q.filter(DailyWeather.date < end_date)
+        weather_q = weather_q.order_by(DailyWeather.date.asc())
+        weather_rows = weather_q.all()
+
         cumulative = 0.0
-        for j, w in enumerate(segment):
+        values_to_insert = []
+
+        for w in weather_rows:
+            # Get parameters effective for this date
+            date_params = get_effective_parameters(session, gdd_model_id, w.date)
+            if not date_params:
+                continue
+
+            # Calculate daily GDD
             if gdd_model.unit.value == "C":
                 tmax = w.temperature_max_c
                 tmin = w.temperature_min_c
             else:
                 tmax = w.temperature_max_f
                 tmin = w.temperature_min_f
-            daily_gdd = (
-                max(0.0, ((tmax + tmin) / 2) - gdd_model.base_temp)
-                if tmax is not None and tmin is not None
-                else None
-            )
-            if daily_gdd is not None:
-                if j == 0:
-                    cumulative = 0.0  # Reset cumulative to 0 on reset date
-                else:
-                    cumulative += daily_gdd
+
+            if tmax is None or tmin is None:
+                daily_gdd = None
+                cumulative_gdd = None
+            else:
+                daily_gdd = max(0.0, ((tmax + tmin) / 2) - date_params["base_temp"])
+                cumulative += daily_gdd
+
+                # Check for threshold reset
+                if (
+                    date_params["reset_on_threshold"]
+                    and cumulative >= date_params["threshold"]
+                    and i == len(resets) - 1  # Only check on the last/current run
+                ):
+                    # Add a new threshold reset
+                    new_reset = GDDReset(
+                        gdd_model_id=gdd_model_id,
+                        reset_date=w.date,
+                        run_number=run_number + 1,
+                        reset_type=ResetType.threshold,
+                    )
+                    session.add(new_reset)
+                    session.commit()
+
+                    # Recalculate from this point with the new reset
+                    calculate_and_store_gdd_values_sync_segmented(
+                        session, gdd_model_id, location_id
+                    )
+                    return
+
             values_to_insert.append(
                 GDDValue(
                     gdd_model_id=gdd_model_id,
@@ -273,6 +236,115 @@ def calculate_and_store_gdd_values_sync_segmented(
                     run=run_number,
                 )
             )
-    session.bulk_save_objects(values_to_insert)
+
+        # Bulk insert values for this segment
+        if values_to_insert:
+            session.bulk_save_objects(values_to_insert)
+            session.commit()
+
+    return True
+
+
+def get_effective_parameters(
+    session: Session, gdd_model_id: int, target_date: datetime.date
+):
+    """
+    Get the effective parameters for a GDD model on a specific date.
+    Returns the most recent parameter set that was effective on or before the target date.
+    """
+    # Find the most recent parameter set effective on or before the target date
+    param_query = (
+        session.query(GDDModelParameters)
+        .filter(
+            GDDModelParameters.gdd_model_id == gdd_model_id,
+            GDDModelParameters.effective_from <= target_date,
+        )
+        .order_by(GDDModelParameters.effective_from.desc())
+        .first()
+    )
+
+    if param_query:
+        return {
+            "base_temp": param_query.base_temp,
+            "threshold": param_query.threshold,
+            "reset_on_threshold": param_query.reset_on_threshold,
+        }
+
+    # If no parameter history found, get current model parameters
+    model = session.get(GDDModel, gdd_model_id)
+    if model:
+        return {
+            "base_temp": model.base_temp,
+            "threshold": model.threshold,
+            "reset_on_threshold": model.reset_on_threshold,
+        }
+
+    return None
+
+
+def store_parameter_history(
+    session: Session,
+    gdd_model_id: int,
+    base_temp: float,
+    threshold: float,
+    reset_on_threshold: bool,
+    effective_from: datetime.date,
+):
+    """
+    Store a new parameter set in the history table.
+    """
+    # Check if we already have parameters for this date
+    existing = (
+        session.query(GDDModelParameters)
+        .filter(
+            GDDModelParameters.gdd_model_id == gdd_model_id,
+            GDDModelParameters.effective_from == effective_from,
+        )
+        .first()
+    )
+
+    if existing:
+        # Update existing record
+        existing.base_temp = base_temp
+        existing.threshold = threshold
+        existing.reset_on_threshold = reset_on_threshold
+    else:
+        # Create new record
+        new_params = GDDModelParameters(
+            gdd_model_id=gdd_model_id,
+            base_temp=base_temp,
+            threshold=threshold,
+            reset_on_threshold=reset_on_threshold,
+            effective_from=effective_from,
+        )
+        session.add(new_params)
+
     session.commit()
-    return len(values_to_insert)
+
+
+def recalculate_historical_gdd(
+    session: Session, gdd_model_id: int, from_date: datetime.date
+):
+    """
+    Recalculate GDD values from a specific date forward using parameter history.
+    """
+    # Get the model to ensure it exists
+    model = session.get(GDDModel, gdd_model_id)
+    if not model:
+        raise ValueError("GDD model not found")
+
+    # Get the lawn to get location_id
+    lawn = session.get(Lawn, model.lawn_id)
+    if not lawn:
+        raise ValueError("Lawn not found for GDD model")
+
+    # Delete existing GDD values from the from_date forward
+    session.query(GDDValue).filter(
+        GDDValue.gdd_model_id == gdd_model_id, GDDValue.date >= from_date
+    ).delete()
+    session.commit()
+
+    # Recalculate using the segmented approach which will now use parameter history
+    calculate_and_store_gdd_values_sync_segmented(
+        session, gdd_model_id, lawn.location_id
+    )

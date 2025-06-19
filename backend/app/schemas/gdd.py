@@ -29,6 +29,14 @@ class GDDModelUpdate(BaseModel):
     reset_on_threshold: Optional[bool] = None
 
 
+class GDDParameterUpdate(BaseModel):
+    base_temp: Optional[float] = None
+    threshold: Optional[float] = None
+    reset_on_threshold: Optional[bool] = None
+    recalculate_history: bool = False
+    effective_from: Optional[date] = None
+
+
 class GDDModelRead(BaseModel):
     id: int
     lawn_id: int
@@ -45,6 +53,19 @@ class GDDModelRead(BaseModel):
         orm_mode = True
 
 
+class GDDParameterHistory(BaseModel):
+    id: int
+    gdd_model_id: int
+    base_temp: float
+    threshold: float
+    reset_on_threshold: bool
+    effective_from: date
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class GDDValueRead(BaseModel):
     id: int
     gdd_model_id: int
@@ -52,13 +73,18 @@ class GDDValueRead(BaseModel):
     daily_gdd: float
     cumulative_gdd: float
     is_forecast: bool
+    effective_params: Optional[dict] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True  # For Pydantic v2, replaces orm_mode
 
 
 class GDDModelWithValues(GDDModelRead):
     gdd_values: List[GDDValueRead] = []
+
+
+class GDDModelWithHistory(GDDModelRead):
+    parameter_history: List[GDDParameterHistory] = []
 
 
 class GDDResetRead(BaseModel):
