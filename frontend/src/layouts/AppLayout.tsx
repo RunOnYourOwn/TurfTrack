@@ -1,4 +1,4 @@
-import { SidebarProvider, useSidebar } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import * as React from "react";
 import { AppSidebar } from "@/components/ui/AppSidebar";
 
@@ -6,7 +6,12 @@ function SidebarWithContent({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen">
       <AppSidebar />
-      <main className="flex-1 min-w-0">{children}</main>
+      <main
+        className="min-w-0"
+        style={{ width: "calc(100vw - 16rem)", maxWidth: "none" }}
+      >
+        {children}
+      </main>
     </div>
   );
 }

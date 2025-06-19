@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import Select from "react-select";
 
 export type ApplicationFormValues = {
   application_date: string;
@@ -137,22 +138,44 @@ export function ApplicationForm({
           <label className="block text-sm font-medium mb-1" htmlFor="lawn_ids">
             Lawn(s)
           </label>
-          <select
-            id="lawn_ids"
+          <Select
+            isMulti
+            inputId="lawn_ids"
             name="lawn_ids"
-            multiple
-            value={(form.lawn_ids || []).map(String)}
-            onChange={handleChange}
+            options={lawns.map((lawn) => ({
+              value: lawn.id,
+              label: lawn.name,
+            }))}
+            value={lawns
+              .filter((lawn) => (form.lawn_ids || []).includes(lawn.id))
+              .map((lawn) => ({ value: lawn.id, label: lawn.name }))}
+            onChange={(opts) => {
+              const selected = opts.map((o: any) => o.value);
+              setForm((f) => ({
+                ...f,
+                lawn_ids: selected,
+                lawn_id: selected.length === 1 ? selected[0] : "",
+              }));
+            }}
+            isDisabled={submitting}
+            classNamePrefix="react-select"
+            styles={{
+              control: (base) => ({ ...base, minHeight: 36, borderRadius: 6 }),
+              valueContainer: (base) => ({ ...base, padding: "2px 6px" }),
+              multiValue: (base) => ({
+                ...base,
+                borderRadius: 4,
+                background: "#f3f4f6",
+              }),
+              multiValueLabel: (base) => ({ ...base, fontWeight: 500 }),
+              option: (base, state) => ({
+                ...base,
+                fontWeight: state.isSelected ? 600 : 400,
+              }),
+            }}
+            placeholder="Select lawn(s)..."
             required={(form.lawn_ids || []).length === 0}
-            disabled={submitting}
-            className="w-full border rounded px-2 py-1 min-h-[60px]"
-          >
-            {lawns.map((lawn) => (
-              <option key={lawn.id} value={String(lawn.id)}>
-                {lawn.name}
-              </option>
-            ))}
-          </select>
+          />
         </div>
         <div>
           <label
