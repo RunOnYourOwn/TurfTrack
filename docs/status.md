@@ -3,6 +3,7 @@
 ## Current Phase
 
 - MVP complete: Core backend and frontend integration (weather, lawns, GDD models, analytics, deduplication, task monitoring)
+- GDD calculation and reset logic fully implemented and tested
 - Weather data deduplication and scheduled updates implemented
 - Documentation and refactoring
 - Task status API endpoints exposed and ready for frontend integration
@@ -23,11 +24,17 @@
 - Robust weather data upsert with atomic operations
 - Fixed race conditions in weather data updates
 - Implemented proper error handling for weather tasks
-- Added TaskStatus tracking to GDD recalculation Celery task (enables monitoring of GDD recalculation jobs in Task Monitor UI)
-- GDD models feature (model management, calculation, analytics, UI/UX) complete
+- Added TaskStatus tracking to GDD recalculation Celery task
+- GDD models feature complete with:
+  - Model management (create, edit, delete)
+  - Accurate GDD calculations with proper reset handling
+  - Manual and automatic threshold resets
+  - Run-based cumulative GDD tracking
+  - Visual analytics and graphing
+  - Proper date handling for resets and runs
 - Task monitoring for weather and GDD recalculation jobs
 - MVP achieved: System is robust, user-friendly, and production-ready
-- Products CRUD UI (add, edit, delete) is now complete and robust, with grouped nutrient fields and read-only scraping info.
+- Products CRUD UI complete with grouped nutrient fields
 
 ## In Progress
 
@@ -53,8 +60,16 @@
 
 ## Notes
 
-- GDD models are user-defined per lawn, use location weather data, and support custom base temp, units, start date, threshold, and reset logic
-- GDD values are stored in the database for performance and historical/forecast analysis
+- GDD models are user-defined per lawn, use location weather data, and support:
+  - Custom base temp, units, start date
+  - Threshold-based automatic resets
+  - Manual resets with proper run handling
+  - Historical data tracking and forecasting
+- GDD values are stored in the database with:
+  - Daily and cumulative values
+  - Run-based segmentation
+  - Proper reset handling
+  - Forecast integration
 - GDD data is deleted when a lawn is deleted and it's the last lawn for a location
 - Task status API endpoints are now exposed and ready for frontend integration
 - Weather data updates are now atomic and race-condition free

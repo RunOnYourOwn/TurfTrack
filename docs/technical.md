@@ -111,7 +111,6 @@
 - reset_on_threshold: Boolean
 - created_at: DateTime
 - updated_at: DateTime
-- (Planned) API will include 'lawn_name' and 'next_threshold_date' fields for each model for analytics and clarity.
 
 ### GDD Values
 
@@ -121,30 +120,45 @@
 - daily_gdd: Float
 - cumulative_gdd: Float
 - is_forecast: Boolean
+- run: Integer (tracks different GDD accumulation periods)
 
 #### GDD Calculation Logic
 
 - On model create/update, backend calculates and stores all GDD values (historical + forecast) for the model using location weather data.
-- If reset_on_threshold is true, cumulative GDD resets to zero the day after threshold is met.
-- Supports recalculation on unit, threshold, or start date change.
-- Only one GDD model is shown per graph at a time.
+- Daily GDD = ((Tmax + Tmin) / 2) - base_temp, where base_temp is user-defined
+- Cumulative GDD is tracked per run, resetting to 0 at the start of each new run
+- Runs can be created by:
+  - Initial model creation (Run 1)
+  - Manual reset (creates new run starting on specified date)
+  - Threshold reset (if enabled, creates new run when threshold is crossed)
+- Reset handling:
+  - Manual resets: New run starts on the specified date with cumulative = 0
+  - Threshold resets: New run starts the day after threshold is crossed
+  - All resets maintain the daily_gdd values while resetting cumulative tracking
+- Supports recalculation on any parameter change
 - GDD data is deleted when a lawn is deleted and it's the last lawn for a location.
 
 #### API Endpoints
 
 - CRUD for GDD models
-- Fetch all GDD values for a model (for graphing)
-- (Optional) Force recalculation endpoint
-- (Planned) GDD models API will return 'lawn_name' and 'next_threshold_date' for each model.
+- Manual reset endpoint
+- Fetch GDD values by run
+- Fetch reset history
+- Parameter update endpoint with recalculation option
+- (Planned) GDD models API will return 'lawn_name' and 'next_threshold_date' for each model
 
 #### Frontend/UX
 
 - UI for GDD model management (create, edit, delete, per lawn)
-- Graph: cumulative GDD (line), daily GDD (bar), forecast in a different color
+- Manual reset controls with date selection
+- Run-based visualization with run selection
+- Graph shows:
+  - Cumulative GDD line (resets properly with runs)
+  - Daily GDD bars
+  - Threshold line
+  - Forecast data in different color
 - Professional, modern look matching current palette
 - Export functionality (CSV, PDF, etc.) is a future enhancement
-- Only one model shown per graph at a time
-- Recommend a modern React graphing library (e.g., Chart.js, Recharts, or Visx)
 
 ## MVP Status
 

@@ -16,7 +16,7 @@
 - [x] Implement Lawns model and API
 - [x] Implement Applications model and API
 - [x] Implement Weather Data model and API (with deduplication)
-- [x] Implement GDD Models and API (in progress)
+- [x] Implement GDD Models and API
 - [x] Expand Products model to include all nutrient and cost fields
 - [x] Update Products API to support advanced filtering and reporting
 
@@ -39,6 +39,8 @@
 - [x] Add GDD model management (create, edit, delete, per lawn)
 - [x] Add GDD data cleanup on lawn/location deletion
 - [x] Build GDD visualization UI (cumulative line, daily bar, forecast distinction)
+- [x] Implement proper reset handling for manual and threshold resets
+- [x] Add run-based GDD tracking with proper date handling
 - [ ] Add GDD export functionality (future)
 
 ## Phase 3: Frontend Development
@@ -49,16 +51,19 @@
 - [x] Implement product management interface
 - [x] Create lawn management interface
 - [x] Build application tracking interface
-- [x] Develop GDD visualization components (in progress)
+- [x] Develop GDD visualization components
+- [x] Add GDD model management UI
+- [x] Implement GDD reset controls and run visualization
 
 ### Features
 
 - [x] Implement product database
 - [x] Create lawn tracking system
 - [x] Build application scheduling system
-- [x] Develop GDD monitoring interface (in progress)
+- [x] Develop GDD monitoring interface
 - [x] Create reporting dashboard
 - [x] Refactor frontend to use Axios for all API requests via a generic fetcher utility
+- [x] Add run-based GDD visualization and controls
 
 ## Phase 4: Task Processing
 
@@ -87,7 +92,9 @@
 
 ## Phase 7: Documentation and Deployment
 
-- [ ] Create API documentation
+- [x] Document GDD calculation methodology
+- [x] Document reset and run handling
+- [ ] Complete API documentation
 - [ ] Write user documentation
 - [ ] Prepare deployment scripts
 - [ ] Set up monitoring and logging
@@ -101,7 +108,7 @@
 - [ ] Advanced analytics
 - [ ] Integration with other weather services
 - [ ] Add GDD export functionality
-- [ ] Add 'lawn_name' and 'next_threshold_date' to GDD models API and frontend table for improved analytics and clarity
+- [ ] Add 'lawn_name' and 'next_threshold_date' to GDD models API and frontend table
 
 ## Notes
 
@@ -109,3 +116,5 @@
 - Weather data deduplication and scheduled updates are fully implemented and tested
 - Weather data updates are now atomic and race-condition free
 - Task status tracking is implemented and ready for frontend integration
+- GDD calculation and reset logic is fully implemented and tested
+- Run-based GDD tracking with proper date handling is complete

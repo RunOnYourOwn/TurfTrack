@@ -3,16 +3,24 @@ graph TB
         UI[React/TypeScript UI]
         Components[UI Components]
         State[State Management]
+        GDDControls[GDD Controls]
+        ResetHandling[Reset Management]
         UI --> Components
         UI --> State
+        Components --> GDDControls
+        Components --> ResetHandling
     end
 
     subgraph Backend
         API[FastAPI Backend]
         Tasks[Celery Tasks]
         TaskStatus[Task Status API]
+        GDDCalc[GDD Calculator]
+        ResetLogic[Reset Handler]
         API --> Tasks
         Tasks --> TaskStatus
+        API --> GDDCalc
+        GDDCalc --> ResetLogic
     end
 
     subgraph External Services
@@ -29,6 +37,7 @@ graph TB
         WeatherData[Weather Data Table]
         GDDModels[GDD Models Table]
         GDDValues[GDD Values Table]
+        GDDResets[GDD Resets Table]
         TaskStatusTable[Task Status Table]
         DB --> Products
         DB --> Lawns
@@ -37,11 +46,13 @@ graph TB
         DB --> WeatherData
         DB --> GDDModels
         DB --> GDDValues
+        DB --> GDDResets
         DB --> TaskStatusTable
         Lawns --> Locations
         WeatherData --> Locations
         GDDModels --> Lawns
         GDDValues --> GDDModels
+        GDDResets --> GDDModels
         Tasks --> TaskStatusTable
     end
 
@@ -69,12 +80,13 @@ graph TB
     classDef external fill:#fbb,stroke:#333,stroke-width:2px
     classDef tasks fill:#fbf,stroke:#333,stroke-width:2px
 
-    class UI,Components,State frontend
-    class API,Tasks,TaskStatus backend
-    class DB,Products,Lawns,Applications,WeatherData,GDDModels,Locations,TaskStatusTable database
+    class UI,Components,State,GDDControls,ResetHandling frontend
+    class API,Tasks,TaskStatus,GDDCalc,ResetLogic backend
+    class DB,Products,Lawns,Applications,WeatherData,GDDModels,GDDValues,GDDResets,Locations,TaskStatusTable database
     class Weather external
     class Redis,Celery,Beat tasks
 
-    %% Note: WeatherData and GDDValues are deduplicated per Location, not per Lawn. Beat schedules daily updates. GDD data is cleaned up on lawn/location deletion.
-    %% Task Status tracking is now implemented for monitoring weather updates and GDD calculations.
-    %% MVP complete: GDD models, analytics, weather sync, and task monitoring are robust. Future enhancements (analytics columns, API improvements) are documented.
+    %% Note: WeatherData and GDDValues are deduplicated per Location, not per Lawn. Beat schedules daily updates.
+    %% GDD data is cleaned up on lawn/location deletion. Task Status tracking monitors weather updates and GDD calculations.
+    %% GDD implementation complete with run-based tracking, manual and threshold resets, and proper date handling.
+    %% MVP complete: System is production-ready with robust GDD functionality, analytics, weather sync, and task monitoring.
