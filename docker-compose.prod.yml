@@ -24,6 +24,9 @@ services:
     environment:
       - NODE_ENV=${NODE_ENV}
       - VITE_API_URL=${VITE_API_URL}
+    depends_on:
+      api:
+        condition: service_started
     networks:
       - turftrack_network
 
