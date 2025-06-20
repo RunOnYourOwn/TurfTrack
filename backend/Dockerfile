@@ -2,26 +2,43 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install UV
-RUN pip install --no-cache-dir uv
+# Set up a virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Install UV properly (like production)
+RUN apt-get update && apt-get install -y curl && \
+    curl -L -o /tmp/uv-installer.sh https://astral.sh/uv/install.sh && \
+    sh /tmp/uv-installer.sh && \
+    mv /root/.local/bin/uv /usr/local/bin/uv && \
+    chmod +x /usr/local/bin/uv && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy .env file for development
+COPY .env .
 
 # Copy only the dependency files first for better caching
-COPY pyproject.toml .
+COPY backend/pyproject.toml .
 
-# Install dependencies using UV
-RUN uv pip install --system .
+# Use uv to install dependencies into the virtual environment
+RUN uv pip install --python /opt/venv/bin/python --no-cache .
 
-# Copy the rest of the application
-COPY . .
+# Copy the application code (excluding .env directory)
+COPY backend/app/ ./app/
+COPY backend/alembic/ ./alembic/
+COPY backend/main.py .
+COPY backend/alembic.ini .
 
+# Set Python to run in unbuffered mode (better for logging)
+ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
 
-# Create non-root user
-RUN addgroup --system --gid 1001 celery && \
-    adduser --system --uid 1001 --gid 1001 --no-create-home celery
+# # Create non-root user
+# RUN addgroup --system --gid 1001 celery && \
+#     adduser --system --uid 1001 --gid 1001 --no-create-home celery
 
-# Set ownership of the app directory
-RUN chown -R celery:celery /app
+# # Set ownership of the app directory
+# RUN chown -R celery:celery /app
 
-# Switch to non-root user
-USER celery
+# # Switch to non-root user
+# USER celery

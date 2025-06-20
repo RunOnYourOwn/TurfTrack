@@ -1,8 +1,8 @@
 services:
   api:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     command: >
       sh -c "alembic upgrade head &&
              uvicorn main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app/"
@@ -10,10 +10,16 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      - ./backend/.env:/app/.env
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       - ALEMBIC_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       - REDIS_URL=redis://${REDIS_HOST}:${REDIS_PORT}/0
+      - CELERY_BROKER_URL=redis://${REDIS_HOST}:${REDIS_PORT}/0
+      - CELERY_RESULT_BACKEND=redis://${REDIS_HOST}:${REDIS_PORT}/0
+      - REDBEAT_REDIS_URL=redis://${REDIS_HOST}:${REDIS_PORT}/1
+      - REDBEAT_LOCK_KEY=${REDBEAT_LOCK_KEY}
+      - REDBEAT_LOCK_TIMEOUT=${REDBEAT_LOCK_TIMEOUT}
     depends_on:
       db:
         condition: service_healthy
@@ -34,7 +40,7 @@ services:
       - frontend_node_modules:/app/node_modules
     environment:
       - NODE_ENV=development
-      - VITE_API_URL=http://localhost:8000
+      - VITE_API_URL=
     depends_on:
       - api
     networks:
@@ -42,33 +48,48 @@ services:
 
   celery_worker:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile.celery
     command: celery -A app.celery_app worker --loglevel=debug
     volumes:
       - ./backend:/app
+      - ./backend/.env:/app/.env
     environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+      - ALEMBIC_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       - REDIS_URL=redis://${REDIS_HOST}:${REDIS_PORT}/0
+      - CELERY_BROKER_URL=redis://${REDIS_HOST}:${REDIS_PORT}/0
+      - CELERY_RESULT_BACKEND=redis://${REDIS_HOST}:${REDIS_PORT}/0
+      - REDBEAT_REDIS_URL=redis://${REDIS_HOST}:${REDIS_PORT}/1
+      - REDBEAT_LOCK_KEY=${REDBEAT_LOCK_KEY}
+      - REDBEAT_LOCK_TIMEOUT=${REDBEAT_LOCK_TIMEOUT}
     depends_on:
       - redis
+      - db
     networks:
       - turftrack_network
 
   celery_beat:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile.celery
     command: celery -A app.celery_app beat --loglevel=debug --scheduler=redbeat.RedBeatScheduler
     volumes:
       - ./backend:/app
+      - ./backend/.env:/app/.env
     environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+      - ALEMBIC_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       - REDIS_URL=redis://${REDIS_HOST}:${REDIS_PORT}/0
-      - REDBEAT_REDIS_URL=redis://${REDIS_HOST}:${REDIS_PORT}/1 # Use a different DB for redbeat
+      - REDBEAT_REDIS_URL=redis://${REDIS_HOST}:${REDIS_PORT}/1
       - REDBEAT_LOCK_KEY=${REDBEAT_LOCK_KEY}
       - REDBEAT_LOCK_TIMEOUT=${REDBEAT_LOCK_TIMEOUT}
+      - CELERY_BROKER_URL=redis://${REDIS_HOST}:${REDIS_PORT}/0
+      - CELERY_RESULT_BACKEND=redis://${REDIS_HOST}:${REDIS_PORT}/0
     depends_on:
       - redis
       - celery_worker
+      - db
     networks:
       - turftrack_network
 
