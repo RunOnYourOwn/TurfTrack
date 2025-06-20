@@ -7,6 +7,11 @@ services:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       - ALEMBIC_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       - REDIS_URL=redis://${REDIS_HOST}:${REDIS_PORT}/0
+      - CELERY_BROKER_URL=redis://${REDIS_HOST}:${REDIS_PORT}/0
+      - CELERY_RESULT_BACKEND=redis://${REDIS_HOST}:${REDIS_PORT}/0
+      - REDBEAT_REDIS_URL=redis://${REDIS_HOST}:${REDIS_PORT}/1
+      - REDBEAT_LOCK_KEY=${REDBEAT_LOCK_KEY}
+      - REDBEAT_LOCK_TIMEOUT=${REDBEAT_LOCK_TIMEOUT}
     depends_on:
       db:
         condition: service_healthy
@@ -36,8 +41,14 @@ services:
       dockerfile: backend/Dockerfile.celery
     command: celery -A app.celery_app worker --loglevel=${CELERY_LOG_LEVEL}
     environment:
-      - REDIS_URL=redis://${REDIS_HOST}:${REDIS_PORT}/0
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+      - ALEMBIC_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+      - REDIS_URL=redis://${REDIS_HOST}:${REDIS_PORT}/0
+      - CELERY_BROKER_URL=redis://${REDIS_HOST}:${REDIS_PORT}/0
+      - CELERY_RESULT_BACKEND=redis://${REDIS_HOST}:${REDIS_PORT}/0
+      - REDBEAT_REDIS_URL=redis://${REDIS_HOST}:${REDIS_PORT}/1
+      - REDBEAT_LOCK_KEY=${REDBEAT_LOCK_KEY}
+      - REDBEAT_LOCK_TIMEOUT=${REDBEAT_LOCK_TIMEOUT}
     depends_on:
       - redis
       - db
@@ -50,11 +61,14 @@ services:
       dockerfile: backend/Dockerfile.celery
     command: celery -A app.celery_app beat --loglevel=${CELERY_LOG_LEVEL} --scheduler=redbeat.RedBeatScheduler
     environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+      - ALEMBIC_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       - REDIS_URL=redis://${REDIS_HOST}:${REDIS_PORT}/0
       - REDBEAT_REDIS_URL=redis://${REDIS_HOST}:${REDIS_PORT}/1
       - REDBEAT_LOCK_KEY=${REDBEAT_LOCK_KEY}
       - REDBEAT_LOCK_TIMEOUT=${REDBEAT_LOCK_TIMEOUT}
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+      - CELERY_BROKER_URL=redis://${REDIS_HOST}:${REDIS_PORT}/0
+      - CELERY_RESULT_BACKEND=redis://${REDIS_HOST}:${REDIS_PORT}/0
     depends_on:
       - redis
       - celery_worker
