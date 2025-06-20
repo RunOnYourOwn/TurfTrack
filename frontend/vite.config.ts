@@ -12,8 +12,12 @@ export default defineConfig({
     },
   },
   server: {
-    // proxy: {
-    //   "/api": "http://localhost:8000",
-    // },
+    proxy: {
+      "/api": {
+        target: "http://api:8000",
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
 });

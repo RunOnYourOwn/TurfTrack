@@ -36,7 +36,6 @@ Thumbs.db
 
 # Misc
 .env
-.env.*
 *.local
 *.lock
 

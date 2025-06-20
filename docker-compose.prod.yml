@@ -1,0 +1,64 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.prod
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+      - ALEMBIC_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+      - REDIS_URL=redis://${REDIS_HOST}:${REDIS_PORT}/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - turftrack_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    ports:
+      - "3000:3000" # Expose on port 3000 for Nginx Proxy Manager
+    environment:
+      - NODE_ENV=${NODE_ENV}
+      - VITE_API_URL=${VITE_API_URL}
+    networks:
+      - turftrack_network
+
+  celery_worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.celery
+    command: celery -A app.celery_app worker --loglevel=${CELERY_LOG_LEVEL}
+    environment:
+      - REDIS_URL=redis://${REDIS_HOST}:${REDIS_PORT}/0
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+    depends_on:
+      - redis
+      - db
+    networks:
+      - turftrack_network
+
+  celery_beat:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.celery
+    command: celery -A app.celery_app beat --loglevel=${CELERY_LOG_LEVEL} --scheduler=redbeat.RedBeatScheduler
+    environment:
+      - REDIS_URL=redis://${REDIS_HOST}:${REDIS_PORT}/0
+      - REDBEAT_REDIS_URL=redis://${REDIS_HOST}:${REDIS_PORT}/1
+      - REDBEAT_LOCK_KEY=${REDBEAT_LOCK_KEY}
+      - REDBEAT_LOCK_TIMEOUT=${REDBEAT_LOCK_TIMEOUT}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+    depends_on:
+      - redis
+      - celery_worker
+      - db
+    networks:
+      - turftrack_network
+
+networks:
+  turftrack_network:
+    external: true

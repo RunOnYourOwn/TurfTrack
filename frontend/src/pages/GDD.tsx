@@ -42,7 +42,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import { toast } from "sonner";
-import { PencilIcon, HistoryIcon } from "lucide-react";
+import { PencilIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const TrashIcon = () => (
@@ -83,11 +83,7 @@ export default function GDD() {
   const [formError, setFormError] = React.useState<string | null>(null);
 
   // Fetch lawns for dropdown
-  const {
-    data: lawns,
-    isLoading: lawnsLoading,
-    error: lawnsError,
-  } = useQuery({
+  const { data: lawns, isLoading: lawnsLoading } = useQuery({
     queryKey: ["lawns"],
     queryFn: () => fetcher("/api/v1/lawns/"),
     staleTime: 5 * 60 * 1000,
@@ -112,11 +108,7 @@ export default function GDD() {
   const [sheetOpen, setSheetOpen] = React.useState(false);
 
   // Fetch reset history for the selected model
-  const {
-    data: resetHistory,
-    isLoading: resetLoading,
-    error: resetError,
-  } = useQuery({
+  const { data: resetHistory } = useQuery({
     queryKey: ["gddResets", selectedModel?.id],
     queryFn: () =>
       selectedModel?.id
@@ -127,11 +119,7 @@ export default function GDD() {
   });
 
   // Fetch parameter history for the selected model
-  const {
-    data: parameterHistory,
-    isLoading: paramHistoryLoading,
-    error: paramHistoryError,
-  } = useQuery({
+  const { data: parameterHistory } = useQuery({
     queryKey: ["gddParameterHistory", selectedModel?.id],
     queryFn: () =>
       selectedModel?.id
@@ -162,11 +150,7 @@ export default function GDD() {
   }, [sheetOpen, resetHistory]);
 
   // Fetch GDD values for the selected run
-  const {
-    data: gddValues,
-    isLoading: gddValuesLoading,
-    error: gddValuesError,
-  } = useQuery({
+  const { data: gddValues } = useQuery({
     queryKey: ["gddValues", selectedModel?.id, selectedRun],
     queryFn: () =>
       selectedModel?.id && selectedRun != null
@@ -391,15 +375,6 @@ export default function GDD() {
   }
 
   // Chart configuration
-  const maxY =
-    gddValuesLoading || !gddValues
-      ? 100
-      : gddValues && gddValues.length > 0
-      ? Math.max(...gddValues.map((v: any) => v.cumulative_gdd || 0))
-      : 100;
-  const step = Math.ceil(maxY / 5 / 10) * 10 || 10; // round to nearest 10
-  const ticks = Array.from({ length: 6 }, (_, i) => i * step);
-
   return (
     <div className="p-4 min-h-screen bg-background w-full">
       <Card className="min-h-[400px] w-full shadow-lg bg-white dark:bg-gray-900 text-black dark:text-white">

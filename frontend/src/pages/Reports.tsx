@@ -137,7 +137,7 @@ export default function Reports() {
   ]);
 
   // Fetch data
-  const { data: applications, isLoading: appsLoading } = useQuery({
+  const { data: applications } = useQuery({
     queryKey: ["applications"],
     queryFn: () => fetcher("/api/v1/applications/"),
     staleTime: 5 * 60 * 1000,
@@ -148,7 +148,7 @@ export default function Reports() {
     staleTime: 5 * 60 * 1000,
   });
   // Fetch products for product name lookup
-  const { data: products, isLoading: productsLoading } = useQuery({
+  const { data: products } = useQuery({
     queryKey: ["products"],
     queryFn: () => fetcher("/api/v1/products/"),
     staleTime: 5 * 60 * 1000,
@@ -235,14 +235,6 @@ export default function Reports() {
       setSelectedLawn(String(lawns[0].id));
     }
   }, [lawns, selectedLawn]);
-
-  // Helper to update date range safely
-  function setDateRangeSafe(update: Partial<{ start: string; end: string }>) {
-    setDateRange((prev) => ({
-      start: update.start !== undefined ? update.start : prev?.start || "",
-      end: update.end !== undefined ? update.end : prev?.end || "",
-    }));
-  }
 
   return (
     <div className="p-4 min-h-screen bg-background w-full">
@@ -334,7 +326,7 @@ export default function Reports() {
                     domain={[0, "auto"]}
                   />
                   <Tooltip
-                    formatter={(value: any, name: string) =>
+                    formatter={(value: any) =>
                       typeof value === "number" ? value.toFixed(2) : value
                     }
                   />

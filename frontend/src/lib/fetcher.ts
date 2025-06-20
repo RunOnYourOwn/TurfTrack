@@ -1,6 +1,5 @@
 import axiosInstance from "./axios";
 import { AxiosRequestConfig, AxiosResponse } from "axios";
-import type { Lawn } from "../types/lawn";
 
 // Generic fetcher for all HTTP methods
 export async function fetcher<T = any>(

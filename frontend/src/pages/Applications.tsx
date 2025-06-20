@@ -8,23 +8,16 @@ import {
   CardAction,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Dialog,
-  DialogTrigger,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
-  DialogClose,
 } from "@/components/ui/dialog";
 import * as React from "react";
 import { PencilIcon, Trash2Icon, PlusIcon } from "lucide-react";
-import {
-  ApplicationForm,
-  ApplicationFormValues,
-} from "@/components/ApplicationForm";
+import { ApplicationForm } from "@/components/ApplicationForm";
 import { toast } from "sonner";
 
 export default function Applications() {
