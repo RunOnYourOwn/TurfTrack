@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     NODE_ENV: str = "production"
     VITE_API_URL: str = "/api"
 
+    # Logging
+    LOG_LEVEL: str = "INFO"  # Can be overridden by environment variable
+
     # Database
     POSTGRES_SERVER: str = "db"
     POSTGRES_PORT: int = 5432

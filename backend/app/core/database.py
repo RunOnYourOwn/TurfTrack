@@ -8,7 +8,7 @@ from sqlalchemy.orm import sessionmaker as sync_sessionmaker
 # Create async engine
 engine = create_async_engine(
     settings.DATABASE_URL,
-    echo=settings.DEBUG,
+    echo=False,
     future=True,
 )
 
@@ -23,7 +23,7 @@ async_session_maker = sessionmaker(
 sync_database_url = settings.DATABASE_URL.replace("+asyncpg", "")
 sync_engine = create_engine(
     sync_database_url,
-    echo=settings.DEBUG,
+    echo=False,
     future=True,
 )
 
