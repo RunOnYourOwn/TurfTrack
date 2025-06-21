@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import date, datetime
 import enum
@@ -19,6 +19,18 @@ class GDDModelCreate(BaseModel):
     threshold: float = Field(...)
     reset_on_threshold: bool = Field(...)
 
+    @field_validator("base_temp")
+    def validate_base_temp(cls, v):
+        if v < 0:
+            raise ValueError("Base temperature cannot be negative")
+        return v
+
+    @field_validator("threshold")
+    def validate_threshold(cls, v):
+        if v <= 0:
+            raise ValueError("Threshold must be greater than 0")
+        return v
+
 
 class GDDModelUpdate(BaseModel):
     name: Optional[str] = Field(None, max_length=100)
@@ -28,6 +40,18 @@ class GDDModelUpdate(BaseModel):
     threshold: Optional[float] = None
     reset_on_threshold: Optional[bool] = None
 
+    @field_validator("base_temp")
+    def validate_base_temp(cls, v):
+        if v is not None and v < 0:
+            raise ValueError("Base temperature cannot be negative")
+        return v
+
+    @field_validator("threshold")
+    def validate_threshold(cls, v):
+        if v is not None and v <= 0:
+            raise ValueError("Threshold must be greater than 0")
+        return v
+
 
 class GDDParameterUpdate(BaseModel):
     base_temp: Optional[float] = None
@@ -35,6 +59,18 @@ class GDDParameterUpdate(BaseModel):
     reset_on_threshold: Optional[bool] = None
     recalculate_history: bool = False
     effective_from: Optional[date] = None
+
+    @field_validator("base_temp")
+    def validate_base_temp(cls, v):
+        if v is not None and v < 0:
+            raise ValueError("Base temperature cannot be negative")
+        return v
+
+    @field_validator("threshold")
+    def validate_threshold(cls, v):
+        if v is not None and v <= 0:
+            raise ValueError("Threshold must be greater than 0")
+        return v
 
 
 class GDDModelRead(BaseModel):

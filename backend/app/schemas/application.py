@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional, List
 from datetime import date, datetime
 import enum
@@ -36,6 +36,12 @@ class ApplicationBase(BaseModel):
     status: ApplicationStatus = ApplicationStatus.planned
     tied_gdd_model_id: Optional[int] = None
 
+    @field_validator("amount_per_area", "area_unit")
+    def must_be_positive(cls, v):
+        if v <= 0:
+            raise ValueError("must be positive")
+        return v
+
 
 class ApplicationCreate(ApplicationBase):
     lawn_ids: Optional[List[int]] = None  # For batch apply
@@ -50,6 +56,12 @@ class ApplicationUpdate(BaseModel):
     notes: Optional[str] = None
     status: Optional[ApplicationStatus] = None
     tied_gdd_model_id: Optional[int] = None
+
+    @field_validator("amount_per_area", "area_unit")
+    def must_be_positive(cls, v):
+        if v is not None and v <= 0:
+            raise ValueError("must be positive")
+        return v
 
 
 class ApplicationRead(ApplicationBase):

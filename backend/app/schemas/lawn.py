@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, Literal
 from datetime import datetime
 
@@ -17,6 +17,24 @@ class LawnCreate(BaseModel):
     weather_enabled: bool = Field(True, description="Enable weather data fetching")
     latitude: Optional[float] = Field(None, description="Latitude for weather lookup")
     longitude: Optional[float] = Field(None, description="Longitude for weather lookup")
+
+    @field_validator("area")
+    def area_must_be_positive(cls, v):
+        if v <= 0:
+            raise ValueError("Area must be greater than 0")
+        return v
+
+    @field_validator("latitude")
+    def latitude_must_be_valid(cls, v):
+        if v is not None and not -90 <= v <= 90:
+            raise ValueError("Latitude must be between -90 and 90")
+        return v
+
+    @field_validator("longitude")
+    def longitude_must_be_valid(cls, v):
+        if v is not None and not -180 <= v <= 180:
+            raise ValueError("Longitude must be between -180 and 180")
+        return v
 
 
 class LawnRead(BaseModel):
@@ -46,3 +64,21 @@ class LawnUpdate(BaseModel):
     weather_enabled: Optional[bool] = Field(None)
     latitude: Optional[float] = Field(None, description="Latitude for weather lookup")
     longitude: Optional[float] = Field(None, description="Longitude for weather lookup")
+
+    @field_validator("area")
+    def area_must_be_positive(cls, v):
+        if v is not None and v <= 0:
+            raise ValueError("Area must be greater than 0")
+        return v
+
+    @field_validator("latitude")
+    def latitude_must_be_valid(cls, v):
+        if v is not None and not -90 <= v <= 90:
+            raise ValueError("Latitude must be between -90 and 90")
+        return v
+
+    @field_validator("longitude")
+    def longitude_must_be_valid(cls, v):
+        if v is not None and not -180 <= v <= 180:
+            raise ValueError("Longitude must be between -180 and 180")
+        return v
