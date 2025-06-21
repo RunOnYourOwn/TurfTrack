@@ -69,5 +69,4 @@ class ApplicationRead(ApplicationBase):
     zn_applied: Optional[float] = None
     cost_applied: Optional[float] = None
 
-    class Config:
-        orm_mode = True
+    model_config = {"from_attributes": True}

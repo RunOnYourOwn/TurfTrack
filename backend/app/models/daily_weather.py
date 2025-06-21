@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Float, Date, Enum, ForeignKey, UniqueConstraint
+from sqlalchemy import Float, Date, Enum, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 import enum
@@ -14,7 +14,9 @@ class DailyWeather(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     date: Mapped[Date] = mapped_column(Date, nullable=False)
-    location_id: Mapped[int] = mapped_column(ForeignKey("locations.id"), nullable=False)
+    location_id: Mapped[int] = mapped_column(
+        ForeignKey("locations.id", ondelete="CASCADE"), nullable=False
+    )
     type: Mapped[WeatherType] = mapped_column(Enum(WeatherType), nullable=False)
 
     temperature_max_c: Mapped[float] = mapped_column(Float, nullable=False)

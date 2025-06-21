@@ -11,6 +11,8 @@ class Location(Base):
     longitude: Mapped[float] = mapped_column(Float, nullable=False)
 
     lawns = relationship("Lawn", back_populates="location")
-    weather_entries = relationship("DailyWeather", back_populates="location")
+    weather_entries = relationship(
+        "DailyWeather", back_populates="location", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (UniqueConstraint("latitude", "longitude", name="uix_lat_lon"),)

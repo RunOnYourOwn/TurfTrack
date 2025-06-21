@@ -16,8 +16,12 @@ class TaskStatus(Base):
     id = Column(Integer, primary_key=True)
     task_id = Column(String, unique=True, nullable=False)
     task_name = Column(String, nullable=False)
-    related_location_id = Column(Integer, ForeignKey("locations.id"), nullable=True)
-    related_lawn_id = Column(Integer, ForeignKey("lawns.id"), nullable=True)
+    related_location_id = Column(
+        Integer, ForeignKey("locations.id", ondelete="CASCADE"), nullable=True
+    )
+    related_lawn_id = Column(
+        Integer, ForeignKey("lawns.id", ondelete="CASCADE"), nullable=True
+    )
     status = Column(
         Enum(TaskStatusEnum), nullable=False, default=TaskStatusEnum.pending
     )

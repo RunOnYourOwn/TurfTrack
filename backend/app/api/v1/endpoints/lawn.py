@@ -2,19 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
-from sqlalchemy import exists
 from app.core.database import get_db
 from app.models.lawn import Lawn, GrassType, WeatherFetchFrequency
 from app.schemas.lawn import LawnCreate, LawnRead, LawnUpdate
 from typing import List
 from app.utils.location import get_or_create_location
-from app.tasks.weather import fetch_and_store_weather
-from app.models.daily_weather import DailyWeather
-from app.models.location import Location
-from app.models.task_status import TaskStatus
-import logging
-import uuid
-import datetime
+from app.utils.weather import trigger_weather_fetch_if_needed
 
 router = APIRouter(prefix="/lawns", tags=["lawns"])
 
@@ -23,23 +16,7 @@ router = APIRouter(prefix="/lawns", tags=["lawns"])
 async def list_lawns(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Lawn).options(selectinload(Lawn.location)))
     lawns = result.scalars().all()
-    return [
-        LawnRead(
-            id=lawn.id,
-            name=lawn.name,
-            area=lawn.area,
-            grass_type=lawn.grass_type,
-            notes=lawn.notes,
-            weather_fetch_frequency=lawn.weather_fetch_frequency,
-            timezone=lawn.timezone,
-            weather_enabled=lawn.weather_enabled,
-            latitude=lawn.location.latitude if lawn.location else None,
-            longitude=lawn.location.longitude if lawn.location else None,
-            created_at=lawn.created_at,
-            updated_at=lawn.updated_at,
-        )
-        for lawn in lawns
-    ]
+    return lawns
 
 
 @router.post("/", response_model=LawnRead, status_code=status.HTTP_201_CREATED)
@@ -58,52 +35,13 @@ async def create_lawn(lawn: LawnCreate, db: AsyncSession = Depends(get_db)):
     db.add(db_lawn)
     await db.commit()
     await db.refresh(db_lawn)
-    # Trigger weather fetch task if enabled and no weather data exists for this location
-    weather_exists = await db.execute(
-        select(exists().where(DailyWeather.location_id == location.id))
-    )
-    logger = logging.getLogger("turftrack.lawn")
-    if db_lawn.weather_enabled and not weather_exists.scalar():
-        logger.info(
-            f"No weather data found for location_id={location.id}. Triggering fetch_and_store_weather."
-        )
-        fetch_and_store_weather.delay(
-            location.id, location.latitude, location.longitude
-        )
-    else:
-        logger.info(
-            f"Weather data already exists for location_id={location.id}. No fetch needed."
-        )
-        # Create a TaskStatus record to indicate weather already exists
-        from app.models.task_status import TaskStatus, TaskStatusEnum
 
-        now = datetime.datetime.now(datetime.timezone.utc)
-        task_status = TaskStatus(
-            task_id=str(uuid.uuid4()),
-            task_name="fetch_and_store_weather",
-            related_location_id=location.id,
-            status=TaskStatusEnum.success,
-            created_at=now,
-            started_at=now,
-            finished_at=now,
-            result="Weather data for this location already exists. No new fetch was needed.",
-        )
-        db.add(task_status)
-        await db.commit()
-    return LawnRead(
-        id=db_lawn.id,
-        name=db_lawn.name,
-        area=db_lawn.area,
-        grass_type=db_lawn.grass_type,
-        notes=db_lawn.notes,
-        weather_fetch_frequency=db_lawn.weather_fetch_frequency,
-        timezone=db_lawn.timezone,
-        weather_enabled=db_lawn.weather_enabled,
-        latitude=location.latitude,
-        longitude=location.longitude,
-        created_at=db_lawn.created_at,
-        updated_at=db_lawn.updated_at,
-    )
+    # Trigger weather fetch if needed
+    await trigger_weather_fetch_if_needed(db, db_lawn)
+
+    # The location relationship needs to be loaded before returning
+    await db.refresh(db_lawn, attribute_names=["location"])
+    return db_lawn
 
 
 @router.get("/{lawn_id}", response_model=LawnRead)
@@ -114,21 +52,7 @@ async def get_lawn(lawn_id: int, db: AsyncSession = Depends(get_db)):
     lawn = result.scalars().first()
     if not lawn:
         raise HTTPException(status_code=404, detail="Lawn not found")
-    location = lawn.location
-    return LawnRead(
-        id=lawn.id,
-        name=lawn.name,
-        area=lawn.area,
-        grass_type=lawn.grass_type,
-        notes=lawn.notes,
-        weather_fetch_frequency=lawn.weather_fetch_frequency,
-        timezone=lawn.timezone,
-        weather_enabled=lawn.weather_enabled,
-        latitude=location.latitude if location else None,
-        longitude=location.longitude if location else None,
-        created_at=lawn.created_at,
-        updated_at=lawn.updated_at,
-    )
+    return lawn
 
 
 @router.put("/{lawn_id}", response_model=LawnRead)
@@ -160,37 +84,13 @@ async def update_lawn(
             setattr(db_lawn, field, value)
     await db.commit()
     await db.refresh(db_lawn)
-    location = db_lawn.location
-    # Trigger weather fetch task if enabled and no weather data exists for this location
-    weather_exists = await db.execute(
-        select(exists().where(DailyWeather.location_id == location.id))
-    )
-    logger = logging.getLogger("turftrack.lawn")
-    if db_lawn.weather_enabled and not weather_exists.scalar():
-        logger.info(
-            f"No weather data found for location_id={location.id}. Triggering fetch_and_store_weather."
-        )
-        fetch_and_store_weather.delay(
-            location.id, location.latitude, location.longitude
-        )
-    else:
-        logger.info(
-            f"Weather data already exists for location_id={location.id}. No fetch needed."
-        )
-    return LawnRead(
-        id=db_lawn.id,
-        name=db_lawn.name,
-        area=db_lawn.area,
-        grass_type=db_lawn.grass_type,
-        notes=db_lawn.notes,
-        weather_fetch_frequency=db_lawn.weather_fetch_frequency,
-        timezone=db_lawn.timezone,
-        weather_enabled=db_lawn.weather_enabled,
-        latitude=location.latitude if location else None,
-        longitude=location.longitude if location else None,
-        created_at=db_lawn.created_at,
-        updated_at=db_lawn.updated_at,
-    )
+
+    # Trigger weather fetch if needed
+    await trigger_weather_fetch_if_needed(db, db_lawn)
+
+    # The location relationship needs to be loaded before returning
+    await db.refresh(db_lawn, attribute_names=["location"])
+    return db_lawn
 
 
 @router.delete("/{lawn_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -206,7 +106,7 @@ async def delete_lawn(lawn_id: int, db: AsyncSession = Depends(get_db)):
     # Store location_id for later use
     location_id = db_lawn.location_id
 
-    # Delete the lawn
+    # Delete the lawn (this will cascade to delete GDD models)
     await db.delete(db_lawn)
     await db.commit()
 
@@ -215,19 +115,28 @@ async def delete_lawn(lawn_id: int, db: AsyncSession = Depends(get_db)):
     remaining_lawns = result.scalars().all()
 
     if not remaining_lawns:
-        # This was the last lawn, delete location and weather data
-        # First delete all weather data for this location
+        # This was the last lawn, clean up location-related data
+        from app.models.location import Location
+        from app.models.daily_weather import DailyWeather
+        from app.models.task_status import TaskStatus
+
+        # Delete weather data for this location
         await db.execute(
             DailyWeather.__table__.delete().where(
                 DailyWeather.location_id == location_id
             )
         )
-        # Then delete all task_status records for this location
+
+        # Delete task status records for this location
         await db.execute(
             TaskStatus.__table__.delete().where(
                 TaskStatus.related_location_id == location_id
             )
         )
-        # Then delete the location
-        await db.execute(Location.__table__.delete().where(Location.id == location_id))
+
+        # Delete the location
+        location = await db.get(Location, location_id)
+        if location:
+            await db.delete(location)
+
         await db.commit()

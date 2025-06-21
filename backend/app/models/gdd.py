@@ -8,7 +8,6 @@ from sqlalchemy import (
     Boolean,
     ForeignKey,
     UniqueConstraint,
-    Column,
     Integer,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -33,7 +32,9 @@ class GDDModel(Base):
     __table_args__ = (UniqueConstraint("lawn_id", "name", name="uix_lawn_name"),)
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    lawn_id: Mapped[int] = mapped_column(ForeignKey("lawns.id"), nullable=False)
+    lawn_id: Mapped[int] = mapped_column(
+        ForeignKey("lawns.id", ondelete="CASCADE"), nullable=False
+    )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     base_temp: Mapped[float] = mapped_column(Float, nullable=False)
     unit: Mapped[TempUnit] = mapped_column(Enum(TempUnit), nullable=False)
@@ -71,7 +72,7 @@ class GDDModelParameters(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     gdd_model_id: Mapped[int] = mapped_column(
-        ForeignKey("gdd_models.id"), nullable=False
+        ForeignKey("gdd_models.id", ondelete="CASCADE"), nullable=False
     )
     base_temp: Mapped[float] = mapped_column(Float, nullable=False)
     threshold: Mapped[float] = mapped_column(Float, nullable=False)
@@ -89,7 +90,7 @@ class GDDValue(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     gdd_model_id: Mapped[int] = mapped_column(
-        ForeignKey("gdd_models.id"), nullable=False
+        ForeignKey("gdd_models.id", ondelete="CASCADE"), nullable=False
     )
     date: Mapped[Date] = mapped_column(Date, nullable=False)
     daily_gdd: Mapped[float] = mapped_column(Float, nullable=False)
@@ -105,7 +106,7 @@ class GDDReset(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     gdd_model_id: Mapped[int] = mapped_column(
-        ForeignKey("gdd_models.id"), nullable=False
+        ForeignKey("gdd_models.id", ondelete="CASCADE"), nullable=False
     )
     reset_date: Mapped[Date] = mapped_column(Date, nullable=False)
     run_number: Mapped[int] = mapped_column(Integer, nullable=False)

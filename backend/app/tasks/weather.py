@@ -1,18 +1,13 @@
 import datetime
 from app.celery_app import app
-from app.core.database import async_session_maker, SessionLocal
-from app.utils.weather import upsert_daily_weather, upsert_daily_weather_sync
+from app.core.database import SessionLocal
 from app.models.daily_weather import WeatherType
 import openmeteo_requests
 from app.models.lawn import Lawn
 from sqlalchemy.future import select
 from app.models.task_status import TaskStatus, TaskStatusEnum
-import asyncio
-from sqlalchemy import and_, insert, update, text
-from sqlalchemy.dialects.postgresql import insert
-from app.models.daily_weather import DailyWeather
+from sqlalchemy import and_, text
 from sqlalchemy.orm import Session
-from app.models.location import Location
 import logging
 from app.models.gdd import GDDModel
 from app.utils.gdd import calculate_and_store_gdd_values_sync_segmented
@@ -151,6 +146,8 @@ def fetch_and_store_weather(self, location_id: int, latitude: float, longitude: 
 def _fetch_and_store_weather_sync(
     location_id: int, latitude: float, longitude: float, session
 ):
+    from app.utils.weather import upsert_daily_weather_sync
+
     om = openmeteo_requests.Client()
     today = datetime.date.today()
 
@@ -221,6 +218,8 @@ def _extract_weather_data(daily, i):
 def _update_recent_weather_for_location_sync(
     location_id: int, latitude: float, longitude: float
 ):
+    from app.utils.weather import upsert_daily_weather_sync
+
     with SessionLocal() as session:
         om = openmeteo_requests.Client()
         # Fetch only yesterday's historical data

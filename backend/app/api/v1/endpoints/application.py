@@ -69,7 +69,7 @@ async def create_application(
         created_apps.append(db_app)
     await db.commit()
     for db_app in created_apps:
-        await db.refresh(db_app)
+        await db.refresh(db_app, attribute_names=["lawn", "product"])
         # GDD reset and recalculation logic
         if db_app.tied_gdd_model_id:
             # Remove any existing reset for this date

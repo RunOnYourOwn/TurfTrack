@@ -2,7 +2,62 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.models.daily_weather import DailyWeather, WeatherType
 import datetime
-from sqlalchemy import text
+from sqlalchemy import exists
+import logging
+import uuid
+
+from app.models.lawn import Lawn
+from app.models.task_status import TaskStatus, TaskStatusEnum
+
+
+async def trigger_weather_fetch_if_needed(db: AsyncSession, lawn: Lawn):
+    """
+    Checks if a weather fetch is needed for a lawn's location and triggers it.
+
+    A fetch is needed if weather is enabled for the lawn and no weather data
+    currently exists for its location. If not needed, it creates a success
+    task status record for visibility in the UI.
+    """
+    from app.tasks.weather import fetch_and_store_weather
+
+    if not lawn.weather_enabled:
+        return
+
+    # A location object should be loaded on the lawn object before calling this
+    if not lawn.location:
+        await db.refresh(lawn, attribute_names=["location"])
+
+    weather_exists = await db.execute(
+        select(exists().where(DailyWeather.location_id == lawn.location_id))
+    )
+
+    logger = logging.getLogger("turftrack.weather_util")
+
+    if not weather_exists.scalar():
+        logger.info(
+            f"No weather data found for location_id={lawn.location_id}. Triggering fetch_and_store_weather."
+        )
+        fetch_and_store_weather.delay(
+            lawn.location_id, lawn.location.latitude, lawn.location.longitude
+        )
+    else:
+        logger.info(
+            f"Weather data already exists for location_id={lawn.location_id}. No fetch needed."
+        )
+        # Create a TaskStatus record to indicate weather already exists for clarity in the UI
+        now = datetime.datetime.now(datetime.timezone.utc)
+        task_status = TaskStatus(
+            task_id=str(uuid.uuid4()),
+            task_name="fetch_and_store_weather",
+            related_location_id=lawn.location_id,
+            status=TaskStatusEnum.success,
+            created_at=now,
+            started_at=now,
+            finished_at=now,
+            result="Weather data for this location already exists. No new fetch was needed.",
+        )
+        db.add(task_status)
+        await db.commit()
 
 
 async def upsert_daily_weather(
