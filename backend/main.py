@@ -9,6 +9,7 @@ from app.core.redis import get_redis
 from app.core.logging import configure_logging
 from app.core.logging_config import get_logger, log_exception
 from app.middleware.logging import LoggingMiddleware
+from app.middleware.security import SecurityHeadersMiddleware
 from app.core.health import check_database, check_redis, check_celery
 from datetime import datetime
 
@@ -24,8 +25,11 @@ app = FastAPI(
     debug=settings.DEBUG,
 )
 
-# Add logging middleware first (before CORS)
+# Add logging middleware first
 app.add_middleware(LoggingMiddleware)
+
+# Add security headers middleware
+app.add_middleware(SecurityHeadersMiddleware)
 
 # Set up CORS middleware
 app.add_middleware(
