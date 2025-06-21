@@ -4,18 +4,47 @@ This document tracks the necessary improvements and best practices to implement 
 
 ---
 
-## 1. Backend (FastAPI)
+## 🚨 CRITICAL: Must Complete Before Public Release
 
-The backend is well-structured, following many of FastAPI's conventions. The use of Pydantic, SQLAlchemy, and APIRouters is solid.
+These items are essential for security, stability, and basic production readiness.
 
-### ✅ What's Done Well
+### Backend (FastAPI)
 
-- **Async Support:** All endpoint and database operations are `async`, which is excellent for performance.
-- **Dependency Injection:** Using `Depends(get_db)` for database sessions is the correct pattern for managing resources.
-- **Configuration Management:** `pydantic-settings` is used to manage settings from environment variables and `.env` files.
-- **Code Organization:** The project is logically structured into `api`, `core`, `models`, `schemas`, and `tasks`.
+- [ ] **Add API Rate Limiting:** The API currently has no rate limiting, which could lead to abuse in production.
 
-### 💡 Areas for Improvement
+  - **Recommendation:** Implement rate limiting middleware using libraries like `slowapi` or custom middleware to protect against abuse.
+
+- [ ] **Add Comprehensive Testing:** The project has a test directory structure but no actual tests.
+
+  - **Recommendation:** Add unit tests for all endpoints, models, and utility functions. Include integration tests for database operations and API workflows. Use pytest fixtures for database setup/teardown.
+
+### Docker & Deployment
+
+- [ ] **Run as Non-Root User:** Containers are currently running as the `root` user, which is a security risk.
+
+  - **Recommendation:** In production Dockerfiles, create and switch to a non-root user before running the application.
+
+- [ ] **Add `.dockerignore` Files:** The project is missing `.dockerignore` files.
+
+  - **Recommendation:** Add `.dockerignore` files to the `frontend` and `backend` directories to prevent secrets, local dependencies, and git history from being included in the build context.
+
+### General Project
+
+- [ ] **Create a `.env.example` File:** This is crucial for onboarding new developers.
+
+  - **Recommendation:** Add a `.env.example` file to the project root that documents all required environment variables without committing any secrets.
+
+- [ ] **Improve Root `README.md`:** The project needs a central `README.md` that explains the architecture, setup, and how to run the application.
+
+  - **Recommendation:** Expand the `README.md` with clear instructions for both development and production environments.
+
+---
+
+## ✅ COMPLETED: Already Implemented
+
+These items have been successfully implemented and are working well.
+
+### Backend (FastAPI)
 
 - [x] **Refactor DTO Mapping:** In endpoints (`lawn.py`, etc.), you manually map SQLAlchemy models to Pydantic schemas.
 
@@ -37,10 +66,6 @@ The backend is well-structured, following many of FastAPI's conventions. The use
 
   - **Recommendation:** Add custom validators for business logic (e.g., date ranges, coordinate validation) and implement proper error responses for invalid inputs.
 
-- [ ] **Add API Rate Limiting:** The API currently has no rate limiting, which could lead to abuse in production.
-
-  - **Recommendation:** Implement rate limiting middleware using libraries like `slowapi` or custom middleware to protect against abuse.
-
 - [x] **Improve Logging Configuration:** Current logging is basic and doesn't follow production best practices.
 
   - **Recommendation:** Implement structured logging with proper log levels, add request/response logging middleware, and configure log rotation for production.
@@ -48,10 +73,6 @@ The backend is well-structured, following many of FastAPI's conventions. The use
 - [x] **Add Health Check Endpoints:** No health check endpoints for monitoring and load balancers.
 
   - **Recommendation:** Add `/health` and `/ready` endpoints that check database connectivity, Redis connectivity, and other critical dependencies.
-
-<!-- - [ ] **Implement API Versioning Strategy:** The API uses `/api/v1/` but has no clear versioning strategy for future changes.
-
-  - **Recommendation:** Document API versioning strategy and implement proper deprecation warnings for future breaking changes. -->
 
 - [x] **Add Request/Response Middleware:** No middleware for request tracking, performance monitoring, or security headers.
 
@@ -81,24 +102,36 @@ The backend is well-structured, following many of FastAPI's conventions. The use
     - All indexes confirmed to be used by PostgreSQL query planner where appropriate
     - Expected 5-50x performance improvement for date range and filtering queries
 
-- [ ] **Add Comprehensive Testing:** The project has a test directory structure but no actual tests.
+### Docker & Deployment
 
-  - **Recommendation:** Add unit tests for all endpoints, models, and utility functions. Include integration tests for database operations and API workflows. Use pytest fixtures for database setup/teardown.
+- [x] **Multi-stage Builds:** Production Dockerfiles use multi-stage builds to create small, secure images.
+- [x] **Separate Environments:** Distinct `dev` and `prod` compose files allow for environment-specific configurations.
+- [x] **Healthchecks:** The `db` service healthcheck ensures a proper startup order.
 
 ---
 
-## 2. Frontend (React)
+## 🔄 POST-RELEASE: Nice-to-Have Improvements
+
+These items can be implemented after the initial public release to improve user experience, performance, and maintainability.
+
+### Backend (FastAPI)
+
+- [ ] **Implement API Versioning Strategy:** The API uses `/api/v1/` but has no clear versioning strategy for future changes.
+
+  - **Recommendation:** Document API versioning strategy and implement proper deprecation warnings for future breaking changes.
+
+### Frontend (React)
 
 The frontend uses modern tools like Vite, TypeScript, and TanStack Query, which is a great foundation.
 
-### ✅ What's Done Well
+#### ✅ What's Done Well
 
 - **Data Fetching:** Using `@tanstack/react-query` (`useQuery`) simplifies server state management, caching, and re-fetching.
 - **Component Library:** `shadcn/ui` provides beautiful, accessible, and consistent UI components.
 - **TypeScript:** The use of TypeScript is essential for building a scalable and maintainable frontend.
 - **Structure:** Standard directory structure (`pages`, `components`, `layouts`) is easy to follow.
 
-### 💡 Areas for Improvement
+#### 💡 Areas for Improvement (Post-Release)
 
 - [ ] **Break Down Large Components:** Pages like `Lawns.tsx` manage too much state, making them large and hard to maintain.
 
@@ -133,47 +166,13 @@ The frontend uses modern tools like Vite, TypeScript, and TanStack Query, which 
     </Suspense>;
     ```
 
----
-
-## 3. Docker & Deployment
-
-The Docker setup provides a good separation between development and production environments.
-
-### ✅ What's Done Well
-
-- **Multi-stage Builds:** Production Dockerfiles use multi-stage builds to create small, secure images.
-- **Separate Environments:** Distinct `dev` and `prod` compose files allow for environment-specific configurations.
-- **Healthchecks:** The `db` service healthcheck ensures a proper startup order.
-
-### 💡 Areas for Improvement
-
-- [ ] **Run as Non-Root User:** Containers are currently running as the `root` user, which is a security risk.
-
-  - **Recommendation:** In production Dockerfiles, create and switch to a non-root user before running the application.
-
-- [ ] **Add `.dockerignore` Files:** The project is missing `.dockerignore` files.
-
-  - **Recommendation:** Add `.dockerignore` files to the `frontend` and `backend` directories to prevent secrets, local dependencies, and git history from being included in the build context.
+### Docker & Deployment
 
 - [ ] **Keep Compose Files DRY:** The `docker-compose.prod.yml` repeats many environment variables across services.
 
   - **Recommendation:** Use YAML anchors or `x-` extension fields to define common environment blocks once and reuse them.
 
----
-
-## 4. General Project
-
-- [ ] **Create a `.env.example` File:** This is crucial for onboarding new developers.
-
-  - **Recommendation:** Add a `.env.example` file to the project root that documents all required environment variables without committing any secrets.
-
-- [ ] **Improve Root `README.md`:** The project needs a central `README.md` that explains the architecture, setup, and how to run the application.
-
-  - **Recommendation:** Expand the `README.md` with clear instructions for both development and production environments.
-
----
-
-## 5. Performance Optimizations
+### Performance Optimizations
 
 - [ ] **Fix N+1 Query in `list_applications`:** The endpoint currently fetches applications and then lazy-loads the related `Lawn` and `Product` for each one, causing many unnecessary database queries.
 
@@ -188,22 +187,12 @@ The Docker setup provides a good separation between development and production e
     )
     ```
 
-- [ ] **Add Database Indexes:** Some queries may be slow because they filter on un-indexed columns.
+---
 
-  - **Recommendation:** Add `index=True` to columns that are frequently used in `WHERE` clauses, such as dates or foreign keys if they are not already indexed. For example, `application_date` in the `applications` table.
+## 📊 Progress Summary
 
-    ```python
-    # In models/application.py
-    application_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
-    ```
+- **Critical Items Remaining:** 5
+- **Completed Items:** 10
+- **Post-Release Improvements:** 6
 
-    _Note: This will require a new Alembic migration._
-
-  - **✅ Implemented:** Added comprehensive database indexes across all major tables:
-    - **Applications**: `application_date` and `status` indexes for date range filtering and status queries
-    - **GDD Values**: `date` index for GDD calculation performance
-    - **GDD Resets**: `reset_date` index for reset processing
-    - **GDD Model Parameters**: `effective_from` index for parameter history lookups
-    - **Task Status**: `started_at` and `status` indexes for task monitoring
-    - All indexes confirmed to be used by PostgreSQL query planner where appropriate
-    - Expected 5-50x performance improvement for date range and filtering queries
+**Overall Progress:** 67% complete for production readiness

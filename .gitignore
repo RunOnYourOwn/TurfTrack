@@ -42,3 +42,4 @@ Thumbs.db
 .DS_Store
 backend/app/core/__pycache__/database.cpython-312.pyc
 backend/app/api/v1/__pycache__/router.cpython-312.pyc
+docs/before_production.md
