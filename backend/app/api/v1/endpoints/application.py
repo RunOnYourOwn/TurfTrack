@@ -15,19 +15,29 @@ from app.utils.gdd import calculate_and_store_gdd_values_sync_segmented
 from app.utils.application import calculate_application_results
 from app.models.lawn import Lawn
 from app.models.product import Product
+from sqlalchemy.orm import selectinload
 
 router = APIRouter(prefix="/applications", tags=["applications"])
 
 
 @router.get("/", response_model=List[ApplicationRead])
 async def list_applications(
-    lawn_id: Optional[int] = Query(None), db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    skip: int = 0,
+    limit: int = 100,
+    lawn_id: Optional[int] = Query(None, description="Filter by lawn ID"),
 ):
-    query = select(Application)
+    query = (
+        select(Application)
+        .options(selectinload(Application.lawn), selectinload(Application.product))
+        .offset(skip)
+        .limit(limit)
+    )
     if lawn_id is not None:
         query = query.where(Application.lawn_id == lawn_id)
     result = await db.execute(query)
-    return result.scalars().all()
+    applications = result.scalars().all()
+    return applications
 
 
 @router.get("/{application_id}", response_model=ApplicationRead)

@@ -24,7 +24,6 @@ class Lawn(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     area: Mapped[float] = mapped_column(Float, nullable=False)
     grass_type: Mapped[GrassType] = mapped_column(Enum(GrassType), nullable=False)
-    location: Mapped[str] = mapped_column(String(255), nullable=False)
     notes: Mapped[str] = mapped_column(String(500), nullable=True)
     weather_fetch_frequency: Mapped[WeatherFetchFrequency] = mapped_column(
         Enum(WeatherFetchFrequency),

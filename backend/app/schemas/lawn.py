@@ -1,22 +1,23 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, Literal
 from datetime import datetime
+from app.models.lawn import GrassType, WeatherFetchFrequency
+from .location import LocationRead
 
 
-class LawnCreate(BaseModel):
-    name: str = Field(..., description="Lawn name", example="Front Yard")
-    area: float = Field(..., description="Lawn area in square feet", example=1200)
-    grass_type: Literal["cold_season", "warm_season"] = Field(
-        ..., description="Grass type"
-    )
-    notes: Optional[str] = Field(None, description="Additional notes")
-    weather_fetch_frequency: Literal["4h", "8h", "12h", "24h"] = Field(
-        "24h", description="How often to fetch weather data (default: 24h)"
-    )
-    timezone: str = Field(..., description="IANA timezone, e.g. America/Chicago")
-    weather_enabled: bool = Field(True, description="Enable weather data fetching")
-    latitude: Optional[float] = Field(None, description="Latitude for weather lookup")
-    longitude: Optional[float] = Field(None, description="Longitude for weather lookup")
+class LawnBase(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    area: float
+    grass_type: GrassType
+    notes: Optional[str] = Field(None, max_length=500)
+    weather_fetch_frequency: WeatherFetchFrequency
+    timezone: str
+    weather_enabled: bool = True
+
+
+class LawnCreate(LawnBase):
+    latitude: float = Field(..., ge=-90, le=90)
+    longitude: float = Field(..., ge=-180, le=180)
 
     @field_validator("area")
     def area_must_be_positive(cls, v):
@@ -24,61 +25,29 @@ class LawnCreate(BaseModel):
             raise ValueError("Area must be greater than 0")
         return v
 
-    @field_validator("latitude")
-    def latitude_must_be_valid(cls, v):
-        if v is not None and not -90 <= v <= 90:
-            raise ValueError("Latitude must be between -90 and 90")
-        return v
 
-    @field_validator("longitude")
-    def longitude_must_be_valid(cls, v):
-        if v is not None and not -180 <= v <= 180:
-            raise ValueError("Longitude must be between -180 and 180")
-        return v
-
-
-class LawnRead(BaseModel):
-    id: int = Field(...)
-    name: str = Field(...)
-    area: float = Field(...)
-    grass_type: str = Field(...)
-    notes: Optional[str] = Field(None)
-    weather_fetch_frequency: str = Field(...)
-    timezone: str = Field(...)
-    weather_enabled: bool = Field(...)
-    latitude: Optional[float] = Field(None, description="Latitude for weather lookup")
-    longitude: Optional[float] = Field(None, description="Longitude for weather lookup")
-    created_at: datetime = Field(...)
-    updated_at: datetime = Field(...)
+class LawnRead(LawnBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+    location: LocationRead
 
     model_config = {"from_attributes": True}
 
 
 class LawnUpdate(BaseModel):
-    name: Optional[str] = Field(None)
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
     area: Optional[float] = Field(None)
-    grass_type: Optional[Literal["cold_season", "warm_season"]] = Field(None)
-    notes: Optional[str] = Field(None)
-    weather_fetch_frequency: Optional[Literal["4h", "8h", "12h", "24h"]] = Field(None)
-    timezone: Optional[str] = Field(None)
-    weather_enabled: Optional[bool] = Field(None)
-    latitude: Optional[float] = Field(None, description="Latitude for weather lookup")
-    longitude: Optional[float] = Field(None, description="Longitude for weather lookup")
+    grass_type: Optional[GrassType] = None
+    notes: Optional[str] = Field(None, max_length=500)
+    weather_fetch_frequency: Optional[WeatherFetchFrequency] = None
+    timezone: Optional[str] = None
+    weather_enabled: Optional[bool] = None
+    latitude: Optional[float] = Field(None, ge=-90, le=90)
+    longitude: Optional[float] = Field(None, ge=-180, le=180)
 
     @field_validator("area")
     def area_must_be_positive(cls, v):
         if v is not None and v <= 0:
             raise ValueError("Area must be greater than 0")
-        return v
-
-    @field_validator("latitude")
-    def latitude_must_be_valid(cls, v):
-        if v is not None and not -90 <= v <= 90:
-            raise ValueError("Latitude must be between -90 and 90")
-        return v
-
-    @field_validator("longitude")
-    def longitude_must_be_valid(cls, v):
-        if v is not None and not -180 <= v <= 180:
-            raise ValueError("Longitude must be between -180 and 180")
         return v
