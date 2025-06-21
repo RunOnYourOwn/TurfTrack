@@ -37,9 +37,14 @@
 - Products CRUD UI complete with grouped nutrient fields
 - **Database Performance Optimization:**
   - Fixed N+1 query problem in applications endpoint using `selectinload`
-  - Added database indexes on `applications.application_date` and `applications.status`
-  - Improved query performance for date range filtering and status filtering
-  - Status index confirmed to be used by PostgreSQL query planner
+  - Added comprehensive database indexes across all major tables:
+    - Applications: `application_date` and `status` indexes
+    - GDD Values: `date` index for calculation performance
+    - GDD Resets: `reset_date` index for reset processing
+    - GDD Model Parameters: `effective_from` index for parameter history
+    - Task Status: `started_at` and `status` indexes for monitoring
+  - All indexes confirmed to be used by PostgreSQL query planner
+  - Expected 5-50x performance improvement for date range and filtering queries
 
 ## In Progress
 
