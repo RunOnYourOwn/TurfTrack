@@ -29,8 +29,9 @@ COPY backend/alembic/ ./alembic/
 COPY backend/main.py .
 COPY backend/alembic.ini .
 
-# Copy VERSION file for version management
+# Copy VERSION file for version management (from project root)
 COPY VERSION .
+COPY VERSION ./app/
 
 # Set Python to run in unbuffered mode (better for logging)
 ENV PYTHONUNBUFFERED=1

@@ -37,6 +37,10 @@ COPY backend/ .
 # Copy the .env file from the project root
 COPY .env .env
 
+# Copy the VERSION file from the project root
+COPY VERSION .
+COPY VERSION ./app/
+
 # Set Python to run in unbuffered mode
 ENV PYTHONUNBUFFERED=1
 

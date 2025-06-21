@@ -126,7 +126,7 @@ def get_git_info() -> Dict[str, str]:
 
 def get_build_info() -> Dict[str, Any]:
     """
-    Get comprehensive build information.
+    Get comprehensive build information, omitting fields with only 'unknown' values.
 
     Returns:
         Dict[str, Any]: Dictionary containing build information
@@ -137,17 +137,28 @@ def get_build_info() -> Dict[str, Any]:
         version = "unknown"
 
     git_info = get_git_info()
-
-    return {
-        "version": version,
-        "build_date": datetime.utcnow().isoformat() + "Z",
-        "git": git_info,
-        "environment": {
-            "python_version": f"{os.sys.version_info.major}.{os.sys.version_info.minor}.{os.sys.version_info.micro}",
-            "platform": os.sys.platform,
-        },
+    environment = {
+        "python_version": f"{os.sys.version_info.major}.{os.sys.version_info.minor}.{os.sys.version_info.micro}",
+        "platform": os.sys.platform,
     }
 
+    result = {
+        "version": version,
+        "build_date": datetime.utcnow().isoformat() + "Z",
+    }
 
-# Version info for easy access
-__version__ = get_version()
+    # Only include git if at least one value is not 'unknown'
+    if any(v != "unknown" for v in git_info.values()):
+        result["git"] = git_info
+
+    # Only include environment if at least one value is not 'unknown'
+    if any(v != "unknown" for v in environment.values()):
+        result["environment"] = environment
+
+    return result
+
+
+# Version info for easy access (lazy loading)
+def __version__() -> str:
+    """Get version string - lazy loaded to avoid import errors."""
+    return get_version()
