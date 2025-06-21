@@ -23,10 +23,10 @@ class TaskStatus(Base):
         Integer, ForeignKey("lawns.id", ondelete="CASCADE"), nullable=True
     )
     status = Column(
-        Enum(TaskStatusEnum), nullable=False, default=TaskStatusEnum.pending
+        Enum(TaskStatusEnum), nullable=False, default=TaskStatusEnum.pending, index=True
     )
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    started_at = Column(DateTime(timezone=True), nullable=True)
+    started_at = Column(DateTime(timezone=True), nullable=True, index=True)
     finished_at = Column(DateTime(timezone=True), nullable=True)
     result = Column(Text, nullable=True)
     error = Column(Text, nullable=True)

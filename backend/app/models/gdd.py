@@ -77,7 +77,7 @@ class GDDModelParameters(Base):
     base_temp: Mapped[float] = mapped_column(Float, nullable=False)
     threshold: Mapped[float] = mapped_column(Float, nullable=False)
     reset_on_threshold: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    effective_from: Mapped[Date] = mapped_column(Date, nullable=False)
+    effective_from: Mapped[Date] = mapped_column(Date, nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow
     )
@@ -92,7 +92,7 @@ class GDDValue(Base):
     gdd_model_id: Mapped[int] = mapped_column(
         ForeignKey("gdd_models.id", ondelete="CASCADE"), nullable=False
     )
-    date: Mapped[Date] = mapped_column(Date, nullable=False)
+    date: Mapped[Date] = mapped_column(Date, nullable=False, index=True)
     daily_gdd: Mapped[float] = mapped_column(Float, nullable=False)
     cumulative_gdd: Mapped[float] = mapped_column(Float, nullable=False)
     is_forecast: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -108,7 +108,7 @@ class GDDReset(Base):
     gdd_model_id: Mapped[int] = mapped_column(
         ForeignKey("gdd_models.id", ondelete="CASCADE"), nullable=False
     )
-    reset_date: Mapped[Date] = mapped_column(Date, nullable=False)
+    reset_date: Mapped[Date] = mapped_column(Date, nullable=False, index=True)
     run_number: Mapped[int] = mapped_column(Integer, nullable=False)
     reset_type: Mapped[ResetType] = mapped_column(Enum(ResetType), nullable=False)
     created_at: Mapped[datetime] = mapped_column(

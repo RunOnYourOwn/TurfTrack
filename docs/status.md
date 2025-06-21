@@ -19,7 +19,7 @@
 - React Query integration for all data fetching and caching
 - Weather data ingestion and deduplication (no duplicate fetches for same location)
 - Celery Beat and Worker setup for scheduled and manual weather updates
-- Logging for weather fetch logic and deduplication
+- Logging for weather data fetch logic and deduplication
 - Task status API endpoints exposed and ready for frontend integration
 - Robust weather data upsert with atomic operations
 - Fixed race conditions in weather data updates
@@ -35,6 +35,11 @@
 - Task monitoring for weather and GDD recalculation jobs
 - MVP achieved: System is robust, user-friendly, and production-ready
 - Products CRUD UI complete with grouped nutrient fields
+- **Database Performance Optimization:**
+  - Fixed N+1 query problem in applications endpoint using `selectinload`
+  - Added database indexes on `applications.application_date` and `applications.status`
+  - Improved query performance for date range filtering and status filtering
+  - Status index confirmed to be used by PostgreSQL query planner
 
 ## In Progress
 

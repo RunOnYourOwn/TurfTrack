@@ -32,13 +32,16 @@ class Application(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     lawn_id: Mapped[int] = mapped_column(ForeignKey("lawns.id"), nullable=False)
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), nullable=False)
-    application_date: Mapped[date] = mapped_column(Date, nullable=False)
+    application_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     amount_per_area: Mapped[float] = mapped_column(Float, nullable=False)
     area_unit: Mapped[int] = mapped_column(Integer, nullable=False, default=1000)
     unit: Mapped[ApplicationUnit] = mapped_column(Enum(ApplicationUnit), nullable=False)
     notes: Mapped[str] = mapped_column(String(512), nullable=True)
     status: Mapped[ApplicationStatus] = mapped_column(
-        Enum(ApplicationStatus), nullable=False, default=ApplicationStatus.planned
+        Enum(ApplicationStatus),
+        nullable=False,
+        default=ApplicationStatus.planned,
+        index=True,
     )
     tied_gdd_model_id: Mapped[int | None] = mapped_column(
         ForeignKey("gdd_models.id"), nullable=True
