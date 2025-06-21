@@ -11,7 +11,8 @@ from sqlalchemy.orm import Session
 import logging
 from app.models.gdd import GDDModel
 from app.utils.gdd import calculate_and_store_gdd_values_sync_segmented
-import uuid
+from sqlalchemy.exc import SQLAlchemyError
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -111,36 +112,56 @@ async def create_or_update_task_status(
 @app.task(name="fetch_and_store_weather", bind=True)
 def fetch_and_store_weather(self, location_id: int, latitude: float, longitude: float):
     task_id = self.request.id
-    with SessionLocal() as session:
-        try:
-            create_or_update_task_status_sync(
-                session,
-                task_id,
-                "fetch_and_store_weather",
-                location_id,
-                TaskStatusEnum.started,
-                started=True,
-            )
-            _fetch_and_store_weather_sync(location_id, latitude, longitude, session)
-            create_or_update_task_status_sync(
-                session,
-                task_id,
-                "fetch_and_store_weather",
-                location_id,
-                TaskStatusEnum.success,
-                finished=True,
-            )
-        except Exception as e:
-            create_or_update_task_status_sync(
-                session,
-                task_id,
-                "fetch_and_store_weather",
-                location_id,
-                TaskStatusEnum.failure,
-                error=str(e),
-                finished=True,
-            )
-            raise
+    try:
+        with SessionLocal() as session:
+            try:
+                create_or_update_task_status_sync(
+                    session,
+                    task_id,
+                    "fetch_and_store_weather",
+                    location_id,
+                    TaskStatusEnum.started,
+                    started=True,
+                )
+                _fetch_and_store_weather_sync(location_id, latitude, longitude, session)
+                create_or_update_task_status_sync(
+                    session,
+                    task_id,
+                    "fetch_and_store_weather",
+                    location_id,
+                    TaskStatusEnum.success,
+                    finished=True,
+                )
+            except (requests.exceptions.RequestException, SQLAlchemyError) as e:
+                logger.error(f"Weather task failed for loc {location_id}: {e}")
+                create_or_update_task_status_sync(
+                    session,
+                    task_id,
+                    "fetch_and_store_weather",
+                    location_id,
+                    TaskStatusEnum.failure,
+                    error=str(e),
+                    finished=True,
+                )
+                raise
+            except Exception as e:
+                logger.error(
+                    f"An unexpected error occurred in weather task for loc {location_id}: {e}"
+                )
+                create_or_update_task_status_sync(
+                    session,
+                    task_id,
+                    "fetch_and_store_weather",
+                    location_id,
+                    TaskStatusEnum.failure,
+                    error="An unexpected error occurred.",
+                    finished=True,
+                )
+                raise
+    except SQLAlchemyError as e:
+        logger.critical(f"Database connection failed for weather task: {e}")
+        # Cannot update task status if DB is down, Celery will retry
+        raise
 
 
 def _fetch_and_store_weather_sync(
@@ -302,90 +323,64 @@ def _update_recent_weather_for_location_sync(
 
 @app.task(name="update_weather_for_all_lawns", bind=True)
 def update_weather_for_all_lawns(self):
+    """
+    Scheduled task to update weather for all locations that have weather enabled.
+    """
     task_id = self.request.id
     with SessionLocal() as session:
-        result = session.execute(select(Lawn).where(Lawn.weather_enabled.is_(True)))
-        lawns = result.scalars().all()
-        for lawn in lawns:
-            location = lawn.location
-            if location:
+        try:
+            # Get all distinct locations for lawns with weather enabled
+            result = session.execute(
+                select(Lawn.location_id, Lawn.latitude, Lawn.longitude)
+                .where(Lawn.weather_enabled == True)
+                .distinct()
+            )
+            locations = result.all()
+            for loc in locations:
                 try:
-                    create_or_update_task_status_sync(
-                        session,
-                        task_id,
-                        "update_recent_weather_for_location",
-                        location.id,
-                        TaskStatusEnum.started,
-                        started=True,
-                    )
                     _update_recent_weather_for_location_sync(
-                        location.id,
-                        location.latitude,
-                        location.longitude,
+                        loc.location_id, loc.latitude, loc.longitude
                     )
-                    create_or_update_task_status_sync(
-                        session,
-                        task_id,
-                        "update_recent_weather_for_location",
-                        location.id,
-                        TaskStatusEnum.success,
-                        finished=True,
+                except (requests.exceptions.RequestException, SQLAlchemyError) as e:
+                    logger.error(
+                        f"Failed to update weather for location {loc.location_id}: {e}"
                     )
+                    # Log and continue to next location
                 except Exception as e:
-                    create_or_update_task_status_sync(
-                        session,
-                        task_id,
-                        "update_recent_weather_for_location",
-                        location.id,
-                        TaskStatusEnum.failure,
-                        error=str(e),
-                        finished=True,
+                    logger.error(
+                        f"An unexpected error occurred updating weather for location {loc.location_id}: {e}"
                     )
-                    raise
+        except SQLAlchemyError as e:
+            logger.critical(
+                f"Database connection failed for all-lawn weather update: {e}"
+            )
+            raise
 
 
 @app.task(name="recalculate_gdd_for_location")
 def recalculate_gdd_for_location(location_id: int):
-    with SessionLocal() as session:
-        task_id = str(uuid.uuid4())
-        from app.tasks.weather import create_or_update_task_status_sync
-
-        # Start status
-        create_or_update_task_status_sync(
-            session,
-            task_id,
-            "recalculate_gdd_for_location",
-            location_id,
-            TaskStatusEnum.started,
-            started=True,
-        )
-        try:
-            lawns = session.query(Lawn).filter(Lawn.location_id == location_id).all()
-            for lawn in lawns:
-                models = (
-                    session.query(GDDModel).filter(GDDModel.lawn_id == lawn.id).all()
-                )
-                for model in models:
+    """
+    Recalculates GDD for all models associated with a given location.
+    Triggered after weather data is updated.
+    """
+    try:
+        with SessionLocal() as session:
+            # Find all GDD models for the given location_id
+            stmt = select(GDDModel).join(Lawn).where(Lawn.location_id == location_id)
+            result = session.execute(stmt)
+            gdd_models = result.scalars().all()
+            for model in gdd_models:
+                try:
                     calculate_and_store_gdd_values_sync_segmented(
                         session, model.id, location_id
                     )
-            # Success status
-            create_or_update_task_status_sync(
-                session,
-                task_id,
-                "recalculate_gdd_for_location",
-                location_id,
-                TaskStatusEnum.success,
-                finished=True,
-            )
-        except Exception as e:
-            create_or_update_task_status_sync(
-                session,
-                task_id,
-                "recalculate_gdd_for_location",
-                location_id,
-                TaskStatusEnum.failure,
-                error=str(e),
-                finished=True,
-            )
-            raise
+                except Exception as e:
+                    logger.error(
+                        f"Failed to recalculate GDD for model {model.id} at location {location_id}: {e}"
+                    )
+                    # Log and continue
+    except SQLAlchemyError as e:
+        logger.critical(
+            f"Database connection failed for GDD recalculation task for loc {location_id}: {e}"
+        )
+        raise

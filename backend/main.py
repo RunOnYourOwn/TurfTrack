@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from redis.asyncio import Redis
+import redis.exceptions
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.redis import get_redis
@@ -52,7 +53,7 @@ async def health_check(
         # Test Redis connection
         await redis.ping()
         health_status["redis"] = "ok"
-    except Exception as e:
+    except redis.exceptions.ConnectionError as e:
         health_status["status"] = "error"
         health_status["redis_error"] = str(e)
 

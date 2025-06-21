@@ -9,7 +9,6 @@ from app.schemas.gdd import (
     GDDModelUpdate,
     GDDModelRead,
     GDDModelWithValues,
-    GDDModelWithHistory,
     GDDResetRead,
     GDDValueRead,
     GDDParameterUpdate,
@@ -243,7 +242,7 @@ async def reset_gdd_model(
 ):
     try:
         reset_date_obj = datetime_date.fromisoformat(reset_date)
-    except Exception:
+    except ValueError:
         raise HTTPException(
             status_code=400, detail="Invalid reset_date format. Use YYYY-MM-DD."
         )

@@ -26,7 +26,53 @@ The backend is well-structured, following many of FastAPI's conventions. The use
   - **Recommendation:** Refactor this into a single utility function (e.g., in `app/utils/weather.py`) to keep endpoint logic clean and DRY.
 
 - [x] **Use Database-Level Cascading Deletes:** The `delete_lawn` endpoint manually cleans up related data (location, weather).
+
   - **Recommendation:** Configure `ondelete="CASCADE"` in the SQLAlchemy models for foreign key relationships. This is more efficient and reliable. _Note: This will require a new Alembic migration._
+
+- [x] **Improve Error Handling:** Several endpoints use bare `except Exception:` blocks which can mask important errors.
+
+  - **Recommendation:** Replace generic exception handling with specific exception types and proper error logging. For example, in `gdd.py` line 245, the date parsing should catch `ValueError` specifically, not all exceptions.
+
+- [ ] **Implement Request Validation:** Some endpoints lack proper input validation beyond Pydantic schemas.
+
+  - **Recommendation:** Add custom validators for business logic (e.g., date ranges, coordinate validation) and implement proper error responses for invalid inputs.
+
+- [ ] **Add API Rate Limiting:** The API currently has no rate limiting, which could lead to abuse in production.
+
+  - **Recommendation:** Implement rate limiting middleware using libraries like `slowapi` or custom middleware to protect against abuse.
+
+- [ ] **Improve Logging Configuration:** Current logging is basic and doesn't follow production best practices.
+
+  - **Recommendation:** Implement structured logging with proper log levels, add request/response logging middleware, and configure log rotation for production.
+
+- [ ] **Add Health Check Endpoints:** No health check endpoints for monitoring and load balancers.
+
+  - **Recommendation:** Add `/health` and `/ready` endpoints that check database connectivity, Redis connectivity, and other critical dependencies.
+
+- [ ] **Implement API Versioning Strategy:** The API uses `/api/v1/` but has no clear versioning strategy for future changes.
+
+  - **Recommendation:** Document API versioning strategy and implement proper deprecation warnings for future breaking changes.
+
+- [ ] **Add Request/Response Middleware:** No middleware for request tracking, performance monitoring, or security headers.
+
+  - **Recommendation:** Add middleware for request ID tracking, CORS headers, security headers (HSTS, CSP), and performance monitoring.
+
+- [ ] **Optimize Database Queries:** Some endpoints may have N+1 query problems or inefficient queries.
+
+  - **Recommendation:** Review all database queries, add proper eager loading where needed, and consider adding database query monitoring in development.
+
+- [ ] **Add Database Indexes:** Some queries may be slow because they filter on un-indexed columns.
+
+  - **Recommendation:** Add `index=True` to columns that are frequently used in `WHERE` clauses, such as dates or foreign keys if they are not already indexed. For example, `application_date` in the `applications` table.
+    ```python
+    # In models/application.py
+    application_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    ```
+    _Note: This will require a new Alembic migration._
+
+- [ ] **Add Comprehensive Testing:** The project has a test directory structure but no actual tests.
+
+  - **Recommendation:** Add unit tests for all endpoints, models, and utility functions. Include integration tests for database operations and API workflows. Use pytest fixtures for database setup/teardown.
 
 ---
 
@@ -54,6 +100,27 @@ The frontend uses modern tools like Vite, TypeScript, and TanStack Query, which 
 - [ ] **Adopt a Form Management Library:** Form state is managed manually with `useState`.
 
   - **Recommendation:** For complex forms, use a library like `react-hook-form` with `zod` for validation to reduce boilerplate and improve robustness.
+
+- [ ] **Implement Frontend Code Splitting:** The frontend Javascript bundle could become large as the application grows, slowing down initial page loads.
+
+  - **Recommendation:** Use route-based code splitting. Vite makes this easy with `React.lazy` and dynamic `import()` statements. This loads the code for each page only when the user navigates to it.
+
+    ```tsx
+    // In App.tsx
+    import { lazy, Suspense } from "react";
+
+    const Dashboard = lazy(() => import("./pages/Dashboard"));
+    const Lawns = lazy(() => import("./pages/Lawns"));
+    // ... import other pages lazily
+
+    <Suspense fallback={<div>Loading...</div>}>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/lawns" element={<Lawns />} />
+        {/* ... other routes */}
+      </Routes>
+    </Suspense>;
+    ```
 
 ---
 
@@ -118,24 +185,3 @@ The Docker setup provides a good separation between development and production e
     application_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     ```
     _Note: This will require a new Alembic migration._
-
-- [ ] **Implement Frontend Code Splitting:** The frontend Javascript bundle could become large as the application grows, slowing down initial page loads.
-
-  - **Recommendation:** Use route-based code splitting. Vite makes this easy with `React.lazy` and dynamic `import()` statements. This loads the code for each page only when the user navigates to it.
-
-    ```tsx
-    // In App.tsx
-    import { lazy, Suspense } from "react";
-
-    const Dashboard = lazy(() => import("./pages/Dashboard"));
-    const Lawns = lazy(() => import("./pages/Lawns"));
-    // ... import other pages lazily
-
-    <Suspense fallback={<div>Loading...</div>}>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/lawns" element={<Lawns />} />
-        {/* ... other routes */}
-      </Routes>
-    </Suspense>;
-    ```
