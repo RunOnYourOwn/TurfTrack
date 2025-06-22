@@ -2,8 +2,6 @@ name: Unified CI/CD
 
 on:
   push:
-    branches:
-      - "main"
     tags:
       - "v*.*.*"
   pull_request:
@@ -55,7 +53,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: backend
-        run: uv pip install -r requirements.txt
+        run: uv pip install .
 
       - name: Set up database
         working-directory: backend
@@ -83,13 +81,6 @@ jobs:
         uses: tj-actions/coverage-badge-py@v2
         with:
           output: coverage-badge.svg
-
-      - name: Commit coverage badge
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "docs: Update coverage badge"
-          file_pattern: "coverage-badge.svg"
 
   publish:
     name: Build and Push Images
@@ -119,10 +110,8 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/turftrack-celery
             ghcr.io/${{ github.repository_owner }}/turftrack-frontend
           tags: |
-            type=ref,event=branch
             type=semver,pattern={{version}}
-            type=sha,prefix=,format=short
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest
 
       - name: Build and push backend image
         uses: docker/build-push-action@v5
