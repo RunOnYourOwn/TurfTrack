@@ -54,7 +54,7 @@ jobs:
       - name: Install dependencies
         working-directory: backend
         run: |
-          uv pip install -e .
+          uv pip install alembic asyncpg celery celery-redbeat factory-boy fastapi flower greenlet gunicorn httpx ipykernel openmeteo-requests pandas psycopg2-binary pydantic pydantic-settings pytest pytest-asyncio pytest-cov pytest-mock python-json-logger redis requests sqlalchemy uvicorn
 
       - name: Run tests (unit, integration, e2e)
         working-directory: backend
