@@ -15,19 +15,19 @@ RUN apt-get update && apt-get install -y curl && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy only the dependency files first for better caching
-COPY pyproject.toml .
+COPY backend/pyproject.toml .
 
 # Use uv to install dependencies into the virtual environment
 RUN uv pip install --python /opt/venv/bin/python --no-cache .
 
 # Copy the application code
-COPY app/ ./app/
-COPY alembic/ ./alembic/
-COPY main.py .
-COPY alembic.ini .
+COPY backend/app/ ./app/
+COPY backend/alembic/ ./alembic/
+COPY backend/main.py .
+COPY backend/alembic.ini .
 
 # Copy and set up the entrypoint script
-COPY entrypoint.sh /app/entrypoint.sh
+COPY backend/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
 # Set Python to run in unbuffered mode (better for logging)

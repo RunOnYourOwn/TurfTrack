@@ -119,7 +119,7 @@ jobs:
       - name: Build and push backend image
         uses: docker/build-push-action@v5
         with:
-          context: ./backend
+          context: .
           file: ./backend/Dockerfile.prod
           platforms: linux/amd64,linux/arm64
           push: true
@@ -129,7 +129,7 @@ jobs:
       - name: Build and push celery image
         uses: docker/build-push-action@v5
         with:
-          context: ./backend
+          context: .
           file: ./backend/Dockerfile.celery
           platforms: linux/amd64,linux/arm64
           push: true
