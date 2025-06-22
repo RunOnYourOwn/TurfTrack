@@ -48,8 +48,8 @@ services:
 
   celery_worker:
     build:
-      context: .
-      dockerfile: backend/Dockerfile.celery
+      context: ./backend
+      dockerfile: Dockerfile.celery
     command: worker
     volumes:
       - ./backend:/app
@@ -72,8 +72,8 @@ services:
 
   celery_beat:
     build:
-      context: .
-      dockerfile: backend/Dockerfile.celery
+      context: ./backend
+      dockerfile: Dockerfile.celery
     command: beat
     volumes:
       - ./backend:/app
