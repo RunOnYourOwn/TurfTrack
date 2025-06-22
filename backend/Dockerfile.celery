@@ -15,16 +15,16 @@ RUN apt-get update && apt-get install -y curl && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy only the dependency files first for better caching
-COPY backend/pyproject.toml .
+COPY pyproject.toml .
 
 # Use uv to install dependencies into the virtual environment
 RUN uv pip install --python /opt/venv/bin/python --no-cache .
 
-# Copy the application code (excluding .env directory)
-COPY backend/app/ ./app/
-COPY backend/alembic/ ./alembic/
-COPY backend/main.py .
-COPY backend/alembic.ini .
+# Copy the application code
+COPY app/ ./app/
+COPY alembic/ ./alembic/
+COPY main.py .
+COPY alembic.ini .
 
 # Set Python to run in unbuffered mode (better for logging)
 ENV PYTHONUNBUFFERED=1

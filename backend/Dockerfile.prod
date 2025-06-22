@@ -17,8 +17,8 @@ RUN apt-get update && apt-get install -y curl && \
     # Clean up apt cache to keep image small
     rm -rf /var/lib/apt/lists/*
 
-# Copy only dependency files from backend directory
-COPY backend/pyproject.toml backend/uv.lock ./
+# Copy only dependency files
+COPY pyproject.toml uv.lock ./
 
 # Use uv to install dependencies into the virtual environment
 RUN uv pip install --python /opt/venv/bin/python --no-cache .
@@ -32,10 +32,8 @@ WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy the application code from backend directory
-COPY backend/ .
-# Copy the .env file from the project root
-COPY .env .env
+# Copy the application code
+COPY . .
 
 # Copy the VERSION file from the project root
 COPY VERSION .
