@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "backend"
 version = "0.1.0"
@@ -31,3 +35,7 @@ dependencies = [
     "sqlalchemy>=2.0.40",
     "uvicorn[standard]>=0.34.2",
 ]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+exclude = ["logs*", "data*", "alembic*", "notebooks*", "tests*"]
