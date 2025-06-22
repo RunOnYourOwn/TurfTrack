@@ -97,7 +97,14 @@ jobs:
 
       - name: Copy coverage file to root
         run: |
+          echo "Before copy - checking backend directory:"
+          ls -la backend/.coverage
+          echo "Copying file..."
           cp backend/.coverage .coverage
+          echo "After copy - checking root directory:"
+          ls -la .coverage
+          echo "Checking root directory contents:"
+          ls -la
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
