@@ -10,10 +10,6 @@ These items are essential for security, stability, and basic production readines
 
 ### Backend (FastAPI)
 
-- [ ] **Add API Rate Limiting:** The API currently has no rate limiting, which could lead to abuse in production.
-
-  - **Recommendation:** Implement rate limiting middleware using libraries like `slowapi` or custom middleware to protect against abuse.
-
 - [ ] **Add Comprehensive Testing:** The project has a test directory structure but no actual tests.
 
   - **Recommendation:** Add unit tests for all endpoints, models, and utility functions. Include integration tests for database operations and API workflows. Use pytest fixtures for database setup/teardown.
@@ -23,6 +19,66 @@ These items are essential for security, stability, and basic production readines
 - [ ] **Run as Non-Root User:** Containers are currently running as the `root` user, which is a security risk.
 
   - **Recommendation:** In production Dockerfiles, create and switch to a non-root user before running the application.
+
+  - **Implementation Plan:**
+
+    #### **Phase 1: Backend API Container**
+
+    1. Update `backend/Dockerfile` (development)
+    2. Update `backend/Dockerfile.prod` (production)
+    3. Test with development environment
+    4. Verify all functionality works
+
+    #### **Phase 2: Celery Containers**
+
+    1. Update `backend/Dockerfile.celery`
+    2. Test worker and beat services
+    3. Verify task execution and scheduling
+
+    #### **Phase 3: Frontend Container**
+
+    1. Update `frontend/Dockerfile` (development)
+    2. Update `frontend/Dockerfile.prod` (production)
+    3. Test build and runtime
+
+    #### **Phase 4: Integration Testing**
+
+    1. Test all services together
+    2. Verify file permissions work correctly
+    3. Test volume mounts and persistence
+
+    #### **User ID Strategy:**
+
+    - **API**: UID 1001, GID 1001
+    - **Celery Worker**: UID 1002, GID 1002
+    - **Celery Beat**: UID 1003, GID 1003
+    - **Frontend**: UID 1004, GID 1004
+
+    #### **Critical Directories & Permissions:**
+
+    - **Application Code**: `/app` - needs read/execute
+    - **Log Files**: `/app/logs` - needs write access
+    - **Database Files**: `/app/data` - needs write access
+    - **Temporary Files**: `/tmp` - needs write access
+    - **Environment Files**: `/app/.env` - needs read access
+
+    #### **Potential Issues & Solutions:**
+
+    - **Port Binding**: Non-root users can't bind to ports < 1024 (already using port 8000)
+    - **File Permissions**: Set proper ownership in Dockerfile and docker-compose
+    - **Database Migrations**: Ensure database user has proper permissions
+    - **Log Files**: Create log directory with proper permissions
+
+    #### **Testing Strategy:**
+
+    - [ ] API endpoints respond correctly
+    - [ ] Database migrations run successfully
+    - [ ] Celery tasks execute properly
+    - [ ] Log files are written correctly
+    - [ ] File uploads/downloads work
+    - [ ] Health checks pass
+    - [ ] Verify containers don't run as root
+    - [ ] Check file permissions are correct
 
 - [ ] **Add `.dockerignore` Files:** The project is missing `.dockerignore` files.
 
@@ -120,6 +176,12 @@ These items can be implemented after the initial public release to improve user 
 
   - **Recommendation:** Document API versioning strategy and implement proper deprecation warnings for future breaking changes.
 
+- [ ] **Add API Rate Limiting:** The API currently has no rate limiting, but this may not be necessary for the current architecture.
+
+  - **Current Assessment:** API is not directly exposed externally (only accessible within Docker network via frontend proxy), so rate limiting may not provide immediate value.
+  - **Future Consideration:** Implement rate limiting if you later expose the API directly or if you see abuse patterns through the frontend.
+  - **Recommendation:** Use `slowapi` with Redis backend for distributed rate limiting. Focus on protecting heavy operations (GDD calculations) and authentication endpoints if implemented.
+
 ### Frontend (React)
 
 The frontend uses modern tools like Vite, TypeScript, and TanStack Query, which is a great foundation.
@@ -191,8 +253,8 @@ The frontend uses modern tools like Vite, TypeScript, and TanStack Query, which 
 
 ## 📊 Progress Summary
 
-- **Critical Items Remaining:** 5
+- **Critical Items Remaining:** 4
 - **Completed Items:** 10
-- **Post-Release Improvements:** 6
+- **Post-Release Improvements:** 7
 
-**Overall Progress:** 67% complete for production readiness
+**Overall Progress:** 71% complete for production readiness

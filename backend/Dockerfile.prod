@@ -44,6 +44,18 @@ COPY VERSION ./app/
 # Set Python to run in unbuffered mode
 ENV PYTHONUNBUFFERED=1
 
+# Create non-root user for API service
+RUN groupadd --system --gid 1001 api && \
+    useradd --system --uid 1001 --gid 1001 --no-create-home --shell /bin/bash api
+
+# Create necessary directories with proper permissions
+RUN mkdir -p /app/logs /app/data /tmp && \
+    chown -R api:api /app && \
+    chown -R api:api /tmp
+
+# Switch to non-root user
+USER api
+
 # Expose the port the app runs on
 EXPOSE 8000
 

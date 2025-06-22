@@ -37,12 +37,17 @@ COPY VERSION ./app/
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
 
-# # Create non-root user
-# RUN addgroup --system --gid 1001 celery && \
-#     adduser --system --uid 1001 --gid 1001 --no-create-home celery
+# Create non-root user for API service
+RUN groupadd --system --gid 1001 api && \
+    useradd --system --uid 1001 --gid 1001 --no-create-home --shell /bin/bash api
 
-# # Set ownership of the app directory
-# RUN chown -R celery:celery /app
+# Create necessary directories with proper permissions
+RUN mkdir -p /app/logs /app/data /tmp && \
+    chown -R api:api /app && \
+    chown -R api:api /tmp
 
-# # Switch to non-root user
-# USER celery
+# Switch to non-root user
+USER api
+
+# Expose the port the app runs on
+EXPOSE 8000
