@@ -144,13 +144,6 @@ release() {
         exit 1
     fi
 
-    # Check for GitHub CLI
-    if ! command -v gh &> /dev/null; then
-        print_error "GitHub CLI ('gh') not found. Please install it to create a release."
-        print_info "See: https://cli.github.com/"
-        exit 1
-    fi
-
     print_info "Starting '$bump_type' release..."
 
     # Check if working directory is clean
@@ -187,11 +180,6 @@ release() {
     
     print_success "Release $new_version created and pushed to all remotes"
     print_info "Tag: $tag_name"
-
-    # Create GitHub Release
-    print_info "Creating GitHub Release for $tag_name..."
-    gh release create "$tag_name" --generate-notes --title "Release $new_version"
-    print_success "GitHub Release $tag_name created successfully."
 }
 
 # Main script logic

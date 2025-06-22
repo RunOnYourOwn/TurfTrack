@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - "main"
+  pull_request:
+    branches:
+      - "main"
+
+jobs:
+  test:
+    name: Test and Analyze
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: turftrack_test
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U test_user -d turftrack_test" --health-interval=5s --health-timeout=5s --health-retries=5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+    env:
+      TEST_DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/turftrack_test
+      TEST_REDIS_URL: redis://localhost:6379/1
+      PYTHONUNBUFFERED: 1
+      DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/turftrack_test
+      REDIS_URL: redis://localhost:6379/0
+      CELERY_BROKER_URL: redis://localhost:6379/0
+      CELERY_RESULT_BACKEND: redis://localhost:6379/0
+      REDBEAT_REDIS_URL: redis://localhost:6379/0
+      ALEMBIC_DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/turftrack_test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Create virtual environment
+        working-directory: backend
+        run: uv venv
+
+      - name: Install dependencies
+        working-directory: backend
+        run: uv pip install -e .
+
+      - name: Set up database
+        working-directory: backend
+        run: uv run alembic upgrade head
+
+      - name: Run tests with coverage
+        id: tests
+        working-directory: backend
+        run: uv run pytest --cov=app --cov-report=xml --junitxml=pytest-report.xml
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-data
+          path: backend/coverage.xml
+
+      - name: Publish Test Report
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: backend/pytest-report.xml
+
+      - name: Generate coverage badge
+        working-directory: backend
+        run: |
+          COVERAGE=$(python -c "import xml.etree.ElementTree as ET; tree = ET.parse('coverage.xml'); root = tree.getroot(); coverage = float(root.attrib['line-rate']) * 100; print(f'{coverage:.1f}')")
+          echo "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"120\" height=\"20\"><rect width=\"120\" height=\"20\" fill=\"#555\"/><rect width=\"60\" height=\"20\" fill=\"#007ec6\"/><rect x=\"60\" width=\"60\" height=\"20\" fill=\"#4c1\"/><text x=\"30\" y=\"14\" text-anchor=\"middle\" fill=\"white\" font-family=\"DejaVu Sans,Verdana,Geneva,sans-serif\" font-size=\"11\">coverage</text><text x=\"90\" y=\"14\" text-anchor=\"middle\" fill=\"white\" font-family=\"DejaVu Sans,Verdana,Geneva,sans-serif\" font-size=\"11\">${COVERAGE}%</text></svg>" > ../coverage-badge.svg
+          echo "Generated coverage badge with ${COVERAGE}% coverage"
