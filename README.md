@@ -55,27 +55,31 @@ cd TurfTrack
   ```
 - Fill in any required values in `.env` (see comments in `.env.example` for details)
 
-### 3. Start with Docker Compose (Recommended)
+### 3. Start with Docker Compose
 
-#### Development Environment
+This project provides multiple ways to run the application depending on your needs.
+
+#### Production (Recommended for Users)
+
+This is the simplest way to run the application. It uses pre-built images from the GitHub Container Registry.
+
+```bash
+docker-compose -f docker-compose.standalone.yml up -d
+```
+
+- The application will be available at [http://localhost:3000](http://localhost:3000).
+- To update the application to a newer version, open `docker-compose.standalone.yml` and change the version tag on the `api`, `frontend`, and `celery` images.
+
+#### Development
+
+This method is for developers who want to work on the code. It mounts the local source code into the containers and enables hot-reloading.
 
 ```bash
 docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
 ```
 
-- This will start the backend, frontend, Postgres, and Redis containers in development mode.
-- The frontend will be available at [http://localhost:5173](http://localhost:5173)
-- The backend API will be available at [http://localhost:8000/api/v1](http://localhost:8000/api/v1) (development only)
-
-#### Production Environment
-
-```bash
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d
-```
-
-- This will start all services in production mode with optimized settings.
-- The frontend will be available at [http://localhost:3000](http://localhost:3000) (or your configured domain)
-- The backend API is only accessible internally within the Docker network.
+- The frontend will be available at [http://localhost:5173](http://localhost:5173).
+- The backend API will be available at [http://localhost:8000/api/v1].
 
 ---
 
@@ -98,7 +102,7 @@ cd backend
 
 ## Container Images & Deployment
 
-This project uses GitHub Actions to automatically build and publish versioned Docker images to the GitHub Container Registry (GHCR).
+This project uses GitHub Actions to automatically build and publish versioned Docker images to the GitHub Container Registry (GHCR). See `docker-compose.standalone.yml` for an example of how to use them.
 
 ### Image Versioning
 
@@ -106,34 +110,20 @@ Three separate images are published: `turftrack-backend`, `turftrack-celery`, an
 
 - `:latest`: For every push to the `main` branch, images are tagged with `:latest`. This tag represents the most recent development build.
 - `:sha-xxxxxxx`: Every commit-specific image is tagged with its short git SHA (e.g., `:cb758e7`).
-- `:<version>`: When a formal release is created using the versioning script, images are tagged with the corresponding semantic version number (e.g., `:1.2.3`).
+- `:<version>`: When a formal release is created, images are tagged with the corresponding semantic version number (e.g., `v1.2.3`).
 
 ### Creating a Release
 
-To create a new, versioned release:
+To create a new, versioned release (for maintainers):
 
-1.  Ensure all your changes are committed on the `main` branch.
+1.  Ensure all your changes are on the `main` branch.
 2.  Use the `version.sh` script to bump the version number. For example, to create a patch release:
     ```bash
-    ./scripts/version.sh bump patch
+    ./scripts/version.sh release patch
     ```
-3.  Create the release, which will update the changelog, commit the changes, and push a new version tag to GitHub:
-    ```bash
-    ./scripts/version.sh release
-    ```
-    This will trigger the "Publish Docker Images" workflow, which will build and publish the images with the new version tag.
-
-### Production Deployment
-
-The `docker-compose.prod.yml` file is configured to run the application using the pre-built images from GHCR.
-
-To deploy the latest version of the application, simply run:
-
-```bash
-docker-compose -f docker-compose.prod.yml up -d
-```
-
-For a stable production environment, it is highly recommended to edit the `docker-compose.prod.yml` file and replace the `:latest` tag with a specific version tag (e.g., `ghcr.io/runonyourown/turftrack-backend:1.0.0`) for each service. This ensures you are running a specific, tested version of the application.
+3.  This will push a new version tag to GitHub, which triggers the `Release` workflow.
+4.  The workflow will test, build, and publish the images, and create a draft release on GitHub.
+5.  Go to the GitHub Releases page to review and publish the draft.
 
 ---
 

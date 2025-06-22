@@ -44,3 +44,20 @@ Thumbs.db
 backend/app/core/__pycache__/database.cpython-312.pyc
 backend/app/api/v1/__pycache__/router.cpython-312.pyc
 docs/before_production.md
+
+# Local files
+remotes.md
+.env
+/redis_data/
+/node_modules/
+/backend/logs/
+/backend/.venv/
+/backend/app.db*
+/backend/.pytest_cache/
+/backend/__pycache__/
+/backend/coverage.xml
+/backend/pytest-report.xml
+*.pyc
+*.swp
+*.swo
+.DS_Store
