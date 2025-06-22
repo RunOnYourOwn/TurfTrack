@@ -95,22 +95,11 @@ jobs:
           echo "Checking for pytest-report.xml file..."
           ls -la pytest-report.xml || echo "pytest-report.xml file not found"
 
-      - name: Copy coverage file to root
-        run: |
-          echo "Before copy - checking backend directory:"
-          ls -la backend/.coverage
-          echo "Copying file..."
-          cp backend/.coverage .coverage
-          echo "After copy - checking root directory:"
-          ls -la .coverage
-          echo "Checking root directory contents:"
-          ls -la
-
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
         with:
           name: coverage-data
-          path: ${{ github.workspace }}/.coverage
+          path: backend/coverage.xml
 
       - name: Publish Test Report
         uses: EnricoMi/publish-unit-test-result-action@v2
@@ -150,6 +139,7 @@ jobs:
         uses: tj-actions/coverage-badge-py@v2
         with:
           output_path: "coverage-badge.svg"
+          coverage_file: "coverage.xml"
 
       - name: Commit coverage badge
         uses: stefanzweifel/git-auto-commit-action@v5
