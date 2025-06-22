@@ -110,14 +110,29 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata for Docker images
-        id: meta
+      - name: Extract metadata for backend image
+        id: meta_backend
         uses: docker/metadata-action@v5
         with:
-          images: |
-            ghcr.io/${{ github.repository_owner }}/turftrack-backend
-            ghcr.io/${{ github.repository_owner }}/turftrack-celery
-            ghcr.io/${{ github.repository_owner }}/turftrack-frontend
+          images: ghcr.io/${{ github.repository_owner }}/turftrack-backend
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest
+
+      - name: Extract metadata for celery image
+        id: meta_celery
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/turftrack-celery
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest
+
+      - name: Extract metadata for frontend image
+        id: meta_frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/turftrack-frontend
           tags: |
             type=semver,pattern={{version}}
             type=raw,value=latest
@@ -128,8 +143,8 @@ jobs:
           context: ./backend
           file: ./backend/Dockerfile.prod
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta_backend.outputs.tags }}
+          labels: ${{ steps.meta_backend.outputs.labels }}
 
       - name: Build and push celery image
         uses: docker/build-push-action@v5
@@ -137,8 +152,8 @@ jobs:
           context: ./backend
           file: ./backend/Dockerfile.celery
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta_celery.outputs.tags }}
+          labels: ${{ steps.meta_celery.outputs.labels }}
 
       - name: Build and push frontend image
         uses: docker/build-push-action@v5
@@ -146,5 +161,5 @@ jobs:
           context: ./frontend
           file: ./frontend/Dockerfile.prod
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta_frontend.outputs.tags }}
+          labels: ${{ steps.meta_frontend.outputs.labels }}
