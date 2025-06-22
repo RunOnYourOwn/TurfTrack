@@ -7,6 +7,42 @@ import datetime
 import app.utils.weather as weather
 
 
+@pytest.mark.asyncio
+async def test_trigger_weather_fetch_if_needed_weather_exists():
+    db = AsyncMock()
+    lawn = MagicMock()
+    lawn.weather_enabled = True
+    lawn.location = MagicMock()
+    lawn.location_id = 1
+    # Simulate weather exists
+    db.execute.return_value.scalar.return_value = True
+    with (
+        patch("app.utils.weather.uuid.uuid4", return_value="uuid"),
+        patch("app.utils.weather.logging.getLogger") as mock_logger,
+    ):
+        await weather.trigger_weather_fetch_if_needed(db, lawn)
+        db.add.assert_called()
+        db.commit.assert_called()
+        mock_logger.return_value.info.assert_called()
+
+
+@pytest.mark.asyncio
+async def test_upsert_daily_weather_existing():
+    session = AsyncMock()
+    location_id = 1
+    date = datetime.date.today()
+    type = WeatherType.historical
+    data = {"temperature_max_c": 25}
+    # Simulate existing record
+    existing = MagicMock()
+    mock_result = MagicMock()
+    mock_result.scalars.return_value.first.return_value = existing
+    session.execute.return_value = mock_result
+    await weather.upsert_daily_weather(session, location_id, date, type, data)
+    assert existing.temperature_max_c == 25
+    session.commit.assert_called()
+
+
 @pytest.fixture
 def mock_session():
     return MagicMock()

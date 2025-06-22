@@ -1,4 +1,4 @@
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 from typing import Optional, List
 from datetime import date, datetime
 import enum
@@ -46,6 +46,12 @@ class ApplicationBase(BaseModel):
 class ApplicationCreate(ApplicationBase):
     lawn_ids: Optional[List[int]] = None  # For batch apply
     lawn_id: Optional[int] = None  # Make this optional!
+
+    @model_validator(mode="after")
+    def check_lawn_id_or_lawn_ids(cls, values):
+        if not values.lawn_id and not (values.lawn_ids and len(values.lawn_ids) > 0):
+            raise ValueError("At least one of lawn_id or lawn_ids must be provided")
+        return values
 
 
 class ApplicationUpdate(BaseModel):
