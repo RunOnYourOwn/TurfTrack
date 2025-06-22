@@ -55,7 +55,7 @@ services:
   #  Application Services
   # ---------------------
   api:
-    image: ghcr.io/runonyourown/turftrack-backend:0.0.17
+    image: ghcr.io/runonyourown/turftrack-backend:latest
     container_name: turftrack-api
     restart: unless-stopped
     env_file:
@@ -78,7 +78,7 @@ services:
       - turftrack_network
 
   frontend:
-    image: ghcr.io/runonyourown/turftrack-frontend:0.0.17
+    image: ghcr.io/runonyourown/turftrack-frontend:latest
     container_name: turftrack-frontend
     restart: unless-stopped
     ports:
@@ -95,7 +95,7 @@ services:
       - turftrack_network
 
   celery_worker:
-    image: ghcr.io/runonyourown/turftrack-celery:0.0.17
+    image: ghcr.io/runonyourown/turftrack-celery:latest
     container_name: turftrack-celery-worker
     restart: unless-stopped
     command: worker
@@ -120,7 +120,7 @@ services:
       - turftrack_network
 
   celery_beat:
-    image: ghcr.io/runonyourown/turftrack-celery:0.0.17
+    image: ghcr.io/runonyourown/turftrack-celery:latest
     container_name: turftrack-celery-beat
     restart: unless-stopped
     command: beat
