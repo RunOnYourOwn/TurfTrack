@@ -5,9 +5,9 @@ import datetime
 from sqlalchemy import exists
 import logging
 import uuid
-
 from app.models.lawn import Lawn
 from app.models.task_status import TaskStatus, TaskStatusEnum
+from app.tasks.weather import fetch_and_store_weather
 
 
 async def trigger_weather_fetch_if_needed(db: AsyncSession, lawn: Lawn):
@@ -18,8 +18,6 @@ async def trigger_weather_fetch_if_needed(db: AsyncSession, lawn: Lawn):
     currently exists for its location. If not needed, it creates a success
     task status record for visibility in the UI.
     """
-    from app.tasks.weather import fetch_and_store_weather
-
     if not lawn.weather_enabled:
         return
 

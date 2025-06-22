@@ -1,6 +1,74 @@
-node_modules
-dist
-.git
+# Environment files (may contain secrets)
 .env
 .env.*
+!.env.example
+
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+dist/
+build/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Logs
 *.log
+logs/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Documentation
+docs/
+*.md
+README*
+
+# Docker files
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Development files
+tests/
+test_*
+__tests__/
+*.test.*
+*.spec.*
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Backup files
+*.bak
+*.backup
+
+# TypeScript declaration files (not needed in production)
+*.d.ts
+
+# Source maps (optional - can be included for debugging)
+*.map

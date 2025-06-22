@@ -14,9 +14,128 @@ These items are essential for security, stability, and basic production readines
 
   - **Recommendation:** Add unit tests for all endpoints, models, and utility functions. Include integration tests for database operations and API workflows. Use pytest fixtures for database setup/teardown.
 
+  - **Implementation Plan:**
+
+    #### **Phase 1: Test Infrastructure Setup**
+
+    1. Configure pytest with proper test discovery and coverage reporting
+    2. Set up test database configuration (separate from development/production)
+    3. Create base test fixtures for database, Redis, and Celery
+    4. Configure test environment variables and secrets management
+    5. Set up CI/CD pipeline integration for automated testing
+
+    #### **Phase 2: Unit Tests - Core Models & Utilities**
+
+    1. **Database Models**: Test all SQLAlchemy models (Lawn, Product, Application, GDD, etc.)
+       - Model creation, validation, relationships
+       - Field constraints and business rules
+       - Cascade delete behavior
+    2. **Utility Functions**: Test all utility modules
+       - Weather data processing (`app/utils/weather.py`)
+       - GDD calculations (`app/utils/gdd.py`)
+       - Location utilities (`app/utils/location.py`)
+       - Application utilities (`app/utils/application.py`)
+    3. **Schema Validation**: Test Pydantic schemas
+       - Input validation, serialization, deserialization
+       - Custom validators and business rules
+
+    #### **Phase 3: Unit Tests - API Endpoints**
+
+    1. **Lawn Endpoints** (`/api/v1/lawns/`)
+       - CRUD operations (create, read, update, delete)
+       - Input validation and error handling
+       - Weather data integration
+       - GDD model associations
+    2. **Product Endpoints** (`/api/v1/products/`)
+       - CRUD operations with nutrient fields
+       - Validation of nutrient calculations
+       - Cost and application rate logic
+    3. **Application Endpoints** (`/api/v1/applications/`)
+       - CRUD operations with lawn/product relationships
+       - Date validation and business rules
+       - Status management
+    4. **GDD Endpoints** (`/api/v1/gdd/`)
+       - GDD calculations and resets
+       - Model parameter management
+       - Historical data retrieval
+    5. **Task Status Endpoints** (`/api/v1/task-status/`)
+       - Task monitoring and status updates
+       - Celery integration
+    6. **Health & Version Endpoints**
+       - Health check functionality
+       - Version information
+
+    #### **Phase 4: Integration Tests**
+
+    1. **Database Integration**
+       - Full CRUD workflows across multiple tables
+       - Transaction rollback scenarios
+       - Concurrent access patterns
+       - Migration testing
+    2. **Celery Task Integration**
+       - Weather fetch task execution
+       - GDD recalculation workflows
+       - Task status tracking
+       - Error handling and retry logic
+    3. **API Workflow Integration**
+       - Complete lawn creation → weather fetch → GDD calculation flow
+       - Product application → GDD reset → recalculation flow
+       - Multi-step business processes
+
+    #### **Phase 5: End-to-End Tests**
+
+    1. **Full Application Workflows**
+       - User journey from lawn creation to GDD monitoring
+       - Product application and tracking
+       - Weather data updates and GDD recalculation
+    2. **Error Scenarios**
+       - Network failures, database outages
+       - Invalid data handling
+       - Rate limiting and timeout scenarios
+
+    #### **Test Coverage Goals:**
+
+    - **Backend Code Coverage**: 90%+ (critical business logic)
+    - **API Endpoint Coverage**: 100% (all endpoints tested)
+    - **Model Coverage**: 100% (all models and relationships)
+    - **Utility Function Coverage**: 95%+ (core calculation logic)
+    - **Integration Test Coverage**: 80%+ (key workflows)
+
+    #### **Testing Tools & Framework:**
+
+    - **pytest**: Main testing framework
+    - **pytest-asyncio**: Async test support
+    - **pytest-cov**: Coverage reporting
+    - **factory-boy**: Test data generation
+    - **httpx**: Async HTTP client for API testing
+    - **testcontainers**: Database and Redis test containers
+    - **pytest-mock**: Mocking and patching
+
+    #### **Test Data Strategy:**
+
+    - **Fixtures**: Reusable test data for common scenarios
+    - **Factories**: Dynamic test data generation
+    - **Mock External Services**: Weather API, external dependencies
+    - **Test Database**: Isolated test database with migrations
+
+    #### **CI/CD Integration:**
+
+    - **GitHub Actions**: Automated test runs on PR and main
+    - **Test Reports**: Coverage reports and test results
+    - **Quality Gates**: Minimum coverage requirements
+    - **Performance Testing**: API response time benchmarks
+
+    #### **Implementation Priority:**
+
+    1. **High Priority**: Core business logic (GDD calculations, weather processing)
+    2. **Medium Priority**: CRUD operations and API endpoints
+    3. **Lower Priority**: Edge cases and error scenarios
+
+    **Status**: Planning complete. Ready for implementation starting with Phase 1.
+
 ### Docker & Deployment
 
-- [ ] **Run as Non-Root User:** Containers are currently running as the `root` user, which is a security risk.
+- [x] **Run as Non-Root User:** Containers are currently running as the `root` user, which is a security risk.
 
   - **Recommendation:** In production Dockerfiles, create and switch to a non-root user before running the application.
 
@@ -68,6 +187,7 @@ These items are essential for security, stability, and basic production readines
     - **File Permissions**: Set proper ownership in Dockerfile and docker-compose ✅
     - **Database Migrations**: Ensure database user has proper permissions ✅
     - **Log Files**: Create log directory with proper permissions ✅
+    - **Nginx Permissions**: Fixed nginx cache directories for non-root user ✅
 
     #### **Testing Strategy:**
 
@@ -80,11 +200,21 @@ These items are essential for security, stability, and basic production readines
     - [x] Verify containers don't run as root
     - [x] Check file permissions are correct
 
-    **Status**: Development environment complete. Ready for production testing.
+    **Status**: ✅ COMPLETE - Both development and production environments now run all containers as non-root users with proper security isolation.
 
-- [ ] **Add `.dockerignore` Files:** The project is missing `.dockerignore` files.
+- [x] **Add `.dockerignore` Files:** The project is missing `.dockerignore` files.
 
   - **Recommendation:** Add `.dockerignore` files to the `frontend` and `backend` directories to prevent secrets, local dependencies, and git history from being included in the build context.
+
+  - **Implementation:**
+    - ✅ Created `backend/.dockerignore` - excludes Python cache, virtual environments, IDE files, test files, and development artifacts
+    - ✅ Created `frontend/.dockerignore` - excludes node_modules, build outputs, IDE files, test files, and development artifacts
+    - ✅ Created root `.dockerignore` - excludes git history, OS files, documentation, and cross-service artifacts
+    - ✅ Tested builds - both backend and frontend containers build successfully with reduced context size
+    - ✅ Security - prevents accidental inclusion of sensitive files and secrets in Docker images
+    - ✅ Performance - reduces build context size and improves build speed
+
+  **Status**: ✅ COMPLETE - All Docker build contexts now properly exclude unnecessary files while maintaining functionality.
 
 ### General Project
 
