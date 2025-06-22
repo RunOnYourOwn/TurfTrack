@@ -57,6 +57,7 @@ jobs:
           uv pip install alembic asyncpg celery celery-redbeat factory-boy fastapi flower greenlet gunicorn httpx ipykernel openmeteo-requests pandas psycopg2-binary pydantic pydantic-settings pytest pytest-asyncio pytest-cov pytest-mock python-json-logger redis requests sqlalchemy uvicorn
 
       - name: Run tests (unit, integration, e2e)
+        id: tests
         working-directory: backend
         env:
           DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
@@ -66,7 +67,22 @@ jobs:
           REDBEAT_REDIS_URL: ${{ env.TEST_REDIS_URL }}
           ALEMBIC_DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
         run: |
-          uv run pytest --cov=app --cov-report=term-missing --cov-report=xml --cov-report=html:htmlcov
+          uv run pytest --cov=app --cov-report=term-missing --cov-report=xml --cov-report=html:htmlcov --junitxml=pytest-report.xml
+
+      - name: Publish Test Report
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: backend/pytest-report.xml
+
+      - name: Publish Coverage Summary
+        uses: irongut/CodeCoverageSummary@v1.3.0
+        if: always()
+        with:
+          filename: backend/coverage.xml
+          badge: true
+          format: "markdown"
+          output: "both"
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
