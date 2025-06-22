@@ -49,7 +49,7 @@ jobs:
       - name: Install dependencies
         working-directory: backend
         run: |
-          uv pip install -r requirements.txt
+          uv install
 
       - name: Run tests (unit, integration, e2e)
         working-directory: backend

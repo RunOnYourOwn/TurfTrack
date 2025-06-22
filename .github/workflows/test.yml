@@ -52,7 +52,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd backend
-          uv pip install -r requirements.txt
+          uv install
 
       - name: Run tests
         run: |
