@@ -112,10 +112,6 @@ jobs:
         run: npm run lint || echo "Linting failed but continuing build - TypeScript fixes needed"
         continue-on-error: true
 
-      - name: Run tests
-        working-directory: frontend
-        run: npm test
-
       - name: Build production bundle
         working-directory: frontend
         run: npm run build

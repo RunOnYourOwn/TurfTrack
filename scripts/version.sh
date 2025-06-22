@@ -109,31 +109,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+   ### Added
+
+   
+   ### Fixed
+
+   
+   ### Changed
+
 EOF
+        return
     fi
     
-    # Add new version entry at the top (after Unreleased)
-    if [ -f "$CHANGELOG_FILE" ]; then
-        # Create temporary file
-        local temp_file=$(mktemp)
-        
-        # Copy lines until "## [Unreleased]"
-        awk '/^## \[Unreleased\]/ {print; next} /^## \[/ {exit} {print}' "$CHANGELOG_FILE" > "$temp_file"
-        
-        # Add new version entry
-        echo "" >> "$temp_file"
-        echo "## [$version] - $date" >> "$temp_file"
-        echo "" >> "$temp_file"
-        echo "### Added" >> "$temp_file"
-        echo "- Initial release" >> "$temp_file"
-        echo "" >> "$temp_file"
-        
-        # Add remaining content
-        awk '/^## \[Unreleased\]/ {next} /^## \[/ {p=1} p' "$CHANGELOG_FILE" >> "$temp_file"
-        
-        # Replace original file
-        mv "$temp_file" "$CHANGELOG_FILE"
-    fi
+    # Create temporary file for the new changelog
+    local temp_file=$(mktemp)
+    
+    # Copy header and [Unreleased] section
+    awk '/^## \[Unreleased\]/ {print; exit} {print}' "$CHANGELOG_FILE" > "$temp_file"
+    
+    # Add the template structure for [Unreleased]
+    cat >> "$temp_file" << 'EOF'
+
+   ### Added
+
+   
+   ### Fixed
+
+   
+   ### Changed
+
+EOF
+    
+    # Add new version entry
+    echo "" >> "$temp_file"
+    echo "## [$version] - $date" >> "$temp_file"
+    echo "" >> "$temp_file"
+    echo "### Added" >> "$temp_file"
+    echo "- Initial release" >> "$temp_file"
+    echo "" >> "$temp_file"
+    
+    # Add all existing version entries
+    awk '/^## \[Unreleased\]/ {next} /^## \[/ {p=1} p' "$CHANGELOG_FILE" >> "$temp_file"
+    
+    # Replace original file
+    mv "$temp_file" "$CHANGELOG_FILE"
 }
 
 # Function to create release
