@@ -33,6 +33,7 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+.cursor/
 
 # Misc
 .env
