@@ -138,9 +138,28 @@ jobs:
         run: ls -laR
 
       - name: Generate coverage badge
-        uses: tj-actions/coverage-badge-py@v2
-        with:
-          output: "coverage-badge.svg"
+        run: |
+          # Read coverage percentage from XML file
+          COVERAGE=$(python -c "
+          import xml.etree.ElementTree as ET
+          tree = ET.parse('coverage.xml')
+          root = tree.getroot()
+          coverage = float(root.attrib['line-rate']) * 100
+          print(f'{coverage:.1f}')
+          ")
+
+          # Generate SVG badge
+          cat > coverage-badge.svg << EOF
+          <svg xmlns="http://www.w3.org/2000/svg" width="120" height="20">
+            <rect width="120" height="20" fill="#555"/>
+            <rect width="60" height="20" fill="#007ec6"/>
+            <rect x="60" width="60" height="20" fill="#4c1"/>
+            <text x="30" y="14" text-anchor="middle" fill="white" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="11">coverage</text>
+            <text x="90" y="14" text-anchor="middle" fill="white" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="11">${COVERAGE}%</text>
+          </svg>
+          EOF
+
+          echo "Generated coverage badge with ${COVERAGE}% coverage"
 
       - name: Commit coverage badge
         uses: stefanzweifel/git-auto-commit-action@v5
