@@ -53,7 +53,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: backend
-        run: uv pip install .
+        run: uv pip install -e .
 
       - name: Set up database
         working-directory: backend
