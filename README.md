@@ -1,6 +1,6 @@
 # TurfTrack
 
-[![Unified CI/CD](https://github.com/RunOnYourOwn/TurfTrack/actions/workflows/cicd.yml/badge.svg)](https://github.com/RunOnYourOwn/TurfTrack/actions/workflows/cicd.yml)
+[![CI](https://github.com/RunOnYourOwn/TurfTrack/actions/workflows/ci.yml/badge.svg)](https://github.com/RunOnYourOwn/TurfTrack/actions/workflows/ci.yml)
 ![Code Coverage](./coverage-badge.svg)
 
 TurfTrack is a modern, full-stack application for managing turfgrass maintenance, weather data, growing degree day (GDD) models, and product applications.
