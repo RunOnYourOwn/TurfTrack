@@ -3,6 +3,8 @@ from unittest.mock import MagicMock, AsyncMock, patch
 from datetime import date
 from app.utils.weather import upsert_daily_weather_sync, trigger_weather_fetch_if_needed
 from app.models.daily_weather import WeatherType
+import datetime
+import app.utils.weather as weather
 
 
 @pytest.fixture
@@ -61,3 +63,128 @@ async def test_trigger_weather_fetch_if_needed_triggers_fetch(monkeypatch):
         await trigger_weather_fetch_if_needed(mock_db, lawn)
         # Assert
         mock_fetch.delay.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_upsert_daily_weather_update():
+    session = AsyncMock()
+    existing = MagicMock()
+    scalars = MagicMock()
+    scalars.first.return_value = existing
+    result = MagicMock()
+    result.scalars.return_value = scalars
+    session.execute.return_value = result
+    data = {"temperature_max_c": 25.0}
+    await weather.upsert_daily_weather(
+        session, 1, datetime.date(2024, 1, 1), WeatherType.historical, data
+    )
+    assert existing.temperature_max_c == 25.0
+    session.add.assert_not_called()
+    assert session.commit.await_count == 2  # One for update, one for forecast delete
+
+
+@pytest.mark.asyncio
+async def test_upsert_daily_weather_insert():
+    session = AsyncMock()
+    scalars = MagicMock()
+    scalars.first.return_value = None
+    result = MagicMock()
+    result.scalars.return_value = scalars
+    session.execute.return_value = result
+    data = {"temperature_max_c": 30.0}
+    # Don't patch DailyWeather for select, just for instantiation
+    with patch(
+        "app.models.daily_weather.DailyWeather", wraps=weather.DailyWeather
+    ) as MockWeather:
+        await weather.upsert_daily_weather(
+            session, 2, datetime.date(2024, 1, 2), WeatherType.historical, data
+        )
+        session.add.assert_called()
+        assert session.commit.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_upsert_daily_weather_forecast_type():
+    session = AsyncMock()
+    scalars = MagicMock()
+    scalars.first.return_value = None
+    result = MagicMock()
+    result.scalars.return_value = scalars
+    session.execute.return_value = result
+    data = {"temperature_max_c": 20.0}
+    with patch(
+        "app.models.daily_weather.DailyWeather", wraps=weather.DailyWeather
+    ) as MockWeather:
+        await weather.upsert_daily_weather(
+            session, 3, datetime.date(2024, 1, 3), WeatherType.forecast, data
+        )
+        session.add.assert_called()
+        # Only one commit for forecast type
+        assert session.commit.await_count == 1
+
+
+def test_upsert_daily_weather_sync_upsert_and_delete():
+    session = MagicMock()
+    with patch("sqlalchemy.text") as mock_text:
+        upsert_stmt = MagicMock()
+        delete_stmt = MagicMock()
+        mock_text.side_effect = [upsert_stmt, delete_stmt]
+        session.execute.return_value = None
+        session.commit.return_value = None
+        data = {"temperature_max_c": 22.0}
+        weather.upsert_daily_weather_sync(
+            session, 4, datetime.date(2024, 1, 4), WeatherType.historical, data
+        )
+        assert session.execute.call_count == 2
+        assert session.commit.call_count == 2
+
+
+def test_upsert_daily_weather_sync_forecast_type():
+    session = MagicMock()
+    with patch("sqlalchemy.text") as mock_text:
+        upsert_stmt = MagicMock()
+        mock_text.side_effect = [upsert_stmt]
+        session.execute.return_value = None
+        session.commit.return_value = None
+        data = {"temperature_max_c": 18.0}
+        weather.upsert_daily_weather_sync(
+            session, 5, datetime.date(2024, 1, 5), WeatherType.forecast, data
+        )
+        assert session.execute.call_count == 1
+        assert session.commit.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_trigger_weather_fetch_if_needed_fetch():
+    db = AsyncMock()
+    lawn = MagicMock()
+    lawn.weather_enabled = True
+    lawn.location = MagicMock()
+    lawn.location_id = 10
+    lawn.location.latitude = 1.1
+    lawn.location.longitude = 2.2
+    # Use regular MagicMock for scalar
+    scalar_mock = MagicMock(return_value=False)
+    db.execute.return_value.scalar = scalar_mock
+    with patch("app.utils.weather.fetch_and_store_weather.delay") as mock_delay:
+        await weather.trigger_weather_fetch_if_needed(db, lawn)
+        mock_delay.assert_called_once_with(10, 1.1, 2.2)
+
+
+@pytest.mark.asyncio
+async def test_trigger_weather_fetch_if_needed_no_fetch():
+    db = AsyncMock()
+    lawn = MagicMock()
+    lawn.weather_enabled = True
+    lawn.location = MagicMock()
+    lawn.location_id = 11
+    lawn.location.latitude = 3.3
+    lawn.location.longitude = 4.4
+    scalar_mock = AsyncMock(return_value=True)
+    db.execute.return_value.scalar = scalar_mock
+    with patch("app.utils.weather.TaskStatus") as MockTaskStatus:
+        mock_status = MagicMock()
+        MockTaskStatus.return_value = mock_status
+        await weather.trigger_weather_fetch_if_needed(db, lawn)
+        db.add.assert_called_once_with(mock_status)
+        db.commit.assert_awaited_once()
