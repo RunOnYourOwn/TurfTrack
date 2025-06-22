@@ -89,6 +89,52 @@ docker-compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d
 - Coverage reports will be shown in the terminal.
 - All core modules, schemas, and utilities are covered (see `docs/before_production.md` for details).
 
+To run the full test suite, use the test runner script in the backend:
+
+```bash
+cd backend
+./run_tests.sh coverage
+```
+
+## Container Images & Deployment
+
+This project uses GitHub Actions to automatically build and publish versioned Docker images to the GitHub Container Registry (GHCR).
+
+### Image Versioning
+
+Three separate images are published: `turftrack-backend`, `turftrack-celery`, and `turftrack-frontend`. The following tagging strategy is used:
+
+- `:latest`: For every push to the `main` branch, images are tagged with `:latest`. This tag represents the most recent development build.
+- `:sha-xxxxxxx`: Every commit-specific image is tagged with its short git SHA (e.g., `:cb758e7`).
+- `:<version>`: When a formal release is created using the versioning script, images are tagged with the corresponding semantic version number (e.g., `:1.2.3`).
+
+### Creating a Release
+
+To create a new, versioned release:
+
+1.  Ensure all your changes are committed on the `main` branch.
+2.  Use the `version.sh` script to bump the version number. For example, to create a patch release:
+    ```bash
+    ./scripts/version.sh bump patch
+    ```
+3.  Create the release, which will update the changelog, commit the changes, and push a new version tag to GitHub:
+    ```bash
+    ./scripts/version.sh release
+    ```
+    This will trigger the "Publish Docker Images" workflow, which will build and publish the images with the new version tag.
+
+### Production Deployment
+
+The `docker-compose.prod.yml` file is configured to run the application using the pre-built images from GHCR.
+
+To deploy the latest version of the application, simply run:
+
+```bash
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+For a stable production environment, it is highly recommended to edit the `docker-compose.prod.yml` file and replace the `:latest` tag with a specific version tag (e.g., `ghcr.io/runonyourown/turftrack-backend:1.0.0`) for each service. This ensures you are running a specific, tested version of the application.
+
 ---
 
 ## 🛠️ Development Workflow
