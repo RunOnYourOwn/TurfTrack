@@ -46,6 +46,11 @@ jobs:
         with:
           version: "latest"
 
+      - name: Create virtual environment
+        working-directory: backend
+        run: |
+          uv venv
+
       - name: Install dependencies
         working-directory: backend
         run: |
