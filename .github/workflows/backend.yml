@@ -73,13 +73,10 @@ jobs:
         run: |
           uv run pytest --cov=app --cov-report=term-missing --cov-report=xml --cov-report=html:htmlcov --junitxml=pytest-report.xml
 
-      - name: Debug - List files in workspace
-        run: ls -laR
-
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-report
+          name: coverage-data
           path: backend/.coverage
 
       - name: Publish Test Report
@@ -110,8 +107,11 @@ jobs:
       - name: Download coverage artifact
         uses: actions/download-artifact@v4
         with:
-          name: coverage-report
+          name: coverage-data
           path: ./
+
+      - name: Debug - List files after download
+        run: ls -laR
 
       - name: Generate coverage badge
         uses: tj-actions/coverage-badge-py@v2
@@ -121,8 +121,8 @@ jobs:
       - name: Commit coverage badge
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "docs: Update coverage badge"
-          file_pattern: "coverage-badge.svg"
+          commit_message: "docs: Update coverage badge and README"
+          file_pattern: "coverage-badge.svg README.md"
           commit_user_name: "github-actions[bot]"
           commit_user_email: "github-actions[bot]@users.noreply.github.com"
           branch: main
