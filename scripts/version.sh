@@ -138,29 +138,47 @@ EOF
 
 # Function to create release
 release() {
-    local version=$(get_current_version)
-    local tag_name="v$version"
-    
-    print_info "Creating release for version $version"
-    
+    local bump_type=$1
+    if [ -z "$bump_type" ]; then
+        print_error "Release type required. Use: patch, minor, or major"
+        exit 1
+    fi
+
+    print_info "Starting '$bump_type' release..."
+
     # Check if working directory is clean
     if [ -n "$(git status --porcelain)" ]; then
         print_error "Working directory is not clean. Please commit or stash changes first."
         exit 1
     fi
     
-    # Create changelog entry
-    create_changelog_entry "$version"
+    # Bump version
+    local current_version=$(get_current_version)
+    bump_version "$bump_type"
+    local new_version=$(get_current_version)
+    local tag_name="v$new_version"
     
-    # Commit version changes
+    # Create changelog entry
+    create_changelog_entry "$new_version"
+    
+    # Commit version and changelog changes
     git add "$VERSION_FILE" "$CHANGELOG_FILE"
-    git commit -m "Release version $version"
+    git commit -m "chore(release): Prepare for v$new_version" -m "Bumps version from $current_version to $new_version and updates changelog."
     
     # Create and push tag
-    git tag -a "$tag_name" -m "Release version $version"
-    git push origin "$tag_name"
+    git tag -a "$tag_name" -m "Release version $new_version"
+
+    # Push commit and tag to all remotes
+    print_info "Pushing to all remotes..."
+    local current_branch=$(git rev-parse --abbrev-ref HEAD)
+    for remote in $(git remote); do
+        print_info "  -> Pushing branch '$current_branch' to '$remote'"
+        git push "$remote" "$current_branch"
+        print_info "  -> Pushing tag '$tag_name' to '$remote'"
+        git push "$remote" "$tag_name"
+    done
     
-    print_success "Release $version created and pushed"
+    print_success "Release $new_version created and pushed to all remotes"
     print_info "Tag: $tag_name"
 }
 
@@ -181,7 +199,11 @@ case $1 in
         set_version "$2"
         ;;
     release)
-        release
+        if [ -z "$2" ]; then
+            print_error "Release type required. Use: patch, minor, or major"
+            exit 1
+        fi
+        release "$2"
         ;;
     current)
         print_info "Current version: $(get_current_version)"
@@ -192,7 +214,7 @@ case $1 in
         echo "Commands:"
         echo "  bump <type>     Bump version (major|minor|patch)"
         echo "  set <version>   Set specific version (e.g., 1.0.0)"
-        echo "  release         Create release with current version"
+        echo "  release <type>  Create and push a new release (major|minor|patch)"
         echo "  current         Show current version"
         echo ""
         echo "Examples:"
@@ -200,7 +222,7 @@ case $1 in
         echo "  $0 bump minor    # 1.0.1 -> 1.1.0"
         echo "  $0 bump major    # 1.1.0 -> 2.0.0"
         echo "  $0 set 0.0.1     # Set version to 0.0.1"
-        echo "  $0 release       # Create release with current version"
+        echo "  $0 release patch # Bumps patch version and creates release"
         exit 1
         ;;
 esac 
