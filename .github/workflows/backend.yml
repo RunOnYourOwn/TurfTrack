@@ -95,11 +95,15 @@ jobs:
           echo "Checking for pytest-report.xml file..."
           ls -la pytest-report.xml || echo "pytest-report.xml file not found"
 
+      - name: Copy coverage file to root
+        run: |
+          cp backend/.coverage .coverage
+
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
         with:
           name: coverage-data
-          path: backend/.coverage
+          path: .coverage
 
       - name: Publish Test Report
         uses: EnricoMi/publish-unit-test-result-action@v2
