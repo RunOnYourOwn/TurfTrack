@@ -19,8 +19,23 @@ RUN npm run build
 # --- Final Stage ---
 FROM nginx:alpine as final
 
+# Create non-root user for frontend (UID/GID 1004)
+RUN addgroup -g 1004 frontend && \
+    adduser -D -u 1004 -G frontend frontend
+
 # Copy the build output from the builder stage
 COPY --from=builder /app/dist /app
+
+# Set ownership of /app to frontend user
+RUN chown -R frontend:frontend /app
+
+# Create nginx cache directories and set permissions for non-root user
+RUN mkdir -p /var/cache/nginx/client_temp /var/cache/nginx/fastcgi_temp /var/cache/nginx/proxy_temp /var/cache/nginx/scgi_temp /var/cache/nginx/uwsgi_temp && \
+    chown -R frontend:frontend /var/cache/nginx && \
+    chown -R frontend:frontend /var/log/nginx && \
+    chown -R frontend:frontend /etc/nginx/conf.d && \
+    touch /var/run/nginx.pid && \
+    chown -R frontend:frontend /var/run/nginx.pid
 
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
@@ -28,5 +43,8 @@ COPY nginx.conf /etc/nginx/nginx.conf
 # Expose the port the app runs on
 EXPOSE 3000
 
+# Run nginx as non-root user
+USER frontend
+
 # Start nginx
-CMD ["nginx", "-g", "daemon off;"] 
+CMD ["nginx", "-g", "daemon off;"]

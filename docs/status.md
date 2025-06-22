@@ -8,6 +8,7 @@
 - Documentation and refactoring
 - Task status API endpoints exposed and ready for frontend integration
 - Full add/edit/delete functionality for products is now implemented in the frontend, using a reusable grouped ProductForm component, robust error handling, and modern UI/UX.
+- **Security Hardening**: Implementing production-ready security measures including non-root user containers
 
 ## Completed Items
 
@@ -45,18 +46,28 @@
     - Task Status: `started_at` and `status` indexes for monitoring
   - All indexes confirmed to be used by PostgreSQL query planner
   - Expected 5-50x performance improvement for date range and filtering queries
+- **Security Hardening - Non-Root User Implementation:**
+  - **Phase 1 Complete**: Backend API containers (dev & prod) now run as non-root user `api` (UID 1001)
+  - **Phase 2 Complete**: Celery worker and beat containers run as non-root user `celery` (UID 1002)
+  - **Phase 3 Complete**: Frontend containers (dev & prod) run as non-root user `frontend` (UID 1004)
+  - **Phase 4 Complete**: Integration testing in development environment verified
+  - All containers can write to required directories (`/app/logs`, `/app/data`, `/tmp`)
+  - API endpoints, health checks, database migrations, and Celery tasks all work correctly
+  - Frontend application accessible and functional at http://localhost:5173/
 
 ## In Progress
 
 - Advanced analytics and reporting (future)
 - More frontend features and polish (future)
+- **Security Hardening**: Production container testing and final validation
 
 ## Next Steps
 
 1. Monitor daily weather and GDD recalculation for correctness
-2. Add advanced analytics and reporting (future)
-3. Continue frontend enhancements (future)
-4. Expand test coverage (future)
+2. Test production containers with non-root user implementation
+3. Add advanced analytics and reporting (future)
+4. Continue frontend enhancements (future)
+5. Expand test coverage (future)
 
 ## Known Issues
 
@@ -64,9 +75,10 @@
 
 ## Upcoming Milestones
 
-1. Complete advanced analytics features
-2. Finalize backend and frontend integration
-3. Prepare for production deployment
+1. Complete security hardening (production testing)
+2. Complete advanced analytics features
+3. Finalize backend and frontend integration
+4. Prepare for production deployment
 
 ## Notes
 
@@ -86,3 +98,4 @@
 - UI is professional, modern, and matches the current palette
 - Export functionality for GDD data is planned for the future
 - Future enhancements (e.g., next_threshold_date, lawn_name columns) are documented in tasks and technical docs
+- **Security**: All containers now run as non-root users with proper file permissions and directory ownership
