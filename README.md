@@ -40,7 +40,7 @@ TurfTrack provides:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-org/TurfTrack.git
+git clone https://github.com/YOUR_USERNAME/TurfTrack.git
 cd TurfTrack
 ```
 
