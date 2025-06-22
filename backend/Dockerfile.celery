@@ -26,6 +26,10 @@ COPY alembic/ ./alembic/
 COPY main.py .
 COPY alembic.ini .
 
+# Copy and set up the entrypoint script
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 # Set Python to run in unbuffered mode (better for logging)
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
@@ -41,3 +45,6 @@ RUN mkdir -p /app/logs /app/data /tmp && \
 
 # Switch to non-root user
 USER celery
+
+# Set the entrypoint for the container
+ENTRYPOINT ["/app/entrypoint.sh"]

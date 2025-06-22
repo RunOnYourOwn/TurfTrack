@@ -50,11 +50,12 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile.celery
-    command: celery -A app.celery_app worker --loglevel=debug
+    command: worker
     volumes:
       - ./backend:/app
       - ./backend/.env:/app/.env
     environment:
+      - CELERY_LOG_LEVEL=debug
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       - ALEMBIC_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       - REDIS_URL=redis://${REDIS_HOST}:${REDIS_PORT}/0
@@ -73,11 +74,12 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile.celery
-    command: celery -A app.celery_app beat --loglevel=debug --scheduler=redbeat.RedBeatScheduler
+    command: beat
     volumes:
       - ./backend:/app
       - ./backend/.env:/app/.env
     environment:
+      - CELERY_LOG_LEVEL=debug
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       - ALEMBIC_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       - REDIS_URL=redis://${REDIS_HOST}:${REDIS_PORT}/0

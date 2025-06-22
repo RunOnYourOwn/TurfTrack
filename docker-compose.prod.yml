@@ -37,8 +37,9 @@ services:
   celery_worker:
     # To use a specific version for production, change 'latest' to a version tag.
     image: ghcr.io/runonyourown/turftrack-celery:latest
-    command: celery -A app.celery_app worker --loglevel=${CELERY_LOG_LEVEL}
+    command: worker
     environment:
+      - CELERY_LOG_LEVEL=${CELERY_LOG_LEVEL}
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       - ALEMBIC_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       - REDIS_URL=redis://${REDIS_HOST}:${REDIS_PORT}/0
@@ -56,8 +57,9 @@ services:
   celery_beat:
     # To use a specific version for production, change 'latest' to a version tag.
     image: ghcr.io/runonyourown/turftrack-celery:latest
-    command: celery -A app.celery_app beat --loglevel=${CELERY_LOG_LEVEL} --scheduler=redbeat.RedBeatScheduler
+    command: beat
     environment:
+      - CELERY_LOG_LEVEL=${CELERY_LOG_LEVEL}
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       - ALEMBIC_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       - REDIS_URL=redis://${REDIS_HOST}:${REDIS_PORT}/0
