@@ -38,8 +38,6 @@ TurfTrack provides:
 
 ## ✨ Screenshots
 
-_Tell a visual story of your application. Add screenshots of the main features._
-
 **Dashboard / Lawns Page**
 
 <table>
