@@ -1,0 +1,42 @@
+/* docs/.vitepress/theme/style.css */
+
+/*
+  Override VitePress's default theme with custom brand colors
+  derived from the TurfTrack logo.
+*/
+
+:root {
+  /* --- Brand Colors --- */
+  --vp-c-brand-1: #48bb78; /* Vibrant Green from logo */
+  --vp-c-brand-2: #38a169; /* A slightly darker green for hover states */
+  --vp-c-brand-3: #2f855a; /* A darker green for active states */
+
+  /* --- Background Colors --- */
+  --vp-c-bg: #1a202c; /* Deep charcoal background from logo */
+  --vp-c-bg-soft: #2d3748; /* A slightly lighter charcoal for secondary elements */
+  --vp-c-bg-mute: #4a5568; /* A muted gray for borders and dividers */
+
+  /* --- Text Colors --- */
+  --vp-c-text-1: rgba(255, 255, 255, 0.87); /* Off-white for main text */
+  --vp-c-text-2: rgba(237, 242, 247, 0.7); /* Lighter gray for secondary text */
+
+  /* --- Hero Section Specifics --- */
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: -webkit-linear-gradient(
+    120deg,
+    #38a169 30%,
+    #48bb78
+  );
+
+  --vp-home-hero-image-background-image: linear-gradient(
+    -45deg,
+    #2d3748 50%,
+    #1a202c 50%
+  );
+  --vp-home-hero-image-filter: blur(44px);
+}
+
+/* Ensure syntax highlighting in code blocks is readable on the dark background */
+.vp-doc pre {
+  background-color: var(--vp-c-bg-soft) !important;
+}
