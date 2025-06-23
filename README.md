@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" alt="TurfTrack Logo" width="200"/>
+</p>
+
 # TurfTrack
 
 [![CI](https://github.com/RunOnYourOwn/TurfTrack/actions/workflows/ci.yml/badge.svg)](https://github.com/RunOnYourOwn/TurfTrack/actions/workflows/ci.yml)
@@ -32,13 +36,55 @@ TurfTrack provides:
 
 ---
 
-## ⚡ Quickstart & Setup
+## ✨ Screenshots
+
+_Tell a visual story of your application. Add screenshots of the main features._
+
+**Dashboard / Lawns Page**
+
+<table>
+  <tr>
+    <td><img src="assets/screenshots/lawns-light.png" alt="Lawns Page (Light Mode)"></td>
+    <td><img src="assets/screenshots/lawns-dark.png" alt="Lawns Page (Dark Mode)"></td>
+  </tr>
+</table>
+
+**Products & Applications**
+
+<table>
+  <tr>
+    <td><img src="assets/screenshots/products.png" alt="Products Page"></td>
+    <td><img src="assets/screenshots/applications.png" alt="Applications Page"></td>
+  </tr>
+</table>
+
+**GDD Tracking**
+
+<table>
+  <tr>
+    <td><img src="assets/screenshots/gdd.png" alt="GDD Chart"></td>
+    <td><img src="assets/screenshots/gdd-detail.png" alt="GDD Model Details"></td>
+  </tr>
+</table>
+
+**Reports**
+
+<table>
+  <tr>
+    <td><img src="assets/screenshots/reports-npk.png" alt="NPK Report"></td>
+    <td><img src="assets/screenshots/reports-cost.png" alt="Cost Report"></td>
+  </tr>
+</table>
+
+---
+
+## ⚡ Quickstart
+
+Getting TurfTrack running on your local machine is simple.
 
 ### Prerequisites
 
 - [Docker](https://www.docker.com/) & Docker Compose
-- [Node.js](https://nodejs.org/) (for frontend development)
-- [Python 3.11+](https://www.python.org/) (for backend development)
 
 ### 1. Clone the Repository
 
@@ -47,57 +93,50 @@ git clone https://github.com/RunOnYourOwn/TurfTrack.git
 cd TurfTrack
 ```
 
-### 2. Environment Variables
+### 2. Run the Application
 
-- Copy `.env.example` to `.env` in the project root:
-  ```bash
-  cp .env.example .env
-  ```
-- Fill in any required values in `.env` (see comments in `.env.example` for details)
-
-### 3. Start with Docker Compose
-
-This project provides multiple ways to run the application depending on your needs.
-
-#### Production (Recommended for Users)
-
-This is the simplest way to run the application. It uses pre-built images from the GitHub Container Registry.
+This single command downloads the pre-built Docker images and starts all services.
 
 ```bash
-docker-compose -f docker-compose.standalone.yml up -d
+docker compose -f docker-compose.standalone.yml up -d
 ```
 
-- The application will be available at [http://localhost:3000](http://localhost:3000).
-- To update the application to a newer version, open `docker-compose.standalone.yml` and change the version tag on the `api`, `frontend`, and `celery` images.
-
-#### Development
-
-This method is for developers who want to work on the code. It mounts the local source code into the containers and enables hot-reloading.
-
-```bash
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
-```
-
-- The frontend will be available at [http://localhost:5173](http://localhost:5173).
-- The backend API will be available at [http://localhost:8000/api/v1].
+The application will be available at [http://localhost:3000](http://localhost:3000).
 
 ---
 
-## 🧪 Testing & Coverage
+## 🛠️ For Developers
 
-- Run all backend tests:
+If you want to contribute to the code, follow these steps.
+
+### 1. Environment Setup
+
+- Copy the example environment file:
   ```bash
-  cd backend
-  ./run_tests.sh
+  cp .env.example .env
   ```
-- Coverage reports will be shown in the terminal.
-- All core modules, schemas, and utilities are covered (see `docs/before_production.md` for details).
+- **(Optional)** Fill in any required values in `.env` if you are not using the default Docker setup.
 
-To run the full test suite, use the test runner script in the backend:
+### 2. Start the Development Environment
+
+This command mounts your local source code into the containers and enables hot-reloading for both the frontend and backend.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
+```
+
+- Frontend (with hot-reloading): [http://localhost:5173](http://localhost:5173)
+- Backend API Docs: [http://localhost:8000/docs](http://localhost:8000/docs)
+
+---
+
+## 🧪 Testing
+
+To run the backend test suite:
 
 ```bash
 cd backend
-./run_tests.sh coverage
+./run_tests.sh
 ```
 
 ## Container Images & Deployment
@@ -127,12 +166,19 @@ To create a new, versioned release (for maintainers):
 
 ---
 
-## 🛠️ Development Workflow
+## 🤝 Contributing
 
-- Use feature branches and pull requests for changes
-- Write unit tests for all new backend logic
-- Use the `.env.example` file to keep environment variables up to date
-- Linting/formatting: (add details if you use black, flake8, eslint, prettier, etc.)
+This project is open to contributions! Here's how you can help:
+
+- **Report Bugs:** If you find a bug, please [open an issue](https://github.com/RunOnYourOwn/TurfTrack/issues) and provide as much detail as possible.
+- **Suggest Features:** Have an idea? [Start a discussion](https://github.com/RunOnYourOwn/TurfTrack/discussions) or create an issue with the `enhancement` label.
+- **Submit Pull Requests:** We welcome PRs for bug fixes and new features. Please follow the development workflow below.
+
+### Development Workflow
+
+- Use feature branches and pull requests.
+- Write unit tests for all new backend logic.
+- Ensure your code is linted and formatted correctly.
 
 ---
 
