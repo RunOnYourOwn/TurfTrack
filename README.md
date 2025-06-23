@@ -93,6 +93,12 @@ cd TurfTrack
 
 ### 2. Run the Application
 
+- Copy the example environment file:
+  ```bash
+  cp .env.example .env
+  ```
+- **(Optional)** Fill in any required values in `.env` if you are not using the default Docker setup.
+
 This single command downloads the pre-built Docker images and starts all services.
 
 ```bash
@@ -136,6 +142,8 @@ To run the backend test suite:
 cd backend
 ./run_tests.sh
 ```
+
+Note: You must also start up the docker-compose.test.yml containers for testing to succeed.
 
 ## Container Images & Deployment
 
@@ -201,6 +209,3 @@ This project is open to contributions! Here's how you can help:
 
 - [Architecture Diagram](docs/architecture.mermaid)
 - [Technical Specs](docs/technical.md)
-- [Production Checklist](docs/before_production.md)
-- [Task List](docs/tasks.md)
-- [Status & Progress](docs/status.md)
