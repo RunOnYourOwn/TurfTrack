@@ -93,7 +93,7 @@ jobs:
         id: meta_backend
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/turftrack-backend
+          images: ghcr.io/${{ tolower(github.repository_owner) }}/turftrack-backend
           tags: |
             type=semver,pattern={{version}}
             type=raw,value=latest
@@ -102,7 +102,7 @@ jobs:
         id: meta_celery
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/turftrack-celery
+          images: ghcr.io/${{ tolower(github.repository_owner) }}/turftrack-celery
           tags: |
             type=semver,pattern={{version}}
             type=raw,value=latest
@@ -111,7 +111,7 @@ jobs:
         id: meta_frontend
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/turftrack-frontend
+          images: ghcr.io/${{ tolower(github.repository_owner) }}/turftrack-frontend
           tags: |
             type=semver,pattern={{version}}
             type=raw,value=latest
@@ -187,7 +187,7 @@ jobs:
       - name: Test Backend Container
         run: |
           # Pull the latest backend image
-          docker pull ghcr.io/${{ github.repository_owner }}/turftrack-backend:latest
+          docker pull ghcr.io/${{ tolower(github.repository_owner) }}/turftrack-backend:latest
 
           # Test container starts and responds to health check
           docker run -d --name test-backend \
@@ -197,7 +197,7 @@ jobs:
             -e CELERY_RESULT_BACKEND=redis://host.docker.internal:6379/0 \
             -e REDBEAT_REDIS_URL=redis://host.docker.internal:6379/0 \
             -e ALEMBIC_DATABASE_URL=postgresql+asyncpg://test_user:test_password@host.docker.internal:5432/turftrack_test \
-            ghcr.io/${{ github.repository_owner }}/turftrack-backend:latest
+            ghcr.io/${{ tolower(github.repository_owner) }}/turftrack-backend:latest
 
           # Wait for container to start
           sleep 10
@@ -215,11 +215,11 @@ jobs:
       - name: Test Frontend Container
         run: |
           # Pull the latest frontend image
-          docker pull ghcr.io/${{ github.repository_owner }}/turftrack-frontend:latest
+          docker pull ghcr.io/${{ tolower(github.repository_owner) }}/turftrack-frontend:latest
 
           # Test container starts
           docker run -d --name test-frontend \
-            ghcr.io/${{ github.repository_owner }}/turftrack-frontend:latest
+            ghcr.io/${{ tolower(github.repository_owner) }}/turftrack-frontend:latest
 
           # Wait for container to start
           sleep 5
@@ -238,8 +238,8 @@ jobs:
 
           # Scan backend image
           echo "Scanning backend image for vulnerabilities..."
-          trivy image --severity HIGH,CRITICAL ghcr.io/${{ github.repository_owner }}/turftrack-backend:latest || echo "Vulnerabilities found in backend image"
+          trivy image --severity HIGH,CRITICAL ghcr.io/${{ tolower(github.repository_owner) }}/turftrack-backend:latest || echo "Vulnerabilities found in backend image"
 
           # Scan frontend image
           echo "Scanning frontend image for vulnerabilities..."
-          trivy image --severity HIGH,CRITICAL ghcr.io/${{ github.repository_owner }}/turftrack-frontend:latest || echo "Vulnerabilities found in frontend image"
+          trivy image --severity HIGH,CRITICAL ghcr.io/${{ tolower(github.repository_owner) }}/turftrack-frontend:latest || echo "Vulnerabilities found in frontend image"
