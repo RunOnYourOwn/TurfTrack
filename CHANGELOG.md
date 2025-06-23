@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Corrected release workflow to prevent image name interpolation errors in `test-containers` job.
+
 ### Changed
 
 ## [0.0.2] - 2025-06-22

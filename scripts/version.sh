@@ -97,62 +97,16 @@ set_version() {
 create_changelog_entry() {
     local version=$1
     local date=$(date +"%Y-%m-%d")
-    
-    if [ ! -f "$CHANGELOG_FILE" ]; then
-        cat > "$CHANGELOG_FILE" << EOF
-# Changelog
+    local new_unreleased_section="## [Unreleased]\n\n### Added\n\n### Fixed\n\n### Changed"
 
-All notable changes to this project will be documented in this file.
+    # Replace the [Unreleased] line with the new version and date
+    # The empty string after -i is for macOS sed compatibility
+    sed -i '' "s/## \[Unreleased\]/## [$version] - $date/" "$CHANGELOG_FILE"
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-## [Unreleased]
-
-   ### Added
-
-   
-   ### Fixed
-
-   
-   ### Changed
-
-EOF
-        return
-    fi
-    
-    # Create temporary file for the new changelog
-    local temp_file=$(mktemp)
-    
-    # Copy header and [Unreleased] section
-    awk '/^## \[Unreleased\]/ {print; exit} {print}' "$CHANGELOG_FILE" > "$temp_file"
-    
-    # Add the template structure for [Unreleased]
-    cat >> "$temp_file" << 'EOF'
-
-   ### Added
-
-   
-   ### Fixed
-
-   
-   ### Changed
-
-EOF
-    
-    # Add new version entry
-    echo "" >> "$temp_file"
-    echo "## [$version] - $date" >> "$temp_file"
-    echo "" >> "$temp_file"
-    echo "### Added" >> "$temp_file"
-    echo "- Initial release" >> "$temp_file"
-    echo "" >> "$temp_file"
-    
-    # Add all existing version entries
-    awk '/^## \[Unreleased\]/ {next} /^## \[/ {p=1} p' "$CHANGELOG_FILE" >> "$temp_file"
-    
-    # Replace original file
-    mv "$temp_file" "$CHANGELOG_FILE"
+    # Add a new, empty [Unreleased] section back at the top, after the header
+    sed -i '' "/semver.org/a\\
+\\
+$new_unreleased_section" "$CHANGELOG_FILE"
 }
 
 # Function to create release
