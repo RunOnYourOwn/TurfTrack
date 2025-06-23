@@ -145,31 +145,6 @@ cd backend
 
 Note: You must also start up the docker-compose.test.yml containers for testing to succeed.
 
-## Container Images & Deployment
-
-This project uses GitHub Actions to automatically build and publish versioned Docker images to the GitHub Container Registry (GHCR). See `docker-compose.standalone.yml` for an example of how to use them.
-
-### Image Versioning
-
-Three separate images are published: `turftrack-backend`, `turftrack-celery`, and `turftrack-frontend`. The following tagging strategy is used:
-
-- `:latest`: For every push to the `main` branch, images are tagged with `:latest`. This tag represents the most recent development build.
-- `:sha-xxxxxxx`: Every commit-specific image is tagged with its short git SHA (e.g., `:cb758e7`).
-- `:<version>`: When a formal release is created, images are tagged with the corresponding semantic version number (e.g., `v1.2.3`).
-
-### Creating a Release
-
-To create a new, versioned release (for maintainers):
-
-1.  Ensure all your changes are on the `main` branch.
-2.  Use the `version.sh` script to bump the version number. For example, to create a patch release:
-    ```bash
-    ./scripts/version.sh release patch
-    ```
-3.  This will push a new version tag to GitHub, which triggers the `Release` workflow.
-4.  The workflow will test, build, and publish the images, and create a draft release on GitHub.
-5.  Go to the GitHub Releases page to review and publish the draft.
-
 ---
 
 ## 🤝 Contributing
