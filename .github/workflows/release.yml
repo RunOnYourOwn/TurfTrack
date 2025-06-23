@@ -93,7 +93,7 @@ jobs:
         id: meta_backend
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ tolower(github.repository_owner) }}/turftrack-backend
+          images: ghcr.io/runonyourown/turftrack-backend
           tags: |
             type=semver,pattern={{version}}
             type=raw,value=latest
@@ -102,7 +102,7 @@ jobs:
         id: meta_celery
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ tolower(github.repository_owner) }}/turftrack-celery
+          images: ghcr.io/runonyourown/turftrack-celery
           tags: |
             type=semver,pattern={{version}}
             type=raw,value=latest
@@ -111,7 +111,7 @@ jobs:
         id: meta_frontend
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ tolower(github.repository_owner) }}/turftrack-frontend
+          images: ghcr.io/runonyourown/turftrack-frontend
           tags: |
             type=semver,pattern={{version}}
             type=raw,value=latest
@@ -186,7 +186,7 @@ jobs:
 
       - name: Test Backend Container
         env:
-          BACKEND_IMAGE_NAME: ghcr.io/${{ tolower(github.repository_owner) }}/turftrack-backend:latest
+          BACKEND_IMAGE_NAME: ghcr.io/runonyourown/turftrack-backend:latest
         run: |
           # Pull the latest backend image
           docker pull $BACKEND_IMAGE_NAME
@@ -216,7 +216,7 @@ jobs:
 
       - name: Test Frontend Container
         env:
-          FRONTEND_IMAGE_NAME: ghcr.io/${{ tolower(github.repository_owner) }}/turftrack-frontend:latest
+          FRONTEND_IMAGE_NAME: ghcr.io/runonyourown/turftrack-frontend:latest
         run: |
           # Pull the latest frontend image
           docker pull $FRONTEND_IMAGE_NAME
@@ -237,8 +237,8 @@ jobs:
 
       - name: Security Scan Containers
         env:
-          BACKEND_IMAGE_NAME: ghcr.io/${{ tolower(github.repository_owner) }}/turftrack-backend:latest
-          FRONTEND_IMAGE_NAME: ghcr.io/${{ tolower(github.repository_owner) }}/turftrack-frontend:latest
+          BACKEND_IMAGE_NAME: ghcr.io/runonyourown/turftrack-backend:latest
+          FRONTEND_IMAGE_NAME: ghcr.io/runonyourown/turftrack-frontend:latest
         run: |
           # Install Trivy for vulnerability scanning
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.48.0
