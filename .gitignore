@@ -1,63 +1,52 @@
-# Node
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
+# --- General ---
+.DS_Store
+.env
+*.local
+*.lock
 
-# Build output
+# --- Build & Dependencies ---
+node_modules/
 dist/
 build/
 .next/
 out/
 coverage/
 .vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
-# Python
+# --- Python ---
 *.pyc
 __pycache__/
 .venv/
-env/
 venv/
+env/
+/backend/app.db*
+/backend/.pytest_cache/
+/backend/coverage.xml
+/backend/pytest-report.xml
 
-# Docker
-frontend_node_modules/
-postgres_data/
-redis_data/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Editor
+# --- Editor / IDE ---
 .vscode/
 .idea/
 *.swp
+*.swo
 .cursor/
 
-# Misc
-.env
-*.local
-*.lock
-
-.DS_Store
-backend/app/core/__pycache__/database.cpython-312.pyc
-backend/app/api/v1/__pycache__/router.cpython-312.pyc
-docs/before_production.md
-
-# Local files
-remotes.md
-.env
-/redis_data/
-/node_modules/
+# --- Logs ---
+*.log
 /backend/logs/
-/backend/.venv/
-/backend/app.db*
-/backend/.pytest_cache/
-/backend/__pycache__/
-/backend/coverage.xml
-/backend/pytest-report.xml
-*.pyc
-*.swp
-*.swo
-.DS_Store
+
+# --- Docker ---
+postgres_data/
+redis_data/
+frontend_node_modules/
+
+# --- Internal / Untracked Documentation ---
+# These files are for local development notes and are not tracked in git.
+docs/before_production.md
+docs/status.md
+docs/tasks.md
+remotes.md
