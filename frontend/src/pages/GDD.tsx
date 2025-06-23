@@ -24,26 +24,16 @@ import { Input } from "@/components/ui/input";
 import {
   Sheet,
   SheetContent,
-  SheetHeader,
   SheetTitle,
   SheetDescription,
   SheetClose,
 } from "@/components/ui/sheet";
 import { useState } from "react";
 import { format } from "date-fns";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  CartesianGrid,
-  ReferenceLine,
-} from "recharts";
 import { toast } from "sonner";
 import { PencilIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ResponsiveLine, PointTooltipProps } from "@nivo/line";
 
 const TrashIcon = () => (
   <svg
@@ -62,6 +52,35 @@ const TrashIcon = () => (
     />
   </svg>
 );
+
+// Custom slice tooltip for Nivo chart (single series, labeled)
+const CustomSliceTooltip = ({ slice }: { slice: any }) => {
+  const date = slice.points[0].data.xFormatted || slice.points[0].data.x;
+  const value = Number(
+    slice.points[0].data.yFormatted || slice.points[0].data.y
+  ).toFixed(2);
+  return (
+    <div
+      style={{
+        background: "#222",
+        color: "#fff",
+        padding: "8px 12px",
+        borderRadius: 6,
+        fontSize: 13,
+        boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+        maxWidth: 220,
+        whiteSpace: "nowrap",
+      }}
+    >
+      <div>
+        <b>Date:</b> {date}
+      </div>
+      <div>
+        <b>Cumulative GDD:</b> {value}
+      </div>
+    </div>
+  );
+};
 
 export default function GDD() {
   const queryClient = useQueryClient();
@@ -177,6 +196,22 @@ export default function GDD() {
   const [parameterEditSubmitting, setParameterEditSubmitting] = useState(false);
   const [parameterEditError, setParameterEditError] = useState<string | null>(
     null
+  );
+
+  // Nivo data transformation for cumulative GDD
+  const nivoData = React.useMemo(
+    () => [
+      {
+        id: "Cumulative GDD",
+        data: (gddValues || [])
+          .filter((v: any) => v.date && v.cumulative_gdd != null)
+          .map((v: any) => ({
+            x: v.date,
+            y: v.cumulative_gdd,
+          })),
+      },
+    ],
+    [gddValues]
   );
 
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -375,6 +410,7 @@ export default function GDD() {
   }
 
   // Chart configuration
+
   return (
     <div className="p-4 min-h-screen bg-background w-full">
       <Card className="min-h-[400px] w-full shadow-lg bg-white dark:bg-gray-900 text-black dark:text-white">
@@ -595,10 +631,22 @@ export default function GDD() {
       {/* Model Details Sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent className="w-[800px] sm:max-w-[800px] overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>{selectedModel?.name}</SheetTitle>
-            <SheetDescription>GDD Model Details and History</SheetDescription>
-          </SheetHeader>
+          <div className="flex items-center justify-between gap-4 pt-4 px-6 mb-4">
+            <div>
+              <SheetTitle>{selectedModel?.name}</SheetTitle>
+              <SheetDescription>GDD Model Details and History</SheetDescription>
+            </div>
+            <SheetClose asChild>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setDeleteDialogOpen(true)}
+                className="ml-2 mr-12"
+              >
+                Delete Model
+              </Button>
+            </SheetClose>
+          </div>
 
           <div className="space-y-6 px-6">
             <div className="space-y-4">
@@ -705,6 +753,39 @@ export default function GDD() {
 
             <div className="space-y-4">
               <h3 className="text-sm font-medium">GDD Values</h3>
+              {/* Debug Table: Show gddValues as rendered */}
+              {gddValues && gddValues.length > 0 && (
+                <div className="overflow-x-auto mb-4">
+                  <table className="text-xs border-collapse border w-full bg-card text-card-foreground rounded-lg shadow">
+                    <thead>
+                      <tr>
+                        <th className="border px-2 py-1 text-center">Date</th>
+                        <th className="border px-2 py-1 text-center">
+                          Daily GDD
+                        </th>
+                        <th className="border px-2 py-1 text-center">
+                          Cumulative GDD
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {gddValues.map((v: any, i: number) => (
+                        <tr key={v.id || i}>
+                          <td className="border px-2 py-1 text-center">
+                            {v.date}
+                          </td>
+                          <td className="border px-2 py-1 text-center">
+                            {Number(v.daily_gdd).toFixed(2)}
+                          </td>
+                          <td className="border px-2 py-1 text-center">
+                            {Number(v.cumulative_gdd).toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
               <div className="rounded-lg border">
                 <div className="flex items-center justify-between p-4">
                   <div className="text-sm text-muted-foreground">
@@ -721,65 +802,79 @@ export default function GDD() {
                   </Button>
                 </div>
                 <div className="h-[300px] p-4">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={gddValues || []}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis
-                        dataKey="date"
-                        tickFormatter={(date) =>
-                          date ? format(new Date(date), "MMM dd") : ""
-                        }
-                      />
-                      <YAxis
-                        domain={[
-                          0,
-                          (dataMax: number) =>
-                            Math.max(dataMax, selectedModel?.threshold || 0) *
-                            1.1,
-                        ]}
-                        tickFormatter={(value) => Math.round(value).toString()}
-                        ticks={[0, 40, 80, 120, 160, 200, 240, 280, 320]}
-                        allowDataOverflow
-                      />
-                      <Tooltip
-                        labelFormatter={(date) =>
-                          date ? format(new Date(date), "MMM dd, yyyy") : ""
-                        }
-                        formatter={(value: any, name: string) => [
-                          Number(value).toFixed(1),
-                          name === "Daily GDD" ? "Daily GDD" : "Cumulative GDD",
-                        ]}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="daily_gdd"
-                        stroke="#10b981"
-                        dot={false}
-                        name="Daily GDD"
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="cumulative_gdd"
-                        stroke="#6366f1"
-                        dot={false}
-                        name="Cumulative GDD"
-                        strokeWidth={2}
-                      />
-                      {gddValues?.[0]?.effective_params?.threshold && (
-                        <ReferenceLine
-                          y={gddValues[0].effective_params.threshold}
-                          stroke="#ef4444"
-                          strokeDasharray="3 3"
-                          label={{
-                            value: `Threshold (${gddValues[0].effective_params.threshold})`,
-                            position: "top",
-                            fill: "#ef4444",
-                            fontSize: 12,
-                          }}
-                        />
-                      )}
-                    </LineChart>
-                  </ResponsiveContainer>
+                  <div style={{ height: 300 }}>
+                    <ResponsiveLine
+                      data={nivoData}
+                      xScale={{ type: "point" }}
+                      yScale={{
+                        type: "linear",
+                        min: 0,
+                        max:
+                          Math.max(
+                            typeof selectedModel?.threshold === "number"
+                              ? selectedModel.threshold
+                              : 0,
+                            ...(nivoData[0]?.data || []).map((d: any) => d.y)
+                          ) * 1.1,
+                      }}
+                      axisBottom={{
+                        tickRotation: -30,
+                        legend: "Date",
+                        legendOffset: 70,
+                        legendPosition: "middle",
+                      }}
+                      axisLeft={{
+                        legend: "Cumulative GDD",
+                        legendOffset: -40,
+                        legendPosition: "middle",
+                      }}
+                      margin={{ top: 20, right: 30, bottom: 110, left: 60 }}
+                      pointSize={8}
+                      enableSlices="x"
+                      theme={{
+                        axis: {
+                          ticks: {
+                            text: {
+                              fill: "var(--nivo-axis-text, #222)",
+                              transition: "fill 0.2s",
+                            },
+                          },
+                          legend: {
+                            text: {
+                              fill: "var(--nivo-axis-text, #222)",
+                              transition: "fill 0.2s",
+                            },
+                          },
+                        },
+                        tooltip: {
+                          container: { background: "#222", color: "#fff" },
+                        },
+                        grid: {
+                          line: { stroke: "#444", strokeDasharray: "3 3" },
+                        },
+                      }}
+                      colors={{ scheme: "category10" }}
+                      sliceTooltip={CustomSliceTooltip}
+                      markers={
+                        typeof selectedModel?.threshold === "number"
+                          ? [
+                              {
+                                axis: "y",
+                                value: selectedModel.threshold,
+                                lineStyle: {
+                                  stroke: "#ef4444",
+                                  strokeWidth: 2,
+                                  strokeDasharray: "6 6",
+                                },
+                                legend: `Threshold (${selectedModel.threshold})`,
+                                legendPosition: "top",
+                                textStyle: { fill: "#ef4444", fontSize: 12 },
+                              },
+                            ]
+                          : []
+                      }
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -825,16 +920,6 @@ export default function GDD() {
               </div>
             </div>
           </div>
-
-          <SheetClose asChild>
-            <Button
-              variant="destructive"
-              className="absolute bottom-6 right-6"
-              onClick={() => setDeleteDialogOpen(true)}
-            >
-              Delete Model
-            </Button>
-          </SheetClose>
         </SheetContent>
       </Sheet>
 

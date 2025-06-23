@@ -1,15 +1,7 @@
 import React, { useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetcher } from "../api/fetcher";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
+import { ResponsiveLine } from "@nivo/line";
 import Select from "react-select";
 import { DateRange } from "react-date-range";
 import {
@@ -122,6 +114,58 @@ const selectStyles = {
   }),
 };
 
+// Helper to map field to label
+const nutrientLabelMap = Object.fromEntries(
+  NUTRIENTS.map((n) => [n.field, n.label])
+);
+
+// Helper to strip .number suffix from Nivo series id, safely
+const getBaseField = (id: string | undefined) =>
+  typeof id === "string" ? id.replace(/\.[0-9]+$/, "") : "";
+
+// Custom slice tooltip for Nivo chart (formats all values to two decimals and shows label)
+const CustomSliceTooltip = ({ slice }: { slice: any }) => (
+  <div
+    style={{
+      background: "#222",
+      color: "#fff",
+      padding: "8px 12px",
+      borderRadius: 6,
+      fontSize: 13,
+      boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+      maxWidth: 220,
+      whiteSpace: "nowrap",
+    }}
+  >
+    {slice.points.map((point: any) => {
+      // Strip .number suffix for label lookup, handle undefined
+      const baseId = getBaseField(point.serieId);
+      const label =
+        nutrientLabelMap[baseId] || baseId || point.serieId || point.id || "";
+      return (
+        <div
+          key={point.id}
+          style={{ display: "flex", alignItems: "center", gap: 8 }}
+        >
+          <span
+            style={{
+              color: point.serieColor,
+              fontWeight: 700,
+              minWidth: 24,
+              display: "inline-block",
+            }}
+          >
+            {label}
+          </span>
+          <span style={{ marginLeft: 4 }}>
+            {Number(point.data.yFormatted || point.data.y).toFixed(2)}
+          </span>
+        </div>
+      );
+    })}
+  </div>
+);
+
 export default function Reports() {
   // State for filters
   const [selectedLawn, setSelectedLawn] = React.useState<string>("");
@@ -205,16 +249,10 @@ export default function Reports() {
       new Set(lawnApps.map((a: any) => a.application_date))
     ).sort();
     if (allDates.length === 0) return [];
-    const firstDate = allDates[0];
     // Initialize cumulative sums for each nutrient
     const cum: Record<string, number> = {};
     NUTRIENTS.forEach((n) => (cum[n.field] = 0));
-    // Synthetic start row
-    const startRow: any = { date: firstDate };
-    selectedNutrients.forEach((n) => {
-      startRow[n] = 0;
-    });
-    const result: any[] = [startRow];
+    const result: any[] = [];
     allDates.forEach((date) => {
       const row: any = { date };
       selectedNutrients.forEach((nutrient) => {
@@ -228,6 +266,45 @@ export default function Reports() {
     });
     return result;
   }, [filteredApps, lawns, selectedLawn, selectedNutrients]);
+
+  // Prepare Nivo data for selected nutrients
+  const nivoData = React.useMemo(() => {
+    if (!chartData || !selectedNutrients) return [];
+    return selectedNutrients.map((nutrient) => ({
+      id: nutrient,
+      data: chartData.map((row: any) => ({
+        x: row.date,
+        y: row[nutrient],
+      })),
+    }));
+  }, [chartData, selectedNutrients]);
+
+  // Dynamic Nivo theme for dark/light mode (matches GDD.tsx)
+  const nivoTheme = React.useMemo(
+    () => ({
+      axis: {
+        ticks: {
+          text: {
+            fill: "var(--nivo-axis-text, #222)",
+            transition: "fill 0.2s",
+          },
+        },
+        legend: {
+          text: {
+            fill: "var(--nivo-axis-text, #222)",
+            transition: "fill 0.2s",
+          },
+        },
+      },
+      tooltip: {
+        container: { background: "#222", color: "#fff" },
+      },
+      grid: {
+        line: { stroke: "#444", strokeDasharray: "3 3" },
+      },
+    }),
+    []
+  );
 
   // Set selectedLawn to first lawn on initial load if not set
   React.useEffect(() => {
@@ -314,53 +391,39 @@ export default function Reports() {
           {/* Chart */}
           <div className="mb-8">
             <h2 className="text-lg font-semibold mb-2">Cumulative Over Time</h2>
-            <div className="bg-background dark:bg-gray-900 rounded shadow p-4 w-full">
-              <ResponsiveContainer width="100%" height={400}>
-                <LineChart
-                  data={chartData}
-                  margin={{ top: 16, right: 24, left: 0, bottom: 8 }}
-                >
-                  <XAxis dataKey="date" />
-                  <YAxis
-                    tickFormatter={(v) => v.toFixed(2)}
-                    domain={[0, "auto"]}
-                  />
-                  <Tooltip
-                    formatter={(value: any) =>
-                      typeof value === "number" ? value.toFixed(2) : value
-                    }
-                  />
-                  <Legend />
-                  {selectedNutrients.map((nutrient, idx) => (
-                    <Line
-                      key={nutrient}
-                      type="monotone"
-                      dataKey={nutrient}
-                      stroke={
-                        [
-                          "#2563eb", // blue
-                          "#eab308", // yellow
-                          "#ef4444", // red
-                          "#10b981", // green
-                          "#a21caf", // purple
-                          "#f59e42", // orange
-                          "#6366f1", // indigo
-                          "#f43f5e", // pink
-                          "#84cc16", // lime
-                          "#0ea5e9", // sky
-                          "#d97706", // amber
-                          "#64748b", // slate
-                        ][idx % 12]
-                      }
-                      dot={false}
-                      name={
-                        NUTRIENTS.find((n) => n.field === nutrient)?.label ||
-                        nutrient
-                      }
-                    />
-                  ))}
-                </LineChart>
-              </ResponsiveContainer>
+            <div
+              className="bg-background dark:bg-gray-900 rounded shadow p-4 w-full"
+              style={{ height: 400 }}
+            >
+              <ResponsiveLine
+                data={nivoData}
+                xScale={{ type: "point" }}
+                yScale={{
+                  type: "linear",
+                  min: "auto",
+                  max: "auto",
+                  stacked: false,
+                }}
+                axisBottom={{
+                  tickRotation: -45,
+                  legend: "Date",
+                  legendOffset: 36,
+                  legendPosition: "middle",
+                }}
+                axisLeft={{
+                  legend: "Cumulative",
+                  legendOffset: -40,
+                  legendPosition: "middle",
+                }}
+                margin={{ top: 16, right: 24, bottom: 50, left: 60 }}
+                pointSize={8}
+                useMesh={true}
+                theme={nivoTheme}
+                colors={{ scheme: "category10" }}
+                enableSlices="x"
+                tooltip={() => null}
+                sliceTooltip={() => null}
+              />
             </div>
           </div>
 

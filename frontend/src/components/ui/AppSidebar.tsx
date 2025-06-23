@@ -152,7 +152,7 @@ export function AppSidebar() {
         <SidebarFooter className="border-t p-4">
           {state === "collapsed" ? null : (
             <span className="text-xs text-muted-foreground">
-              © 2024 TurfTrack
+              © 2025 TurfTrack
             </span>
           )}
         </SidebarFooter>
