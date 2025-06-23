@@ -7,7 +7,7 @@ export default withMermaid(
     description: "TurfTrack Documentation",
     base: "/TurfTrack/",
     themeConfig: {
-      logo: "/logo.png", // You will need to add a logo to docs/public/logo.png
+      logo: { src: "/logo.png", alt: "TurfTrack Logo" },
       nav: [
         { text: "Home", link: "/" },
         { text: "GitHub", link: "https://github.com/RunOnYourOwn/TurfTrack" },
