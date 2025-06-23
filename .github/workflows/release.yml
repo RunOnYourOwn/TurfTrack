@@ -222,11 +222,18 @@ jobs:
           docker ps | grep test-backend
 
           # Test health endpoint (if available)
-          docker exec test-backend curl -f http://localhost:8000/health || echo "Health endpoint not available yet"
+          if ! docker exec test-backend curl -f http://localhost:8000/health; then
+            echo "Health endpoint not available yet or returned error. Printing logs:"
+            docker logs test-backend
+            exit 1
+          fi
 
           # Clean up
           docker stop test-backend
           docker rm test-backend
+
+          echo "Final backend container logs:"
+          docker logs test-backend || true
 
       - name: Test Frontend Container
         env:
