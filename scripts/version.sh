@@ -97,16 +97,21 @@ set_version() {
 create_changelog_entry() {
     local version=$1
     local date=$(date +"%Y-%m-%d")
-    local new_unreleased_section="## [Unreleased]\n\n### Added\n\n### Fixed\n\n### Changed"
 
     # Replace the [Unreleased] line with the new version and date
-    # The empty string after -i is for macOS sed compatibility
     sed -i '' "s/## \[Unreleased\]/## [$version] - $date/" "$CHANGELOG_FILE"
 
-    # Add a new, empty [Unreleased] section back at the top, after the header
-    sed -i '' "/semver.org/a\\
-\\
-$new_unreleased_section" "$CHANGELOG_FILE"
+    # Add a new, empty [Unreleased] section back at the top, after the header.
+    # This syntax with literal newlines is compatible with both macOS and GNU sed.
+    sed -i '' '/semver.org/a \
+\
+## [Unreleased]\
+\
+### Added\
+\
+### Fixed\
+\
+### Changed' "$CHANGELOG_FILE"
 }
 
 # Function to create release
