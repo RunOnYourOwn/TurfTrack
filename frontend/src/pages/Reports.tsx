@@ -1,15 +1,7 @@
 import React, { useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetcher } from "../api/fetcher";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
+import { ResponsiveLine } from "@nivo/line";
 import Select from "react-select";
 import { DateRange } from "react-date-range";
 import {
@@ -205,16 +197,10 @@ export default function Reports() {
       new Set(lawnApps.map((a: any) => a.application_date))
     ).sort();
     if (allDates.length === 0) return [];
-    const firstDate = allDates[0];
     // Initialize cumulative sums for each nutrient
     const cum: Record<string, number> = {};
     NUTRIENTS.forEach((n) => (cum[n.field] = 0));
-    // Synthetic start row
-    const startRow: any = { date: firstDate };
-    selectedNutrients.forEach((n) => {
-      startRow[n] = 0;
-    });
-    const result: any[] = [startRow];
+    const result: any[] = [];
     allDates.forEach((date) => {
       const row: any = { date };
       selectedNutrients.forEach((nutrient) => {
@@ -228,6 +214,45 @@ export default function Reports() {
     });
     return result;
   }, [filteredApps, lawns, selectedLawn, selectedNutrients]);
+
+  // Prepare Nivo data for selected nutrients
+  const nivoData = React.useMemo(() => {
+    if (!chartData || !selectedNutrients) return [];
+    return selectedNutrients.map((nutrient) => ({
+      id: nutrient,
+      data: chartData.map((row: any) => ({
+        x: row.date,
+        y: row[nutrient],
+      })),
+    }));
+  }, [chartData, selectedNutrients]);
+
+  // Dynamic Nivo theme for dark/light mode (matches GDD.tsx)
+  const nivoTheme = React.useMemo(
+    () => ({
+      axis: {
+        ticks: {
+          text: {
+            fill: "var(--nivo-axis-text, #222)",
+            transition: "fill 0.2s",
+          },
+        },
+        legend: {
+          text: {
+            fill: "var(--nivo-axis-text, #222)",
+            transition: "fill 0.2s",
+          },
+        },
+      },
+      tooltip: {
+        container: { background: "#222", color: "#fff" },
+      },
+      grid: {
+        line: { stroke: "#444", strokeDasharray: "3 3" },
+      },
+    }),
+    []
+  );
 
   // Set selectedLawn to first lawn on initial load if not set
   React.useEffect(() => {
@@ -314,53 +339,39 @@ export default function Reports() {
           {/* Chart */}
           <div className="mb-8">
             <h2 className="text-lg font-semibold mb-2">Cumulative Over Time</h2>
-            <div className="bg-background dark:bg-gray-900 rounded shadow p-4 w-full">
-              <ResponsiveContainer width="100%" height={400}>
-                <LineChart
-                  data={chartData}
-                  margin={{ top: 16, right: 24, left: 0, bottom: 8 }}
-                >
-                  <XAxis dataKey="date" />
-                  <YAxis
-                    tickFormatter={(v) => v.toFixed(2)}
-                    domain={[0, "auto"]}
-                  />
-                  <Tooltip
-                    formatter={(value: any) =>
-                      typeof value === "number" ? value.toFixed(2) : value
-                    }
-                  />
-                  <Legend />
-                  {selectedNutrients.map((nutrient, idx) => (
-                    <Line
-                      key={nutrient}
-                      type="monotone"
-                      dataKey={nutrient}
-                      stroke={
-                        [
-                          "#2563eb", // blue
-                          "#eab308", // yellow
-                          "#ef4444", // red
-                          "#10b981", // green
-                          "#a21caf", // purple
-                          "#f59e42", // orange
-                          "#6366f1", // indigo
-                          "#f43f5e", // pink
-                          "#84cc16", // lime
-                          "#0ea5e9", // sky
-                          "#d97706", // amber
-                          "#64748b", // slate
-                        ][idx % 12]
-                      }
-                      dot={false}
-                      name={
-                        NUTRIENTS.find((n) => n.field === nutrient)?.label ||
-                        nutrient
-                      }
-                    />
-                  ))}
-                </LineChart>
-              </ResponsiveContainer>
+            <div
+              className="bg-background dark:bg-gray-900 rounded shadow p-4 w-full"
+              style={{ height: 400 }}
+            >
+              <ResponsiveLine
+                data={nivoData}
+                xScale={{ type: "point" }}
+                yScale={{
+                  type: "linear",
+                  min: "auto",
+                  max: "auto",
+                  stacked: false,
+                }}
+                axisBottom={{
+                  tickRotation: -45,
+                  legend: "Date",
+                  legendOffset: 36,
+                  legendPosition: "middle",
+                }}
+                axisLeft={{
+                  legend: "Cumulative",
+                  legendOffset: -40,
+                  legendPosition: "middle",
+                }}
+                margin={{ top: 16, right: 24, bottom: 50, left: 60 }}
+                pointSize={8}
+                useMesh={true}
+                theme={nivoTheme}
+                colors={{ scheme: "category10" }}
+                enableSlices="x"
+                tooltip={() => null}
+                sliceTooltip={() => null}
+              />
             </div>
           </div>
 
