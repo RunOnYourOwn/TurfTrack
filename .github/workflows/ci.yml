@@ -146,6 +146,9 @@ jobs:
         working-directory: docs
         run: npm run docs:build
 
+      - name: List build output for debugging
+        run: ls -R docs/.vitepress/dist
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
