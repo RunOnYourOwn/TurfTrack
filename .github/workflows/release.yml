@@ -200,12 +200,12 @@ jobs:
 
           # Test container starts and responds to health check
           docker run -d --name test-backend \
-            -e DATABASE_URL=postgresql+asyncpg://test_user:test_password@host.docker.internal:5432/turftrack_test \
+            -e DATABASE_URL=postgresql+asyncpg://test_user:test_password@postgres:5432/turftrack_test \
             -e REDIS_URL=redis://host.docker.internal:6379/0 \
             -e CELERY_BROKER_URL=redis://host.docker.internal:6379/0 \
             -e CELERY_RESULT_BACKEND=redis://host.docker.internal:6379/0 \
             -e REDBEAT_REDIS_URL=redis://host.docker.internal:6379/0 \
-            -e ALEMBIC_DATABASE_URL=postgresql+asyncpg://test_user:test_password@host.docker.internal:5432/turftrack_test \
+            -e ALEMBIC_DATABASE_URL=postgresql+asyncpg://test_user:test_password@postgres:5432/turftrack_test \
             $BACKEND_IMAGE_NAME
 
           # Wait for container to start
