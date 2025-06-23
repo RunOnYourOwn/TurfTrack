@@ -208,6 +208,13 @@ jobs:
             -e ALEMBIC_DATABASE_URL=postgresql+asyncpg://test_user:test_password@host.docker.internal:5432/turftrack_test \
             $BACKEND_IMAGE_NAME
 
+          # If the container exited, print logs for debugging
+          if ! docker ps | grep test-backend; then
+            echo "Backend container exited. Printing logs:"
+            docker logs test-backend
+            exit 1
+          fi
+
           # Wait for container to start
           sleep 10
 
