@@ -65,23 +65,13 @@ jobs:
         working-directory: backend
         run: uv run pytest
 
-  publish:
-    name: Build, Push, and Draft Release
+  build:
+    name: Build Images
     needs: test
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      packages: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -89,79 +79,51 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Extract metadata for backend image
-        id: meta_backend
-        uses: docker/metadata-action@v5
+      - name: Cache Docker layers
+        uses: actions/cache@v4
         with:
-          images: ghcr.io/runonyourown/turftrack-backend
-          tags: |
-            type=semver,pattern={{version}}
-            type=raw,value=latest
+          path: /tmp/.buildx-cache
+          key: buildx-${{ github.sha }}
+          restore-keys: |
+            buildx-
 
-      - name: Extract metadata for celery image
-        id: meta_celery
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/runonyourown/turftrack-celery
-          tags: |
-            type=semver,pattern={{version}}
-            type=raw,value=latest
-
-      - name: Extract metadata for frontend image
-        id: meta_frontend
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/runonyourown/turftrack-frontend
-          tags: |
-            type=semver,pattern={{version}}
-            type=raw,value=latest
-
-      - name: Build and push backend image
+      - name: Build backend image (local)
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./backend/Dockerfile.prod
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta_backend.outputs.tags }}
-          labels: ${{ steps.meta_backend.outputs.labels }}
+          platforms: linux/amd64
+          load: true
+          tags: turftrack-backend:ci
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
 
-      - name: Build and push celery image
+      - name: Build celery image (local)
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./backend/Dockerfile.celery
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta_celery.outputs.tags }}
-          labels: ${{ steps.meta_celery.outputs.labels }}
+          platforms: linux/amd64
+          load: true
+          tags: turftrack-celery:ci
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
 
-      - name: Build and push frontend image
+      - name: Build frontend image (local)
         uses: docker/build-push-action@v5
         with:
           context: ./frontend
           file: ./frontend/Dockerfile.prod
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta_frontend.outputs.tags }}
-          labels: ${{ steps.meta_frontend.outputs.labels }}
-
-      - name: Create Draft Release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create ${{ github.ref_name }} \
-            --draft \
-            --generate-notes \
-            --title "Release ${{ github.ref_name }}"
+          platforms: linux/amd64
+          load: true
+          tags: turftrack-frontend:ci
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
 
   test-containers:
     name: Test Built Containers
-    needs: publish
+    needs: build
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: read
     services:
       postgres:
         image: postgres:16
@@ -181,24 +143,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Test Backend Container
-        env:
-          BACKEND_IMAGE_NAME: ghcr.io/runonyourown/turftrack-backend:latest
         run: |
-          # Pull the latest backend image
-          docker pull $BACKEND_IMAGE_NAME
-
-          # Test container starts and responds to health check
           docker run -d --name test-backend --network host \
             -e DATABASE_URL=postgresql+asyncpg://test_user:test_password@localhost:5432/turftrack_test \
             -e REDIS_URL=redis://localhost:6379/0 \
@@ -206,9 +155,8 @@ jobs:
             -e CELERY_RESULT_BACKEND=redis://localhost:6379/0 \
             -e REDBEAT_REDIS_URL=redis://localhost:6379/0 \
             -e ALEMBIC_DATABASE_URL=postgresql+asyncpg://test_user:test_password@localhost:5432/turftrack_test \
-            $BACKEND_IMAGE_NAME
+            turftrack-backend:ci
 
-          # Wait for container to start
           sleep 20
 
           echo "Backend container logs before health check:"
@@ -220,43 +168,91 @@ jobs:
           echo "Backend container logs after health check:"
           docker logs test-backend || true
 
-          # Clean up
           docker stop test-backend
           docker rm test-backend
 
       - name: Test Frontend Container
-        env:
-          FRONTEND_IMAGE_NAME: ghcr.io/runonyourown/turftrack-frontend:latest
         run: |
-          # Pull the latest frontend image
-          docker pull $FRONTEND_IMAGE_NAME
-
-          # Test container starts
-          docker run -d --name test-frontend \
-            $FRONTEND_IMAGE_NAME
-
-          # Wait for container to start
+          docker run -d --name test-frontend turftrack-frontend:ci
           sleep 5
-
-          # Check if container is running
           docker ps | grep test-frontend
-
-          # Clean up
           docker stop test-frontend
           docker rm test-frontend
 
       - name: Security Scan Containers
-        env:
-          BACKEND_IMAGE_NAME: ghcr.io/runonyourown/turftrack-backend:latest
-          FRONTEND_IMAGE_NAME: ghcr.io/runonyourown/turftrack-frontend:latest
         run: |
-          # Install Trivy for vulnerability scanning
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.48.0
-
-          # Scan backend image
           echo "Scanning backend image for vulnerabilities..."
-          trivy image --severity HIGH,CRITICAL $BACKEND_IMAGE_NAME || echo "Vulnerabilities found in backend image"
-
-          # Scan frontend image
+          trivy image --severity HIGH,CRITICAL turftrack-backend:ci || echo "Vulnerabilities found in backend image"
           echo "Scanning frontend image for vulnerabilities..."
-          trivy image --severity HIGH,CRITICAL $FRONTEND_IMAGE_NAME || echo "Vulnerabilities found in frontend image"
+          trivy image --severity HIGH,CRITICAL turftrack-frontend:ci || echo "Vulnerabilities found in frontend image"
+
+  publish:
+    name: Publish Images
+    needs: test-containers
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./backend/Dockerfile.prod
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/runonyourown/turftrack-backend:latest
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
+
+      - name: Build and push celery image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./backend/Dockerfile.celery
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/runonyourown/turftrack-celery:latest
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile.prod
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/runonyourown/turftrack-frontend:latest
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
+
+  release:
+    name: Create Draft Release
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Create Draft Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create ${{ github.ref_name }} \
+            --draft \
+            --generate-notes \
+            --title "Release ${{ github.ref_name }}"
