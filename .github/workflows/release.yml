@@ -98,6 +98,14 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
 
+      - name: Save backend image
+        run: docker save turftrack-backend:ci -o backend-image.tar
+      - name: Upload backend image
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-image
+          path: backend-image.tar
+
       - name: Build celery image (local)
         uses: docker/build-push-action@v5
         with:
@@ -109,6 +117,14 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
 
+      - name: Save celery image
+        run: docker save turftrack-celery:ci -o celery-image.tar
+      - name: Upload celery image
+        uses: actions/upload-artifact@v4
+        with:
+          name: celery-image
+          path: celery-image.tar
+
       - name: Build frontend image (local)
         uses: docker/build-push-action@v5
         with:
@@ -119,6 +135,14 @@ jobs:
           tags: turftrack-frontend:ci
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
+
+      - name: Save frontend image
+        run: docker save turftrack-frontend:ci -o frontend-image.tar
+      - name: Upload frontend image
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-image
+          path: frontend-image.tar
 
   test-containers:
     name: Test Built Containers
@@ -145,6 +169,27 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Download backend image
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-image
+      - name: Load backend image
+        run: docker load -i backend-image.tar
+
+      - name: Download celery image
+        uses: actions/download-artifact@v4
+        with:
+          name: celery-image
+      - name: Load celery image
+        run: docker load -i celery-image.tar
+
+      - name: Download frontend image
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-image
+      - name: Load frontend image
+        run: docker load -i frontend-image.tar
 
       - name: Test Backend Container
         run: |
