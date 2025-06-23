@@ -185,9 +185,11 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Test Backend Container
+        env:
+          BACKEND_IMAGE_NAME: ghcr.io/${{ tolower(github.repository_owner) }}/turftrack-backend:latest
         run: |
           # Pull the latest backend image
-          docker pull ghcr.io/${{ tolower(github.repository_owner) }}/turftrack-backend:latest
+          docker pull $BACKEND_IMAGE_NAME
 
           # Test container starts and responds to health check
           docker run -d --name test-backend \
@@ -197,7 +199,7 @@ jobs:
             -e CELERY_RESULT_BACKEND=redis://host.docker.internal:6379/0 \
             -e REDBEAT_REDIS_URL=redis://host.docker.internal:6379/0 \
             -e ALEMBIC_DATABASE_URL=postgresql+asyncpg://test_user:test_password@host.docker.internal:5432/turftrack_test \
-            ghcr.io/${{ tolower(github.repository_owner) }}/turftrack-backend:latest
+            $BACKEND_IMAGE_NAME
 
           # Wait for container to start
           sleep 10
@@ -213,13 +215,15 @@ jobs:
           docker rm test-backend
 
       - name: Test Frontend Container
+        env:
+          FRONTEND_IMAGE_NAME: ghcr.io/${{ tolower(github.repository_owner) }}/turftrack-frontend:latest
         run: |
           # Pull the latest frontend image
-          docker pull ghcr.io/${{ tolower(github.repository_owner) }}/turftrack-frontend:latest
+          docker pull $FRONTEND_IMAGE_NAME
 
           # Test container starts
           docker run -d --name test-frontend \
-            ghcr.io/${{ tolower(github.repository_owner) }}/turftrack-frontend:latest
+            $FRONTEND_IMAGE_NAME
 
           # Wait for container to start
           sleep 5
@@ -232,14 +236,17 @@ jobs:
           docker rm test-frontend
 
       - name: Security Scan Containers
+        env:
+          BACKEND_IMAGE_NAME: ghcr.io/${{ tolower(github.repository_owner) }}/turftrack-backend:latest
+          FRONTEND_IMAGE_NAME: ghcr.io/${{ tolower(github.repository_owner) }}/turftrack-frontend:latest
         run: |
           # Install Trivy for vulnerability scanning
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.48.0
 
           # Scan backend image
           echo "Scanning backend image for vulnerabilities..."
-          trivy image --severity HIGH,CRITICAL ghcr.io/${{ tolower(github.repository_owner) }}/turftrack-backend:latest || echo "Vulnerabilities found in backend image"
+          trivy image --severity HIGH,CRITICAL $BACKEND_IMAGE_NAME || echo "Vulnerabilities found in backend image"
 
           # Scan frontend image
           echo "Scanning frontend image for vulnerabilities..."
-          trivy image --severity HIGH,CRITICAL ghcr.io/${{ tolower(github.repository_owner) }}/turftrack-frontend:latest || echo "Vulnerabilities found in frontend image"
+          trivy image --severity HIGH,CRITICAL $FRONTEND_IMAGE_NAME || echo "Vulnerabilities found in frontend image"
