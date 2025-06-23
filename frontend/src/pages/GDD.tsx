@@ -33,7 +33,7 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { PencilIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ResponsiveLine, PointTooltipProps } from "@nivo/line";
+import { ResponsiveLine } from "@nivo/line";
 
 const TrashIcon = () => (
   <svg

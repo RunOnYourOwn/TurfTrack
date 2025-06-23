@@ -114,58 +114,6 @@ const selectStyles = {
   }),
 };
 
-// Helper to map field to label
-const nutrientLabelMap = Object.fromEntries(
-  NUTRIENTS.map((n) => [n.field, n.label])
-);
-
-// Helper to strip .number suffix from Nivo series id, safely
-const getBaseField = (id: string | undefined) =>
-  typeof id === "string" ? id.replace(/\.[0-9]+$/, "") : "";
-
-// Custom slice tooltip for Nivo chart (formats all values to two decimals and shows label)
-const CustomSliceTooltip = ({ slice }: { slice: any }) => (
-  <div
-    style={{
-      background: "#222",
-      color: "#fff",
-      padding: "8px 12px",
-      borderRadius: 6,
-      fontSize: 13,
-      boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-      maxWidth: 220,
-      whiteSpace: "nowrap",
-    }}
-  >
-    {slice.points.map((point: any) => {
-      // Strip .number suffix for label lookup, handle undefined
-      const baseId = getBaseField(point.serieId);
-      const label =
-        nutrientLabelMap[baseId] || baseId || point.serieId || point.id || "";
-      return (
-        <div
-          key={point.id}
-          style={{ display: "flex", alignItems: "center", gap: 8 }}
-        >
-          <span
-            style={{
-              color: point.serieColor,
-              fontWeight: 700,
-              minWidth: 24,
-              display: "inline-block",
-            }}
-          >
-            {label}
-          </span>
-          <span style={{ marginLeft: 4 }}>
-            {Number(point.data.yFormatted || point.data.y).toFixed(2)}
-          </span>
-        </div>
-      );
-    })}
-  </div>
-);
-
 export default function Reports() {
   // State for filters
   const [selectedLawn, setSelectedLawn] = React.useState<string>("");
