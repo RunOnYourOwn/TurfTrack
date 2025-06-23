@@ -6,7 +6,7 @@ export default withMermaid(
     title: "TurfTrack",
     description: "TurfTrack Documentation",
     base: "/TurfTrack/",
-    publicDir: ".vitepress/public",
+    publicDir: "docs/.vitepress/public",
     themeConfig: {
       logo: { src: "/logo.png", alt: "TurfTrack Logo" },
       nav: [
