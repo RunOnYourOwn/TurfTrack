@@ -109,7 +109,7 @@ jobs:
       - name: Build celery image (local)
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./backend
           file: ./backend/Dockerfile.celery
           platforms: linux/amd64
           load: true
