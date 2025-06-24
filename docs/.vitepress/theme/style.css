@@ -36,7 +36,52 @@
   --vp-home-hero-image-filter: blur(44px);
 }
 
-/* Ensure syntax highlighting in code blocks is readable on the dark background */
+/* Light mode overrides */
+html.light {
+  /* --- Background Colors --- */
+  --vp-c-bg: #ffffff; /* White background */
+  --vp-c-bg-soft: #f7fafc; /* Light gray for secondary elements */
+  --vp-c-bg-mute: #e2e8f0; /* Light gray for borders and dividers */
+
+  /* --- Text Colors --- */
+  --vp-c-text-1: rgba(60, 60, 67, 0.92); /* Dark text for main content */
+  --vp-c-text-2: rgba(60, 60, 67, 0.78); /* Medium gray for secondary text */
+
+  /* --- Hero Section Specifics --- */
+  --vp-home-hero-name-background: -webkit-linear-gradient(
+    120deg,
+    #38a169 30%,
+    #48bb78
+  );
+
+  --vp-home-hero-image-background-image: linear-gradient(
+    -45deg,
+    #f7fafc 50%,
+    #e2e8f0 50%
+  );
+}
+
+/* Ensure syntax highlighting in code blocks is readable on both themes */
 .vp-doc pre {
   background-color: var(--vp-c-bg-soft) !important;
+}
+
+/* Additional light mode specific adjustments */
+html.light .vp-doc pre {
+  background-color: var(--vp-c-bg-mute) !important;
+}
+
+/* Ensure proper contrast for links and interactive elements */
+html.light a {
+  color: var(--vp-c-brand-1);
+}
+
+html.light .vp-button {
+  color: var(--vp-c-text-1);
+  background-color: var(--vp-c-bg-soft);
+  border: 1px solid var(--vp-c-bg-mute);
+}
+
+html.light .vp-button:hover {
+  background-color: var(--vp-c-bg-mute);
 }
