@@ -260,7 +260,9 @@ jobs:
           file: ./backend/Dockerfile.prod
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ghcr.io/runonyourown/turftrack-backend:latest
+          tags: |
+            ghcr.io/runonyourown/turftrack-backend:latest
+            ghcr.io/runonyourown/turftrack-backend:${{ github.ref_name }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
 
@@ -271,7 +273,9 @@ jobs:
           file: ./backend/Dockerfile.celery
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ghcr.io/runonyourown/turftrack-celery:latest
+          tags: |
+            ghcr.io/runonyourown/turftrack-celery:latest
+            ghcr.io/runonyourown/turftrack-celery:${{ github.ref_name }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
 
@@ -282,7 +286,9 @@ jobs:
           file: ./frontend/Dockerfile.prod
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ghcr.io/runonyourown/turftrack-frontend:latest
+          tags: |
+            ghcr.io/runonyourown/turftrack-frontend:latest
+            ghcr.io/runonyourown/turftrack-frontend:${{ github.ref_name }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
 
