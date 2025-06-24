@@ -12,20 +12,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 ### Changed
+
 ## [0.0.5] - 2025-06-23
 
 ### Added
 
+- Major mobile experience improvements across all frontend pages.
+- Responsive sidebar: hamburger menu on mobile, auto-closes after navigation.
+- Custom, horizontally scrollable chart legend for mobile.
+- Dynamic chart axis/legend sizing and layout for mobile and desktop.
+- Improved dark/light mode support for chart legends and UI elements.
+
 ### Fixed
 
+- Sidebar now closes automatically after navigation on mobile.
+- Chart legends no longer overlap or get cut off on mobile/desktop.
+- X-axis date labels no longer overlap with legends or axis titles.
+- Product search and add button layout fixed for mobile.
+- Reports and GDD pages now fully scrollable and usable on mobile.
+
 ### Changed
-## [0.0.4] - 2025-06-23
 
-### Added
-
-### Fixed
-
-### Changed
+- All tables, forms, and charts are now responsive and touch-friendly.
+- Chart legends use user-friendly nutrient names.
+- Improved overall layout and spacing for mobile and desktop.
+- Updated frontend dependencies for better compatibility.
 
 ## [0.0.4] - 2025-06-23
 
