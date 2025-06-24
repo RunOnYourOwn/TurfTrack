@@ -12,11 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 ### Changed
+
 ## [0.0.6] - 2025-06-24
 
 ### Added
 
 ### Fixed
+
+- Update weather.py to include latitude and longitude that was causing failed jobs.
 
 ### Changed
 
