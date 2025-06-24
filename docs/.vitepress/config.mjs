@@ -3,6 +3,7 @@ import { withMermaid } from "vitepress-plugin-mermaid";
 
 export default withMermaid(
   defineConfig({
+    appearance: true,
     title: "TurfTrack",
     description: "TurfTrack Documentation",
     base: "/TurfTrack/",

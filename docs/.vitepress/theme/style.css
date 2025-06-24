@@ -44,7 +44,8 @@
 }
 
 /* Light mode overrides */
-html.light {
+html.light,
+.light {
   /* --- Background Colors --- */
   --vp-c-bg: #ffffff; /* White background */
   --vp-c-bg-soft: #f7fafc; /* Light gray for secondary elements */
