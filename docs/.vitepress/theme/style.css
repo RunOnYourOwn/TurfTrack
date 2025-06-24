@@ -50,10 +50,22 @@ html.light,
   --vp-c-bg: #ffffff; /* White background */
   --vp-c-bg-soft: #f7fafc; /* Light gray for secondary elements */
   --vp-c-bg-mute: #e2e8f0; /* Light gray for borders and dividers */
+  --vp-c-bg-alt: #f7fafc; /* Card/box backgrounds */
 
   /* --- Text Colors --- */
-  --vp-c-text-1: rgba(60, 60, 67, 0.92); /* Dark text for main content */
-  --vp-c-text-2: rgba(60, 60, 67, 0.78); /* Medium gray for secondary text */
+  --vp-c-text-1: #222; /* Main text color */
+  --vp-c-text-2: #444; /* Secondary text color */
+  --vp-sidebar-title: #222;
+  --vp-sidebar-link: #222;
+  --vp-sidebar-link-active: #38a169;
+  --vp-sidebar-link-hover: #38a169;
+  --vp-nav-link: #222;
+  --vp-nav-link-active: #38a169;
+  --vp-c-brand-1: #38a169;
+
+  /* --- Card and Border Colors --- */
+  --vp-c-divider: #e2e8f0;
+  --vp-c-border: #e2e8f0;
 
   /* --- Hero Section Specifics --- */
   --vp-home-hero-name-background: -webkit-linear-gradient(
