@@ -180,8 +180,22 @@ export default function Lawns() {
       weather_fetch_frequency: lawn.weather_fetch_frequency,
       timezone: lawn.timezone,
       weather_enabled: lawn.weather_enabled,
-      latitude: lawn.latitude ? String(lawn.latitude) : "",
-      longitude: lawn.longitude ? String(lawn.longitude) : "",
+      latitude:
+        lawn.location &&
+        lawn.location.latitude !== undefined &&
+        lawn.location.latitude !== null
+          ? String(lawn.location.latitude)
+          : lawn.latitude !== undefined && lawn.latitude !== null
+          ? String(lawn.latitude)
+          : "",
+      longitude:
+        lawn.location &&
+        lawn.location.longitude !== undefined &&
+        lawn.location.longitude !== null
+          ? String(lawn.location.longitude)
+          : lawn.longitude !== undefined && lawn.longitude !== null
+          ? String(lawn.longitude)
+          : "",
     });
     setEditOpen(true);
   }
@@ -226,8 +240,10 @@ export default function Lawns() {
           weather_fetch_frequency: editForm.weather_fetch_frequency,
           timezone: editForm.timezone,
           weather_enabled: editForm.weather_enabled,
-          latitude: parseFloat(editForm.latitude) || null,
-          longitude: parseFloat(editForm.longitude) || null,
+          latitude:
+            editForm.latitude !== "" ? parseFloat(editForm.latitude) : null,
+          longitude:
+            editForm.longitude !== "" ? parseFloat(editForm.longitude) : null,
         },
       });
       setEditOpen(false);

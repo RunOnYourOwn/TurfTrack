@@ -142,14 +142,14 @@ export default function Products() {
   return (
     <div className="p-4 min-h-screen bg-background w-full">
       <Card className="min-h-[500px] w-full shadow-lg bg-white dark:bg-gray-900 text-black dark:text-white">
-        <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
+        <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 pb-2">
           <CardTitle className="text-2xl font-bold">Products</CardTitle>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col md:flex-row w-full md:w-auto gap-2 mt-2 md:mt-0">
             <Input
               placeholder="Search by name..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-64"
+              className="w-full md:w-64"
             />
             <Dialog
               open={modalOpen}
@@ -166,6 +166,7 @@ export default function Products() {
                     setEditProduct(null);
                     setModalOpen(true);
                   }}
+                  className="w-full md:w-auto"
                 >
                   + Add Product
                 </Button>
@@ -196,7 +197,7 @@ export default function Products() {
             </Dialog>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-2 md:p-6">
           {isLoading ? (
             <div className="py-8 text-center text-muted-foreground">
               Loading products...
