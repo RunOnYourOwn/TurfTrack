@@ -34,6 +34,13 @@
     #1a202c 50%
   );
   --vp-home-hero-image-filter: blur(44px);
+
+  /* --- VitePress Layout Variables --- */
+  --vp-layout-bg: var(--vp-c-bg);
+  --vp-sidebar-bg: var(--vp-c-bg);
+  --vp-sidebar-nav-bg: var(--vp-c-bg);
+  --vp-nav-bg: var(--vp-c-bg);
+  --vp-content-bg: var(--vp-c-bg);
 }
 
 /* Light mode overrides */
@@ -59,6 +66,13 @@ html.light {
     #f7fafc 50%,
     #e2e8f0 50%
   );
+
+  /* --- VitePress Layout Variables --- */
+  --vp-layout-bg: var(--vp-c-bg);
+  --vp-sidebar-bg: var(--vp-c-bg);
+  --vp-sidebar-nav-bg: var(--vp-c-bg);
+  --vp-nav-bg: var(--vp-c-bg);
+  --vp-content-bg: var(--vp-c-bg);
 }
 
 /* Ensure syntax highlighting in code blocks is readable on both themes */
