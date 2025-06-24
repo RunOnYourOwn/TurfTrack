@@ -1,3 +1,12 @@
+export interface Location {
+  id: number;
+  latitude: number;
+  longitude: number;
+  city?: string;
+  state?: string;
+  country?: string;
+}
+
 export interface Lawn {
   id: number;
   name: string;
@@ -12,4 +21,5 @@ export interface Lawn {
   longitude?: number | null;
   created_at: string;
   updated_at: string;
+  location?: Location;
 }

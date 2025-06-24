@@ -114,6 +114,20 @@ const selectStyles = {
   }),
 };
 
+// Nivo color scheme (category10)
+const nivoColors = [
+  "#1f77b4",
+  "#ff7f0e",
+  "#2ca02c",
+  "#d62728",
+  "#9467bd",
+  "#8c564b",
+  "#e377c2",
+  "#7f7f7f",
+  "#bcbd22",
+  "#17becf",
+];
+
 export default function Reports() {
   // State for filters
   const [selectedLawn, setSelectedLawn] = React.useState<string>("");
@@ -215,16 +229,19 @@ export default function Reports() {
     return result;
   }, [filteredApps, lawns, selectedLawn, selectedNutrients]);
 
-  // Prepare Nivo data for selected nutrients
+  // Prepare Nivo data for selected nutrients (use friendly label for id)
   const nivoData = React.useMemo(() => {
     if (!chartData || !selectedNutrients) return [];
-    return selectedNutrients.map((nutrient) => ({
-      id: nutrient,
-      data: chartData.map((row: any) => ({
-        x: row.date,
-        y: row[nutrient],
-      })),
-    }));
+    return selectedNutrients.map((nutrient) => {
+      const nutrientObj = NUTRIENTS.find((n) => n.field === nutrient);
+      return {
+        id: nutrientObj ? nutrientObj.label : nutrient,
+        data: chartData.map((row: any) => ({
+          x: row.date,
+          y: row[nutrient],
+        })),
+      };
+    });
   }, [chartData, selectedNutrients]);
 
   // Dynamic Nivo theme for dark/light mode (matches GDD.tsx)
@@ -261,17 +278,28 @@ export default function Reports() {
     }
   }, [lawns, selectedLawn]);
 
+  // Responsive Nivo chart margins, font size, tick rotation, and legend
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+  const chartMargin = isMobile
+    ? { top: 16, right: 10, bottom: 80, left: 40 }
+    : { top: 16, right: 24, bottom: 120, left: 60 };
+  const axisFontSize = isMobile ? 10 : 13;
+  const tickRotation = isMobile ? -30 : -45;
+  const legendAnchor = isMobile ? "bottom" : "bottom";
+  const legendDirection = isMobile ? "row" : "row";
+  const legendTranslateY = isMobile ? 70 : 100;
+
   return (
     <div className="p-4 min-h-screen bg-background w-full">
       <Card className="min-h-[500px] w-full shadow-lg bg-white dark:bg-gray-900 text-black dark:text-white">
         <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
           <CardTitle className="text-2xl font-bold">Reports</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="overflow-y-auto max-h-[calc(100vh-100px)] p-2 md:p-6">
           {/* Filters */}
-          <div className="flex flex-wrap gap-4 mb-6 items-end">
+          <div className="flex flex-col md:flex-row gap-4 mb-6 items-stretch w-full">
             {/* Lawn selector */}
-            <div className="min-w-[180px] flex-1">
+            <div className="w-full md:min-w-[180px] md:flex-1">
               <label className="block text-sm font-medium mb-1">Lawn</label>
               <Select
                 isSearchable
@@ -302,7 +330,7 @@ export default function Reports() {
               />
             </div>
             {/* Date range picker */}
-            <div className="flex flex-col min-w-[260px] flex-1 relative">
+            <div className="w-full md:min-w-[260px] md:flex-1 relative">
               <label className="block text-sm font-medium mb-1">
                 Date Range
               </label>
@@ -312,7 +340,7 @@ export default function Reports() {
               />
             </div>
             {/* Nutrient multi-select */}
-            <div className="min-w-[180px] flex-1">
+            <div className="w-full md:min-w-[180px] md:flex-1">
               <label className="block text-sm font-medium mb-1">
                 Nutrients
               </label>
@@ -353,26 +381,107 @@ export default function Reports() {
                   stacked: false,
                 }}
                 axisBottom={{
-                  tickRotation: -45,
-                  legend: "Date",
-                  legendOffset: 36,
-                  legendPosition: "middle",
+                  tickRotation,
                 }}
                 axisLeft={{
                   legend: "Cumulative",
                   legendOffset: -40,
                   legendPosition: "middle",
                 }}
-                margin={{ top: 16, right: 24, bottom: 50, left: 60 }}
+                margin={chartMargin}
                 pointSize={8}
                 useMesh={true}
-                theme={nivoTheme}
+                theme={{
+                  ...nivoTheme,
+                  axis: {
+                    ...nivoTheme.axis,
+                    ticks: {
+                      ...nivoTheme.axis.ticks,
+                      text: {
+                        ...nivoTheme.axis.ticks.text,
+                        fontSize: axisFontSize,
+                      },
+                    },
+                    legend: {
+                      ...nivoTheme.axis.legend,
+                      text: {
+                        ...nivoTheme.axis.legend.text,
+                        fontSize: axisFontSize,
+                      },
+                    },
+                  },
+                  legends: {
+                    text: {
+                      fill: "var(--nivo-axis-text, #222)",
+                    },
+                  },
+                }}
                 colors={{ scheme: "category10" }}
                 enableSlices="x"
                 tooltip={() => null}
                 sliceTooltip={() => null}
+                legends={
+                  isMobile
+                    ? []
+                    : [
+                        {
+                          anchor: legendAnchor,
+                          direction: legendDirection,
+                          justify: false,
+                          translateX: 0,
+                          translateY: legendTranslateY,
+                          itemsSpacing: 8,
+                          itemDirection: "left-to-right",
+                          itemWidth: 80,
+                          itemHeight: 20,
+                          itemOpacity: 0.75,
+                          symbolSize: 12,
+                          symbolShape: "circle",
+                          effects: [
+                            {
+                              on: "hover",
+                              style: {
+                                itemBackground: "rgba(0, 0, 0, .03)",
+                                itemOpacity: 1,
+                              },
+                            },
+                          ],
+                        },
+                      ]
+                }
               />
             </div>
+            {/* Custom HTML legend for mobile (outside chart container) */}
+            {isMobile && (
+              <div
+                className="flex overflow-x-auto gap-4 py-2 w-full mt-2"
+                style={{ WebkitOverflowScrolling: "touch" }}
+              >
+                {nivoData.map((series, i) => (
+                  <div
+                    key={series.id}
+                    className="flex items-center min-w-[70px] flex-shrink-0"
+                  >
+                    <span
+                      className="inline-block rounded-full mr-2"
+                      style={{
+                        width: 12,
+                        height: 12,
+                        backgroundColor: nivoColors[i % nivoColors.length],
+                      }}
+                    />
+                    <span
+                      style={{
+                        color: "var(--nivo-axis-text, #222)",
+                        fontSize: 13,
+                      }}
+                    >
+                      {series.id}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Application History */}

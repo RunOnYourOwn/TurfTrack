@@ -214,6 +214,13 @@ export default function GDD() {
     [gddValues]
   );
 
+  // Responsive Nivo chart margins and font size
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+  const chartMargin = isMobile
+    ? { top: 20, right: 10, bottom: 60, left: 40 }
+    : { top: 20, right: 30, bottom: 110, left: 60 };
+  const axisFontSize = isMobile ? 10 : 13;
+
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value, type, checked } = e.target;
     setForm((f) => ({
@@ -630,7 +637,7 @@ export default function GDD() {
 
       {/* Model Details Sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className="w-[800px] sm:max-w-[800px] overflow-y-auto">
+        <SheetContent className="w-full max-w-[95vw] md:w-[800px] md:max-w-[800px] overflow-y-auto p-2 md:p-6 rounded-none md:rounded-lg">
           <div className="flex items-center justify-between gap-4 pt-4 px-6 mb-4">
             <div>
               <SheetTitle>{selectedModel?.name}</SheetTitle>
@@ -802,7 +809,7 @@ export default function GDD() {
                   </Button>
                 </div>
                 <div className="h-[300px] p-4">
-                  <div style={{ height: 300 }}>
+                  <div className="w-full" style={{ height: 300 }}>
                     <ResponsiveLine
                       data={nivoData}
                       xScale={{ type: "point" }}
@@ -828,7 +835,7 @@ export default function GDD() {
                         legendOffset: -40,
                         legendPosition: "middle",
                       }}
-                      margin={{ top: 20, right: 30, bottom: 110, left: 60 }}
+                      margin={chartMargin}
                       pointSize={8}
                       enableSlices="x"
                       theme={{
@@ -837,12 +844,14 @@ export default function GDD() {
                             text: {
                               fill: "var(--nivo-axis-text, #222)",
                               transition: "fill 0.2s",
+                              fontSize: axisFontSize,
                             },
                           },
                           legend: {
                             text: {
                               fill: "var(--nivo-axis-text, #222)",
                               transition: "fill 0.2s",
+                              fontSize: axisFontSize,
                             },
                           },
                         },

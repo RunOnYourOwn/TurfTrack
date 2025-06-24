@@ -100,7 +100,7 @@ function DarkModeToggle() {
 
 export function AppSidebar() {
   const location = useLocation();
-  const { state } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
   const isActive = (path: string) => location.pathname === path;
 
   return (
@@ -136,7 +136,13 @@ export function AppSidebar() {
                       isActive={isActive(item.url)}
                       tooltip={item.description}
                     >
-                      <Link to={item.url} className="flex items-center gap-2">
+                      <Link
+                        to={item.url}
+                        className="flex items-center gap-2"
+                        onClick={() => {
+                          if (isMobile) setOpenMobile(false);
+                        }}
+                      >
                         <item.icon className="h-5 w-5" />
                         {state === "collapsed" ? null : (
                           <span>{item.title}</span>
