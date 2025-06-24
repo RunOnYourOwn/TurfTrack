@@ -2,6 +2,7 @@ import datetime
 from app.celery_app import app
 from app.core.database import SessionLocal
 from app.models.daily_weather import WeatherType
+from app.models.location import Location
 import openmeteo_requests
 from app.models.lawn import Lawn
 from sqlalchemy.future import select
@@ -324,35 +325,52 @@ def _update_recent_weather_for_location_sync(
 @app.task(name="update_weather_for_all_lawns", bind=True)
 def update_weather_for_all_lawns(self):
     """
-    Scheduled task to update weather for all locations that have weather enabled.
+    Refresh yesterday + 16-day forecast for every Location that has at least
+    one lawn with weather updates enabled.
     """
-    task_id = self.request.id
+    task_id = self.request.id  # ← keeps parity with your other tasks
     with SessionLocal() as session:
         try:
-            # Get all distinct locations for lawns with weather enabled
-            result = session.execute(
-                select(Lawn.location_id, Lawn.latitude, Lawn.longitude)
-                .where(Lawn.weather_enabled == True)
-                .distinct()
+            # One row per unique Location that has an enabled Lawn
+            stmt = (
+                select(
+                    Location.id.label("location_id"),
+                    Location.latitude,
+                    Location.longitude,
+                )
+                .join(
+                    Lawn,
+                    and_(
+                        Lawn.location_id == Location.id, Lawn.weather_enabled.is_(True)
+                    ),
+                )
+                .group_by(Location.id, Location.latitude, Location.longitude)
+                # .yield_per(100)  # uncomment if you expect thousands of rows
             )
-            locations = result.all()
-            for loc in locations:
+
+            for loc in session.execute(stmt):
                 try:
                     _update_recent_weather_for_location_sync(
                         loc.location_id, loc.latitude, loc.longitude
                     )
                 except (requests.exceptions.RequestException, SQLAlchemyError) as e:
                     logger.error(
-                        f"Failed to update weather for location {loc.location_id}: {e}"
+                        f"[{task_id}] Weather update failed for location "
+                        f"{loc.location_id}: {e}"
                     )
-                    # Log and continue to next location
                 except Exception as e:
                     logger.error(
-                        f"An unexpected error occurred updating weather for location {loc.location_id}: {e}"
+                        f"[{task_id}] Unexpected error updating location "
+                        f"{loc.location_id}: {e}"
                     )
+
+            # If scale or API-rate-limit become issues, consider:
+            #     fetch_and_store_weather.delay(loc.location_id, lat, lon)
+            # instead of calling the sync helper in-line.
+
         except SQLAlchemyError as e:
             logger.critical(
-                f"Database connection failed for all-lawn weather update: {e}"
+                f"[{task_id}] DB connection failed in all-lawn weather update: {e}"
             )
             raise
 
