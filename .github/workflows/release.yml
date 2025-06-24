@@ -267,7 +267,7 @@ jobs:
       - name: Build and push celery image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./backend
           file: ./backend/Dockerfile.celery
           platforms: linux/amd64,linux/arm64
           push: true
