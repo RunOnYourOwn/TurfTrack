@@ -237,6 +237,57 @@ def _extract_weather_data(daily, i):
     }
 
 
+def _get_historical_start_date(session, location_id: int) -> datetime.date:
+    """
+    Determine the optimal start date for fetching historical weather data.
+
+    Strategy:
+    1. Find the earliest forecast date for this location
+    2. If forecast data exists and is before today, use that date as start
+    3. If no forecast data or earliest date is today/future, use 7 days ago as fallback
+
+    This ensures we fill gaps in weather data when the app has been offline.
+    """
+    from app.models.daily_weather import DailyWeather, WeatherType
+
+    today = datetime.date.today()
+
+    # Query earliest forecast date for this location
+    stmt = (
+        select(DailyWeather.date)
+        .where(
+            and_(
+                DailyWeather.location_id == location_id,
+                DailyWeather.type == WeatherType.forecast,
+            )
+        )
+        .order_by(DailyWeather.date.asc())
+        .limit(1)
+    )
+
+    result = session.execute(stmt)
+    earliest_forecast_date = result.scalar_one_or_none()
+    logger.info(
+        f"Location {location_id}: Earliest forecast date: {earliest_forecast_date}"
+    )
+
+    if earliest_forecast_date and earliest_forecast_date < today:
+        # Use the earliest forecast date as our start date
+        logger.info(
+            f"Location {location_id}: Using earliest forecast date {earliest_forecast_date} "
+            f"as historical start date (today: {today})"
+        )
+        return earliest_forecast_date
+    else:
+        # Fallback: use 7 days ago to ensure we have some historical context
+        fallback_date = today - datetime.timedelta(days=7)
+        logger.info(
+            f"Location {location_id}: No forecast data found or earliest date is today/future. "
+            f"Using fallback start date {fallback_date} (today: {today})"
+        )
+        return fallback_date
+
+
 def _update_recent_weather_for_location_sync(
     location_id: int, latitude: float, longitude: float
 ):
@@ -244,14 +295,17 @@ def _update_recent_weather_for_location_sync(
 
     with SessionLocal() as session:
         om = openmeteo_requests.Client()
-        # Fetch only yesterday's historical data
+
+        # Determine the optimal start date for historical data
+        historical_start_date = _get_historical_start_date(session, location_id)
         today = datetime.date.today()
-        yesterday = today - datetime.timedelta(days=1)
+
+        # Fetch historical data from the calculated start date to today
         params_hist = {
             "latitude": latitude,
             "longitude": longitude,
-            "start_date": yesterday.isoformat(),
-            "end_date": yesterday.isoformat(),
+            "start_date": historical_start_date.isoformat(),
+            "end_date": today.isoformat(),
             "daily": [
                 "temperature_2m_max",
                 "temperature_2m_min",
@@ -325,12 +379,28 @@ def _update_recent_weather_for_location_sync(
 @app.task(name="update_weather_for_all_lawns", bind=True)
 def update_weather_for_all_lawns(self):
     """
-    Refresh yesterday + 16-day forecast for every Location that has at least
+    Refresh historical weather data and 16-day forecast for every Location that has at least
     one lawn with weather updates enabled.
+
+    Historical data fetching strategy:
+    - Finds the earliest forecast date in the database for each location
+    - Fetches historical data from that date to today to fill any gaps
+    - If no forecast data exists, fetches from 7 days ago to today
+    - This ensures weather data continuity even if the app has been offline
     """
-    task_id = self.request.id  # ← keeps parity with your other tasks
-    with SessionLocal() as session:
-        try:
+    task_id = self.request.id
+    try:
+        with SessionLocal() as session:
+            # Create task status record for start
+            create_or_update_task_status_sync(
+                session,
+                task_id,
+                "update_weather_for_all_lawns",
+                1,  # No specific location_id for this task
+                TaskStatusEnum.started,
+                started=True,
+            )
+
             # One row per unique Location that has an enabled Lawn
             stmt = (
                 select(
@@ -345,7 +415,6 @@ def update_weather_for_all_lawns(self):
                     ),
                 )
                 .group_by(Location.id, Location.latitude, Location.longitude)
-                # .yield_per(100)  # uncomment if you expect thousands of rows
             )
 
             for loc in session.execute(stmt):
@@ -364,29 +433,78 @@ def update_weather_for_all_lawns(self):
                         f"{loc.location_id}: {e}"
                     )
 
-            # If scale or API-rate-limit become issues, consider:
-            #     fetch_and_store_weather.delay(loc.location_id, lat, lon)
-            # instead of calling the sync helper in-line.
-
-        except SQLAlchemyError as e:
-            logger.critical(
-                f"[{task_id}] DB connection failed in all-lawn weather update: {e}"
+            # Create task status record for success
+            create_or_update_task_status_sync(
+                session,
+                task_id,
+                "update_weather_for_all_lawns",
+                1,  # No specific location_id for this task
+                TaskStatusEnum.success,
+                finished=True,
             )
-            raise
+
+    except (requests.exceptions.RequestException, SQLAlchemyError) as e:
+        logger.error(f"All-lawn weather update task failed: {e}")
+        try:
+            with SessionLocal() as session:
+                create_or_update_task_status_sync(
+                    session,
+                    task_id,
+                    "update_weather_for_all_lawns",
+                    1,  # No specific location_id for this task
+                    TaskStatusEnum.failure,
+                    error=str(e),
+                    finished=True,
+                )
+        except SQLAlchemyError:
+            # Cannot update task status if DB is down, Celery will retry
+            pass
+        raise
+    except Exception as e:
+        logger.error(
+            f"An unexpected error occurred in all-lawn weather update task: {e}"
+        )
+        try:
+            with SessionLocal() as session:
+                create_or_update_task_status_sync(
+                    session,
+                    task_id,
+                    "update_weather_for_all_lawns",
+                    1,  # No specific location_id for this task
+                    TaskStatusEnum.failure,
+                    error="An unexpected error occurred.",
+                    finished=True,
+                )
+        except SQLAlchemyError:
+            # Cannot update task status if DB is down, Celery will retry
+            pass
+        raise
 
 
-@app.task(name="recalculate_gdd_for_location")
-def recalculate_gdd_for_location(location_id: int):
+@app.task(name="recalculate_gdd_for_location", bind=True)
+def recalculate_gdd_for_location(self, location_id: int):
     """
     Recalculates GDD for all models associated with a given location.
     Triggered after weather data is updated.
     """
+    task_id = self.request.id
     try:
         with SessionLocal() as session:
+            # Create task status record for start
+            create_or_update_task_status_sync(
+                session,
+                task_id,
+                "recalculate_gdd_for_location",
+                location_id,
+                TaskStatusEnum.started,
+                started=True,
+            )
+
             # Find all GDD models for the given location_id
             stmt = select(GDDModel).join(Lawn).where(Lawn.location_id == location_id)
             result = session.execute(stmt)
             gdd_models = result.scalars().all()
+
             for model in gdd_models:
                 try:
                     calculate_and_store_gdd_values_sync_segmented(
@@ -397,8 +515,52 @@ def recalculate_gdd_for_location(location_id: int):
                         f"Failed to recalculate GDD for model {model.id} at location {location_id}: {e}"
                     )
                     # Log and continue
+
+            # Create task status record for success
+            create_or_update_task_status_sync(
+                session,
+                task_id,
+                "recalculate_gdd_for_location",
+                location_id,
+                TaskStatusEnum.success,
+                finished=True,
+            )
+
     except SQLAlchemyError as e:
         logger.critical(
             f"Database connection failed for GDD recalculation task for loc {location_id}: {e}"
         )
+        try:
+            with SessionLocal() as session:
+                create_or_update_task_status_sync(
+                    session,
+                    task_id,
+                    "recalculate_gdd_for_location",
+                    location_id,
+                    TaskStatusEnum.failure,
+                    error=str(e),
+                    finished=True,
+                )
+        except SQLAlchemyError:
+            # Cannot update task status if DB is down, Celery will retry
+            pass
+        raise
+    except Exception as e:
+        logger.error(
+            f"An unexpected error occurred in GDD recalculation task for loc {location_id}: {e}"
+        )
+        try:
+            with SessionLocal() as session:
+                create_or_update_task_status_sync(
+                    session,
+                    task_id,
+                    "recalculate_gdd_for_location",
+                    location_id,
+                    TaskStatusEnum.failure,
+                    error="An unexpected error occurred.",
+                    finished=True,
+                )
+        except SQLAlchemyError:
+            # Cannot update task status if DB is down, Celery will retry
+            pass
         raise
