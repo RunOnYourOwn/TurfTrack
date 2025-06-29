@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetcher } from "../lib/fetcher";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -79,7 +79,6 @@ export default function WeatherSummary() {
     start: string;
     end: string;
   } | null>(null);
-  const [autoDateRange, setAutoDateRange] = useState(true); // Track if user has set a custom range
   const [allTimeMode, setAllTimeMode] = useState(false);
 
   // Fetch lawns for dropdown
@@ -108,7 +107,6 @@ export default function WeatherSummary() {
       end.setDate(today.getDate() + 16);
       const endStr = end.toISOString().slice(0, 10);
       setDateRange({ start: startStr, end: endStr });
-      setAutoDateRange(true);
     }
   }, [dateRange]);
 
@@ -150,12 +148,6 @@ export default function WeatherSummary() {
       setAllTimeMode(false);
     }
   }, [allTimeMode, weatherData]);
-
-  // If user changes date range, turn off autoDateRange
-  const handleSetDateRange = (range: { start: string; end: string } | null) => {
-    setDateRange(range);
-    setAutoDateRange(false);
-  };
 
   // Prepare Nivo data
   const nivoData = useMemo(() => {
@@ -264,7 +256,7 @@ export default function WeatherSummary() {
             <div className="w-[260px]">
               <DateRangePopover
                 dateRange={dateRange}
-                setDateRange={handleSetDateRange}
+                setDateRange={setDateRange}
                 onAllTime={() => {
                   setAllTimeMode(true);
                   setDateRange(null);
