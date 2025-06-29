@@ -13,6 +13,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+## [0.0.7] - 2025-06-28
+
+### Added
+
+- Weather summary on dashboard page
+
+### Fixed
+
+- Made weather update more generic in the logic.
+
+### Changed
+
 ## [0.0.6] - 2025-06-24
 
 ### Added
