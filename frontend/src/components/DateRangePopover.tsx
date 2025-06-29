@@ -13,11 +13,13 @@ import {
 interface DateRangePopoverProps {
   dateRange: { start: string; end: string } | null;
   setDateRange: (r: { start: string; end: string } | null) => void;
+  onAllTime?: () => void;
 }
 
 const DateRangePopover: React.FC<DateRangePopoverProps> = ({
   dateRange,
   setDateRange,
+  onAllTime,
 }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -116,20 +118,25 @@ const DateRangePopover: React.FC<DateRangePopoverProps> = ({
             direction="vertical"
           />
           <div className="flex flex-wrap gap-2 mt-2">
-            {presets.map((preset) => (
-              <button
-                key={preset.label}
-                type="button"
-                className="text-xs px-2 py-1 rounded border bg-muted dark:bg-gray-700 dark:text-white hover:bg-muted/70 dark:hover:bg-gray-600 border-gray-300 dark:border-gray-700"
-                onClick={() => {
-                  if (preset.range) setDateRange(preset.range);
-                  else setDateRange(null);
-                  setOpen(false);
-                }}
-              >
-                {preset.label}
-              </button>
-            ))}
+            {presets.map((preset) => {
+              const isAllTime = preset.label === "All Time";
+              return (
+                <button
+                  key={preset.label}
+                  type="button"
+                  className="text-xs px-2 py-1 rounded border bg-muted dark:bg-gray-700 dark:text-white hover:bg-muted/70 dark:hover:bg-gray-600 border-gray-300 dark:border-gray-700"
+                  onClick={() => {
+                    if (isAllTime && onAllTime) {
+                      onAllTime();
+                    } else if (preset.range) setDateRange(preset.range);
+                    else setDateRange(null);
+                    setOpen(false);
+                  }}
+                >
+                  {preset.label}
+                </button>
+              );
+            })}
             {(dateRange?.start || dateRange?.end) && (
               <button
                 type="button"

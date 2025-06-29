@@ -14,8 +14,6 @@ import { ResponsiveLine } from "@nivo/line";
 import DateRangePopover from "./DateRangePopover";
 import { format, parseISO } from "date-fns";
 
-const HIST_MAX_COLOR = "#2563eb";
-const HIST_MIN_COLOR = "#60a5fa";
 const MIN_COLOR = "#60a5fa"; // blue
 const MAX_COLOR = "#f59e42"; // orange
 
@@ -33,11 +31,6 @@ interface WeatherEntry {
   temperature_min_c: number;
   temperature_min_f: number;
   // ...other fields omitted for brevity
-}
-
-interface NivoDatum {
-  x: string;
-  y: number;
 }
 
 // Custom tooltip for Nivo (formats to 2 decimals and always shows label)
@@ -87,6 +80,7 @@ export default function WeatherSummary() {
     end: string;
   } | null>(null);
   const [autoDateRange, setAutoDateRange] = useState(true); // Track if user has set a custom range
+  const [allTimeMode, setAllTimeMode] = useState(false);
 
   // Fetch lawns for dropdown
   const { data: lawns, isLoading: lawnsLoading } = useQuery<Lawn[]>({
@@ -107,7 +101,7 @@ export default function WeatherSummary() {
     if (!dateRange) {
       const today = new Date();
       const start = new Date(today);
-      start.setDate(today.getDate() - 10);
+      start.setDate(today.getDate() - 5);
       const startStr = start.toISOString().slice(0, 10);
       // Set a wide end date initially; will adjust after data fetch
       const end = new Date(today);
@@ -124,30 +118,38 @@ export default function WeatherSummary() {
     isLoading: weatherLoading,
     error: weatherError,
   } = useQuery<WeatherEntry[]>({
-    queryKey: ["weather", selectedLawnId, dateRange],
-    queryFn: () =>
-      selectedLawnId !== undefined && dateRange
-        ? fetcher(
-            `/api/v1/weather/lawn/${selectedLawnId}?start_date=${dateRange.start}&end_date=${dateRange.end}`
-          )
-        : Promise.resolve([]),
-    enabled: selectedLawnId !== undefined && !!dateRange,
+    queryKey: ["weather", selectedLawnId, dateRange, allTimeMode],
+    queryFn: () => {
+      if (selectedLawnId === undefined) return Promise.resolve([]);
+      if (allTimeMode) {
+        // Fetch all data for the lawn (no date range)
+        return fetcher(`/api/v1/weather/lawn/${selectedLawnId}`);
+      }
+      if (dateRange) {
+        return fetcher(
+          `/api/v1/weather/lawn/${selectedLawnId}?start_date=${dateRange.start}&end_date=${dateRange.end}`
+        );
+      }
+      return Promise.resolve([]);
+    },
+    enabled:
+      selectedLawnId !== undefined && (dateRange !== null || allTimeMode),
     staleTime: 5 * 60 * 1000,
   });
 
-  // After first weather data fetch, if autoDateRange is true, set end date to latest date in data
+  // When allTimeMode is true and weatherData loads, set dateRange to min/max and turn off allTimeMode
   useEffect(() => {
-    if (autoDateRange && weatherData && weatherData.length > 0) {
-      const latest = weatherData.reduce(
-        (max, d) => (d.date > max ? d.date : max),
-        weatherData[0].date
+    if (allTimeMode && weatherData && weatherData.length > 0) {
+      const sorted = [...weatherData].sort((a, b) =>
+        a.date.localeCompare(b.date)
       );
-      if (dateRange && latest > dateRange.end) {
-        setDateRange({ start: dateRange.start, end: latest });
-      }
-      setAutoDateRange(false); // Only auto-set once
+      setDateRange({
+        start: sorted[0].date,
+        end: sorted[sorted.length - 1].date,
+      });
+      setAllTimeMode(false);
     }
-  }, [weatherData, autoDateRange, dateRange]);
+  }, [allTimeMode, weatherData]);
 
   // If user changes date range, turn off autoDateRange
   const handleSetDateRange = (range: { start: string; end: string } | null) => {
@@ -158,47 +160,49 @@ export default function WeatherSummary() {
   // Prepare Nivo data
   const nivoData = useMemo(() => {
     if (!weatherData || !Array.isArray(weatherData)) return [];
-    const minHist: { x: string; y: number | null }[] = [];
-    const minFore: { x: string; y: number | null }[] = [];
-    const maxHist: { x: string; y: number | null }[] = [];
-    const maxFore: { x: string; y: number | null }[] = [];
+    const minSeries: { x: string; y: number; isForecast: boolean }[] = [];
+    const maxSeries: { x: string; y: number; isForecast: boolean }[] = [];
     weatherData.forEach((d) => {
-      const min = unit === "C" ? d.temperature_min_c : d.temperature_min_f;
-      const max = unit === "C" ? d.temperature_max_c : d.temperature_max_f;
-      if (d.type === "historical") {
-        minHist.push({ x: d.date, y: min });
-        minFore.push({ x: d.date, y: null });
-        maxHist.push({ x: d.date, y: max });
-        maxFore.push({ x: d.date, y: null });
-      } else {
-        minHist.push({ x: d.date, y: null });
-        minFore.push({ x: d.date, y: min });
-        maxHist.push({ x: d.date, y: null });
-        maxFore.push({ x: d.date, y: max });
-      }
+      minSeries.push({
+        x: d.date,
+        y: unit === "C" ? d.temperature_min_c : d.temperature_min_f,
+        isForecast: d.type === "forecast",
+      });
+      maxSeries.push({
+        x: d.date,
+        y: unit === "C" ? d.temperature_max_c : d.temperature_max_f,
+        isForecast: d.type === "forecast",
+      });
     });
     return [
-      { id: "Min Temperature (Historical)", data: minHist },
-      { id: "Min Temperature (Forecast)", data: minFore },
-      { id: "Max Temperature (Historical)", data: maxHist },
-      { id: "Max Temperature (Forecast)", data: maxFore },
+      { id: "Min Temperature", data: minSeries },
+      { id: "Max Temperature", data: maxSeries },
     ];
   }, [weatherData, unit]);
 
   // Responsive chart margins and x-axis ticks
   const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
   const chartMargin = isMobile
-    ? { top: 20, right: 10, bottom: 75, left: 60 }
-    : { top: 20, right: 30, bottom: 80, left: 60 };
+    ? { top: 20, right: 10, bottom: 50, left: 60 }
+    : { top: 20, right: 30, bottom: 50, left: 60 };
   const axisFontSize = isMobile ? 10 : 13;
 
-  // X-axis tick formatting and reduction for mobile
+  // X-axis tick formatting and reduction for mobile and long ranges
   const xTickValues = useMemo(() => {
     if (!weatherData || !Array.isArray(weatherData)) return undefined;
     const dates = weatherData.map((d) => d.date);
-    if (!isMobile) return undefined; // default ticks
-    // Show every 3rd date on mobile
-    return dates.filter((_: string, i: number) => i % 3 === 0);
+    if (dates.length > 60) {
+      // For very long ranges, every 14th date
+      return dates.filter((_: string, i: number) => i % 14 === 0);
+    } else if (dates.length > 30) {
+      // For moderately long ranges, every 7th date
+      return dates.filter((_: string, i: number) => i % 7 === 0);
+    } else if (isMobile) {
+      // For mobile, every 3rd date
+      return dates.filter((_: string, i: number) => i % 3 === 0);
+    }
+    // Default: all dates
+    return undefined;
   }, [weatherData, isMobile]);
 
   const xTickFormat = (d: string) => {
@@ -261,6 +265,10 @@ export default function WeatherSummary() {
               <DateRangePopover
                 dateRange={dateRange}
                 setDateRange={handleSetDateRange}
+                onAllTime={() => {
+                  setAllTimeMode(true);
+                  setDateRange(null);
+                }}
               />
             </div>
           </div>
@@ -349,107 +357,62 @@ export default function WeatherSummary() {
                     line: { stroke: "#444", strokeDasharray: "3 3" },
                   },
                 }}
-                colors={[MIN_COLOR, MIN_COLOR, MAX_COLOR, MAX_COLOR]}
+                colors={[MIN_COLOR, MAX_COLOR]}
                 layers={[
                   "grid",
                   // Custom lines layer for dashed forecast segments
                   ({ series, lineGenerator, xScale, yScale }) => (
                     <g>
                       {series.map((serie) => {
-                        const isForecast =
-                          serie.id === "Min Temperature (Forecast)" ||
-                          serie.id === "Max Temperature (Forecast)";
                         const points = serie.data;
-                        let prev: (typeof points)[0] | null = null;
-                        return points.map((point, i) => {
-                          if (
-                            typeof point.data.y !== "number" ||
-                            prev === null ||
-                            typeof prev.data.y !== "number"
-                          ) {
-                            prev = point;
-                            return null;
-                          }
-                          const line = (
-                            <path
-                              key={`${serie.id}-segment-${i}`}
-                              d={lineGenerator([
-                                {
-                                  x: xScale(prev.data.x),
-                                  y: yScale(prev.data.y),
-                                },
-                                {
-                                  x: xScale(point.data.x),
-                                  y: yScale(point.data.y),
-                                },
-                              ])}
-                              fill="none"
-                              stroke={serie.color}
-                              strokeWidth={3}
-                              strokeDasharray={isForecast ? "6,6" : ""}
-                            />
-                          );
-                          prev = point;
-                          return line;
-                        });
+                        return points
+                          .map((point, i) => {
+                            if (i === 0) return null; // Skip first point
+                            const prevPoint = points[i - 1];
+
+                            // Type guard to ensure both points have valid data
+                            if (
+                              typeof point.data.y !== "number" ||
+                              typeof prevPoint.data.y !== "number"
+                            ) {
+                              return null;
+                            }
+
+                            // Dashed if either endpoint is forecast
+                            const isDashed =
+                              (prevPoint.data as any).isForecast ||
+                              (point.data as any).isForecast;
+
+                            return (
+                              <path
+                                key={`${serie.id}-segment-${i}`}
+                                d={
+                                  lineGenerator([
+                                    {
+                                      x: xScale(prevPoint.data.x),
+                                      y: yScale(prevPoint.data.y),
+                                    },
+                                    {
+                                      x: xScale(point.data.x),
+                                      y: yScale(point.data.y),
+                                    },
+                                  ]) || ""
+                                }
+                                fill="none"
+                                stroke={serie.color}
+                                strokeWidth={3}
+                                strokeDasharray={isDashed ? "6,6" : ""}
+                              />
+                            );
+                          })
+                          .filter(Boolean); // Remove null values
                       })}
                     </g>
                   ),
                   "points",
                   "slices",
                   "axes",
-                  "legends",
                 ]}
-                legends={
-                  isMobile
-                    ? []
-                    : [
-                        {
-                          anchor: "bottom",
-                          direction: "row",
-                          justify: false,
-                          translateY: 80,
-                          itemsSpacing: 8,
-                          itemDirection: "left-to-right",
-                          itemWidth: 180,
-                          itemHeight: 20,
-                          itemOpacity: 0.75,
-                          symbolSize: 12,
-                          symbolShape: "circle",
-                          data: [
-                            {
-                              id: "Max Temperature (Historical)",
-                              label: "Max Temp (Hist)",
-                              color: MAX_COLOR,
-                            },
-                            {
-                              id: "Max Temperature (Forecast)",
-                              label: "Max Temp (Forecast)",
-                              color: MAX_COLOR,
-                            },
-                            {
-                              id: "Min Temperature (Historical)",
-                              label: "Min Temp (Hist)",
-                              color: MIN_COLOR,
-                            },
-                            {
-                              id: "Min Temperature (Forecast)",
-                              label: "Min Temp (Forecast)",
-                              color: MIN_COLOR,
-                            },
-                          ],
-                          effects: [
-                            {
-                              on: "hover",
-                              style: {
-                                itemBackground: "rgba(0, 0, 0, .03)",
-                                itemOpacity: 1,
-                              },
-                            },
-                          ],
-                        },
-                      ]
-                }
                 sliceTooltip={CustomTooltip}
                 lineWidth={3}
                 pointSymbol={(props) => {
