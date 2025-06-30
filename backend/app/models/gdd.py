@@ -29,11 +29,13 @@ class ResetType(enum.Enum):
 
 class GDDModel(Base):
     __tablename__ = "gdd_models"
-    __table_args__ = (UniqueConstraint("lawn_id", "name", name="uix_lawn_name"),)
+    __table_args__ = (
+        UniqueConstraint("location_id", "name", name="uix_location_name"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    lawn_id: Mapped[int] = mapped_column(
-        ForeignKey("lawns.id", ondelete="CASCADE"), nullable=False
+    location_id: Mapped[int] = mapped_column(
+        ForeignKey("locations.id", ondelete="CASCADE"), nullable=False
     )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     base_temp: Mapped[float] = mapped_column(Float, nullable=False)
@@ -50,7 +52,7 @@ class GDDModel(Base):
         DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
-    lawn = relationship("Lawn", back_populates="gdd_models")
+    location = relationship("Location", back_populates="gdd_models")
     gdd_values = relationship(
         "GDDValue", back_populates="gdd_model", cascade="all, delete-orphan"
     )

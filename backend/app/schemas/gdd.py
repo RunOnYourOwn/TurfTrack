@@ -11,7 +11,7 @@ class TempUnit(str, enum.Enum):
 
 
 class GDDModelCreate(BaseModel):
-    lawn_id: int = Field(...)
+    location_id: int = Field(...)
     name: str = Field(..., max_length=100)
     base_temp: float = Field(...)
     unit: TempUnit = Field(...)
@@ -75,7 +75,7 @@ class GDDParameterUpdate(BaseModel):
 
 class GDDModelRead(BaseModel):
     id: int
-    lawn_id: int
+    location_id: int
     name: str
     base_temp: float
     unit: TempUnit

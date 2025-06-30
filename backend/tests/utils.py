@@ -56,10 +56,12 @@ class GDDModelFactory(factory.Factory):
         model = GDDModel
 
     name = factory.Sequence(lambda n: f"Test GDD Model {n}")
-    base_temp_c = factory.LazyFunction(lambda: random.uniform(5.0, 15.0))
-    units = factory.Iterator(["C", "F"])
+    location_id = factory.LazyFunction(lambda: random.randint(1, 100))
+    base_temp = factory.LazyFunction(lambda: random.uniform(5.0, 15.0))
+    unit = factory.Iterator(["C", "F"])
     start_date = factory.LazyFunction(lambda: date.today() - timedelta(days=30))
-    threshold_reset = factory.LazyFunction(lambda: random.uniform(500.0, 1500.0))
+    threshold = factory.LazyFunction(lambda: random.uniform(500.0, 1500.0))
+    reset_on_threshold = factory.Iterator([True, False])
 
 
 class LocationFactory(factory.Factory):
@@ -129,6 +131,11 @@ async def create_test_product(db: AsyncSession, **kwargs) -> Product:
 async def create_test_gdd_model(db: AsyncSession, **kwargs) -> GDDModel:
     """Create and save a test GDD model to the database."""
     model_data = GDDModelFactory.build(**kwargs)
+    # Convert unit string to TempUnit enum if needed
+    if isinstance(model_data.unit, str):
+        from app.models.gdd import TempUnit
+
+        model_data.unit = TempUnit(model_data.unit)
     model = GDDModel(**model_data.__dict__)
     db.add(model)
     await db.commit()

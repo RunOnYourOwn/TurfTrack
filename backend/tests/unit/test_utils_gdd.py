@@ -167,24 +167,27 @@ def test_recalculate_historical_gdd_model_not_found():
 def test_recalculate_historical_gdd_lawn_not_found():
     session = MagicMock()
     gdd_model = MagicMock()
-    gdd_model.lawn_id = 42
-    session.get.side_effect = [gdd_model, None]
-    with pytest.raises(ValueError, match="Lawn not found for GDD model"):
-        gdd.recalculate_historical_gdd(session, 1, datetime.date(2024, 1, 1))
-
-
-def test_recalculate_historical_gdd_calls_segmented():
-    session = MagicMock()
-    gdd_model = MagicMock()
-    gdd_model.lawn_id = 42
-    lawn = MagicMock()
-    lawn.location_id = 99
-    session.get.side_effect = [gdd_model, lawn]
+    gdd_model.location_id = 42
+    session.get.return_value = gdd_model
     with patch(
         "app.utils.gdd.calculate_and_store_gdd_values_sync_segmented"
     ) as mock_segmented:
         gdd.recalculate_historical_gdd(session, 1, datetime.date(2024, 1, 1))
         assert mock_segmented.called
+        mock_segmented.assert_called_once_with(session, 1, 42)
+
+
+def test_recalculate_historical_gdd_calls_segmented():
+    session = MagicMock()
+    gdd_model = MagicMock()
+    gdd_model.location_id = 99
+    session.get.return_value = gdd_model
+    with patch(
+        "app.utils.gdd.calculate_and_store_gdd_values_sync_segmented"
+    ) as mock_segmented:
+        gdd.recalculate_historical_gdd(session, 1, datetime.date(2024, 1, 1))
+        assert mock_segmented.called
+        mock_segmented.assert_called_once_with(session, 1, 99)
 
 
 def test_manual_gdd_reset_sync_duplicate_and_future_resets():

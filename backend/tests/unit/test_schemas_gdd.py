@@ -18,7 +18,7 @@ from app.models.gdd import ResetType
 def test_gdd_model_create_validators():
     # Valid
     GDDModelCreate(
-        lawn_id=1,
+        location_id=1,
         name="Test",
         base_temp=5,
         unit="C",
@@ -29,7 +29,7 @@ def test_gdd_model_create_validators():
     # Negative base_temp
     with pytest.raises(ValidationError):
         GDDModelCreate(
-            lawn_id=1,
+            location_id=1,
             name="Test",
             base_temp=-1,
             unit="C",
@@ -40,7 +40,7 @@ def test_gdd_model_create_validators():
     # Zero threshold
     with pytest.raises(ValidationError):
         GDDModelCreate(
-            lawn_id=1,
+            location_id=1,
             name="Test",
             base_temp=5,
             unit="C",
@@ -51,7 +51,7 @@ def test_gdd_model_create_validators():
     # Invalid unit
     with pytest.raises(ValidationError):
         GDDModelCreate(
-            lawn_id=1,
+            location_id=1,
             name="Test",
             base_temp=5,
             unit="X",
@@ -62,7 +62,7 @@ def test_gdd_model_create_validators():
     # Name too long
     with pytest.raises(ValidationError):
         GDDModelCreate(
-            lawn_id=1,
+            location_id=1,
             name="A" * 101,
             base_temp=5,
             unit="C",
@@ -110,7 +110,7 @@ def test_gdd_parameter_update_none_validators():
 def test_gdd_model_read_serialization():
     data = dict(
         id=1,
-        lawn_id=1,
+        location_id=1,
         name="Test",
         base_temp=5,
         unit="C",
@@ -155,7 +155,7 @@ def test_gdd_value_read_serialization():
 def test_gdd_model_with_values_and_history():
     base = dict(
         id=1,
-        lawn_id=1,
+        location_id=1,
         name="Test",
         base_temp=5,
         unit="C",

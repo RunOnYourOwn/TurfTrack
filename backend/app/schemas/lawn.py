@@ -16,8 +16,7 @@ class LawnBase(BaseModel):
 
 
 class LawnCreate(LawnBase):
-    latitude: float = Field(..., ge=-90, le=90)
-    longitude: float = Field(..., ge=-180, le=180)
+    location_id: int
 
     @field_validator("area")
     def area_must_be_positive(cls, v):
@@ -43,8 +42,7 @@ class LawnUpdate(BaseModel):
     weather_fetch_frequency: Optional[WeatherFetchFrequency] = None
     timezone: Optional[str] = None
     weather_enabled: Optional[bool] = None
-    latitude: Optional[float] = Field(None, ge=-90, le=90)
-    longitude: Optional[float] = Field(None, ge=-180, le=180)
+    location_id: Optional[int] = None
 
     @field_validator("area")
     def area_must_be_positive(cls, v):

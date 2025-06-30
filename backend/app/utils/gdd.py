@@ -355,11 +355,6 @@ def recalculate_historical_gdd(
     if not model:
         raise ValueError("GDD model not found")
 
-    # Get the lawn to get location_id
-    lawn = session.get(Lawn, model.lawn_id)
-    if not lawn:
-        raise ValueError("Lawn not found for GDD model")
-
     # Delete existing GDD values from the from_date forward
     session.query(GDDValue).filter(
         GDDValue.gdd_model_id == gdd_model_id, GDDValue.date >= from_date
@@ -368,5 +363,5 @@ def recalculate_historical_gdd(
 
     # Recalculate using the segmented approach which will now use parameter history
     calculate_and_store_gdd_values_sync_segmented(
-        session, gdd_model_id, lawn.location_id
+        session, gdd_model_id, model.location_id
     )

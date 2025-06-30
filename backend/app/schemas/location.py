@@ -1,13 +1,14 @@
 from pydantic import BaseModel
-from typing import Optional
 
 
 class LocationBase(BaseModel):
+    name: str
     latitude: float
     longitude: float
-    city: Optional[str] = None
-    state: Optional[str] = None
-    country: Optional[str] = None
+
+
+class LocationCreate(LocationBase):
+    pass
 
 
 class LocationRead(LocationBase):
