@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Fixed
+
+### Changed
+## [0.0.9] - 2025-06-29
+
+### Added
+
 - Added the ability to review data per location name as all weather data is tied per location.
 
 ### Fixed
