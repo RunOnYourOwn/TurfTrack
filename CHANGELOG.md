@@ -12,6 +12,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 ### Changed
+## [0.0.11] - 2025-06-30
+
+### Added
+
+### Fixed
+
+- Refactor UI to modular components
+- Fixed backend cascade delete for applications when deleting a lawn
+
+### Changed
+
 ## [0.0.10] - 2025-06-30
 
 ### Added
