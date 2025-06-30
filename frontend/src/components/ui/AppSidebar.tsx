@@ -111,12 +111,12 @@ export function AppSidebar() {
           {state === "collapsed" ? (
             <>
               <span className="text-2xl flex-1 text-center">T</span>
-              <CollapseButton />
+              {isMobile && <CollapseButton />}
             </>
           ) : (
             <>
               <span className="flex-1">TurfTrack</span>
-              <CollapseButton />
+              {isMobile && <CollapseButton />}
             </>
           )}
         </div>

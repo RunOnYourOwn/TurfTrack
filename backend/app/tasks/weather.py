@@ -501,7 +501,7 @@ def recalculate_gdd_for_location(self, location_id: int):
             )
 
             # Find all GDD models for the given location_id
-            stmt = select(GDDModel).join(Lawn).where(Lawn.location_id == location_id)
+            stmt = select(GDDModel).where(GDDModel.location_id == location_id)
             result = session.execute(stmt)
             gdd_models = result.scalars().all()
 

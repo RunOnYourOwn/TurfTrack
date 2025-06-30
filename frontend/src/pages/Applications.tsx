@@ -157,7 +157,7 @@ export default function Applications() {
   }
 
   return (
-    <div className="p-4 min-h-screen bg-background w-full flex flex-col">
+    <div className="p-4 min-h-screen bg-background w-full flex flex-col overflow-y-auto">
       <Card className="min-h-[500px] w-full max-w-none shadow-lg flex flex-col bg-white dark:bg-gray-900 text-black dark:text-white">
         <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2 w-full">
           <CardTitle className="text-2xl font-bold">Applications</CardTitle>

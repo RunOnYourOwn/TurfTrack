@@ -20,18 +20,14 @@ function MobileHeader() {
 }
 
 function SidebarWithContent({ children }: { children: React.ReactNode }) {
+  const { state } = useSidebar();
+
   return (
-    <div className="fixed inset-0 bg-background">
+    <div className={`min-h-screen bg-background sidebar-${state}`}>
       <MobileHeader />
       <div className="flex min-h-screen">
         <AppSidebar />
-        <main
-          className="min-w-0 bg-background flex-1"
-          style={{
-            width: "calc(100vw - var(--sidebar-width))",
-            maxWidth: "none",
-          }}
-        >
+        <main className="min-w-0 bg-background flex-1 w-screen md:w-[calc(100vw-var(--sidebar-width))] max-w-none">
           {children}
         </main>
       </div>
