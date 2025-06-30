@@ -6,6 +6,7 @@ from app.models.lawn import Lawn
 from app.models.daily_weather import DailyWeather
 from typing import Optional
 from datetime import date, timedelta
+import math
 
 router = APIRouter(prefix="/weather", tags=["weather"])
 
@@ -43,25 +44,35 @@ async def get_weather_for_lawn(
     result = await db.execute(stmt)
     weather_entries = result.scalars().all()
 
+    # Helper to sanitize float values
+    def safe_float(val):
+        if isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
+            return None
+        return val
+
     # Serialize all fields
     def serialize(entry: DailyWeather):
         return {
             "date": entry.date.isoformat(),
             "type": entry.type.value,
-            "temperature_max_c": entry.temperature_max_c,
-            "temperature_max_f": entry.temperature_max_f,
-            "temperature_min_c": entry.temperature_min_c,
-            "temperature_min_f": entry.temperature_min_f,
-            "precipitation_mm": entry.precipitation_mm,
-            "precipitation_in": entry.precipitation_in,
-            "precipitation_probability_max": entry.precipitation_probability_max,
-            "wind_speed_max_ms": entry.wind_speed_max_ms,
-            "wind_speed_max_mph": entry.wind_speed_max_mph,
-            "wind_gusts_max_ms": entry.wind_gusts_max_ms,
-            "wind_gusts_max_mph": entry.wind_gusts_max_mph,
-            "wind_direction_dominant_deg": entry.wind_direction_dominant_deg,
-            "et0_evapotranspiration_mm": entry.et0_evapotranspiration_mm,
-            "et0_evapotranspiration_in": entry.et0_evapotranspiration_in,
+            "temperature_max_c": safe_float(entry.temperature_max_c),
+            "temperature_max_f": safe_float(entry.temperature_max_f),
+            "temperature_min_c": safe_float(entry.temperature_min_c),
+            "temperature_min_f": safe_float(entry.temperature_min_f),
+            "precipitation_mm": safe_float(entry.precipitation_mm),
+            "precipitation_in": safe_float(entry.precipitation_in),
+            "precipitation_probability_max": safe_float(
+                entry.precipitation_probability_max
+            ),
+            "wind_speed_max_ms": safe_float(entry.wind_speed_max_ms),
+            "wind_speed_max_mph": safe_float(entry.wind_speed_max_mph),
+            "wind_gusts_max_ms": safe_float(entry.wind_gusts_max_ms),
+            "wind_gusts_max_mph": safe_float(entry.wind_gusts_max_mph),
+            "wind_direction_dominant_deg": safe_float(
+                entry.wind_direction_dominant_deg
+            ),
+            "et0_evapotranspiration_mm": safe_float(entry.et0_evapotranspiration_mm),
+            "et0_evapotranspiration_in": safe_float(entry.et0_evapotranspiration_in),
         }
 
     return [serialize(e) for e in weather_entries]
