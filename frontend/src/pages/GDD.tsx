@@ -82,11 +82,19 @@ const CustomSliceTooltip = ({ slice }: { slice: any }) => {
   );
 };
 
+// Types
+interface Location {
+  id: number;
+  name: string;
+  latitude: number;
+  longitude: number;
+}
+
 export default function GDD() {
   const queryClient = useQueryClient();
-  const [selectedLawnId, setSelectedLawnId] = React.useState<string | null>(
-    null
-  );
+  const [selectedLocationId, setSelectedLocationId] = React.useState<
+    string | null
+  >(null);
 
   // Add GDD Model modal state
   const [open, setOpen] = React.useState(false);
@@ -101,25 +109,25 @@ export default function GDD() {
   const [submitting, setSubmitting] = React.useState(false);
   const [formError, setFormError] = React.useState<string | null>(null);
 
-  // Fetch lawns for dropdown
-  const { data: lawns, isLoading: lawnsLoading } = useQuery({
-    queryKey: ["lawns"],
-    queryFn: () => fetcher("/api/v1/lawns/"),
+  // Fetch locations for dropdown
+  const { data: locations, isLoading: locationsLoading } = useQuery({
+    queryKey: ["locations"],
+    queryFn: () => fetcher("/api/v1/locations/"),
     staleTime: 5 * 60 * 1000,
   });
 
-  // Fetch GDD models for selected lawn
+  // Fetch GDD models for selected location
   const {
     data: gddModels,
     isLoading: gddLoading,
     error: gddError,
   } = useQuery({
-    queryKey: ["gddModels", selectedLawnId],
+    queryKey: ["gddModels", selectedLocationId],
     queryFn: () =>
-      selectedLawnId
-        ? fetcher(`/api/v1/gdd_models/lawn/${selectedLawnId}`)
+      selectedLocationId
+        ? fetcher(`/api/v1/gdd_models/location/${selectedLocationId}`)
         : Promise.resolve([]),
-    enabled: !!selectedLawnId,
+    enabled: !!selectedLocationId,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -248,8 +256,8 @@ export default function GDD() {
     setSubmitting(true);
     setFormError(null);
     try {
-      if (!selectedLawnId) {
-        setFormError("Please select a lawn.");
+      if (!selectedLocationId) {
+        setFormError("Please select a location.");
         setSubmitting(false);
         return;
       }
@@ -262,7 +270,7 @@ export default function GDD() {
           start_date: form.start_date,
           threshold: Number(form.threshold),
           reset_on_threshold: form.reset_on_threshold,
-          lawn_id: Number(selectedLawnId),
+          location_id: Number(selectedLocationId),
         },
       });
       setOpen(false);
@@ -275,7 +283,7 @@ export default function GDD() {
         reset_on_threshold: false,
       });
       queryClient.invalidateQueries({
-        queryKey: ["gddModels", selectedLawnId],
+        queryKey: ["gddModels", selectedLocationId],
       });
     } catch (err: any) {
       setFormError(err.message || "Failed to add GDD model");
@@ -322,7 +330,7 @@ export default function GDD() {
 
       // Refresh data
       queryClient.invalidateQueries({
-        queryKey: ["gddModels", selectedLawnId],
+        queryKey: ["gddModels", selectedLocationId],
       });
       queryClient.invalidateQueries({
         queryKey: ["gddParameterHistory", selectedModel.id],
@@ -362,7 +370,7 @@ export default function GDD() {
         queryKey: ["gddValues", selectedModel.id, selectedRun],
       });
       await queryClient.invalidateQueries({
-        queryKey: ["gddModels", selectedLawnId],
+        queryKey: ["gddModels", selectedLocationId],
       });
       toast.success("GDD model reset successfully");
     } catch (err: any) {
@@ -383,7 +391,7 @@ export default function GDD() {
       setSheetOpen(false);
       setSelectedModel(null);
       queryClient.invalidateQueries({
-        queryKey: ["gddModels", selectedLawnId],
+        queryKey: ["gddModels", selectedLocationId],
       });
       toast.success("GDD model deleted successfully");
     } catch (err: any) {
@@ -409,7 +417,7 @@ export default function GDD() {
         queryKey: ["gddValues", selectedModel?.id, selectedRun],
       });
       queryClient.invalidateQueries({
-        queryKey: ["gddModels", selectedLawnId],
+        queryKey: ["gddModels", selectedLocationId],
       });
     } catch (err: any) {
       toast.error(err.message || "Failed to delete reset.");
@@ -425,7 +433,11 @@ export default function GDD() {
           <CardTitle className="text-2xl font-bold">GDD Models</CardTitle>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button variant="default" size="sm" disabled={!selectedLawnId}>
+              <Button
+                variant="default"
+                size="sm"
+                disabled={!selectedLocationId}
+              >
                 + Add GDD Model
               </Button>
             </DialogTrigger>
@@ -433,7 +445,7 @@ export default function GDD() {
               <DialogHeader>
                 <DialogTitle>Add GDD Model</DialogTitle>
                 <DialogDescription>
-                  Fill out the form to add a new GDD model for this lawn.
+                  Fill out the form to add a new GDD model for this location.
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -560,29 +572,31 @@ export default function GDD() {
           </Dialog>
         </CardHeader>
         <CardContent>
-          {/* Lawn Dropdown */}
+          {/* Location Dropdown */}
           <div className="mb-4 flex items-center gap-4">
-            <span className="font-medium">Lawn:</span>
+            <span className="font-medium">Location:</span>
             <Select
-              value={selectedLawnId || ""}
-              onValueChange={setSelectedLawnId}
-              disabled={lawnsLoading || !lawns}
+              value={selectedLocationId || ""}
+              onValueChange={setSelectedLocationId}
+              disabled={locationsLoading || !locations}
             >
               <SelectTrigger className="w-64">
                 <SelectValue
-                  placeholder={lawnsLoading ? "Loading..." : "Select a lawn"}
+                  placeholder={
+                    locationsLoading ? "Loading..." : "Select a location"
+                  }
                 />
               </SelectTrigger>
               <SelectContent>
-                {lawns && lawns.length > 0 ? (
-                  lawns.map((lawn: any) => (
-                    <SelectItem key={lawn.id} value={String(lawn.id)}>
-                      {lawn.name}
+                {locations && locations.length > 0 ? (
+                  locations.map((location: any) => (
+                    <SelectItem key={location.id} value={String(location.id)}>
+                      {location.name}
                     </SelectItem>
                   ))
                 ) : (
                   <div className="px-4 py-2 text-muted-foreground">
-                    No lawns found
+                    No locations found
                   </div>
                 )}
               </SelectContent>
@@ -599,7 +613,7 @@ export default function GDD() {
             </div>
           ) : !gddModels || gddModels.length === 0 ? (
             <div className="py-8 text-center text-muted-foreground">
-              No GDD models found for this lawn.
+              No GDD models found for this location.
             </div>
           ) : (
             <div className="space-y-4">
