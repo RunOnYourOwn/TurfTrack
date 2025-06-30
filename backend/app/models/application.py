@@ -30,7 +30,9 @@ class Application(Base):
     __tablename__ = "applications"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    lawn_id: Mapped[int] = mapped_column(ForeignKey("lawns.id"), nullable=False)
+    lawn_id: Mapped[int] = mapped_column(
+        ForeignKey("lawns.id", ondelete="CASCADE"), nullable=False
+    )
     product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), nullable=False)
     application_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     amount_per_area: Mapped[float] = mapped_column(Float, nullable=False)

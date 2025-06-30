@@ -3,10 +3,71 @@ import { fetcher } from "../lib/fetcher";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import * as React from "react";
-import { ProductFormValues } from "../components/ProductForm";
+import { ProductFormValues } from "@/types/product";
 import { ProductsTable } from "@/components/products/ProductsTable";
 import { ProductFormDialog } from "@/components/products/ProductFormDialog";
 import { ProductDeleteDialog } from "@/components/products/ProductDeleteDialog";
+
+function toBackendPayload(form: ProductFormValues) {
+  const payload: any = { name: form.name };
+  [
+    "n_pct",
+    "p_pct",
+    "k_pct",
+    "ca_pct",
+    "mg_pct",
+    "s_pct",
+    "fe_pct",
+    "cu_pct",
+    "mn_pct",
+    "b_pct",
+    "zn_pct",
+    "weight_lbs",
+    "cost_per_bag",
+    "sgn",
+    "product_link",
+    "label",
+    "sources",
+    "urea_nitrogen",
+    "ammoniacal_nitrogen",
+    "water_insol_nitrogen",
+    "other_water_soluble",
+    "slowly_available_from",
+    "last_scraped_price",
+    "last_scraped_at",
+  ].forEach((key) => {
+    let value = (form as any)[key];
+    if (typeof value === "string" && value.trim() === "") value = undefined;
+    if (
+      [
+        "n_pct",
+        "p_pct",
+        "k_pct",
+        "ca_pct",
+        "mg_pct",
+        "s_pct",
+        "fe_pct",
+        "cu_pct",
+        "mn_pct",
+        "b_pct",
+        "zn_pct",
+        "weight_lbs",
+        "cost_per_bag",
+        "urea_nitrogen",
+        "ammoniacal_nitrogen",
+        "water_insol_nitrogen",
+        "other_water_soluble",
+        "last_scraped_price",
+      ].includes(key) &&
+      value !== undefined
+    ) {
+      value = Number(value);
+      if (isNaN(value)) value = undefined;
+    }
+    if (value !== undefined) payload[key] = value;
+  });
+  return payload;
+}
 
 export default function Products() {
   const queryClient = useQueryClient();
@@ -67,7 +128,7 @@ export default function Products() {
     try {
       await fetcher("/api/v1/products/", {
         method: "POST",
-        data: values,
+        data: toBackendPayload(values),
       });
       setModalOpen(false);
       setEditProduct(null);
@@ -86,7 +147,7 @@ export default function Products() {
     try {
       await fetcher(`/api/v1/products/${editProduct.id}`, {
         method: "PUT",
-        data: values,
+        data: toBackendPayload(values),
       });
       setModalOpen(false);
       setEditProduct(null);

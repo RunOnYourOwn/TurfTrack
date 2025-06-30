@@ -1,34 +1,7 @@
 import * as React from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-
-export type ProductFormValues = {
-  name: string;
-  product_link?: string;
-  weight_lbs?: number;
-  cost_per_bag?: number;
-  sgn?: string;
-  label?: string;
-  sources?: string;
-  n_pct?: number;
-  p_pct?: number;
-  k_pct?: number;
-  ca_pct?: number;
-  mg_pct?: number;
-  s_pct?: number;
-  fe_pct?: number;
-  cu_pct?: number;
-  mn_pct?: number;
-  b_pct?: number;
-  zn_pct?: number;
-  urea_nitrogen?: number;
-  ammoniacal_nitrogen?: number;
-  water_insol_nitrogen?: number;
-  other_water_soluble?: number;
-  slowly_available_from?: string;
-  last_scraped_price?: number;
-  last_scraped_at?: string;
-};
+import { ProductFormValues } from "@/types/product";
 
 type ProductFormProps = {
   initialValues?: Partial<ProductFormValues>;
@@ -38,6 +11,27 @@ type ProductFormProps = {
   onSubmit: (values: ProductFormValues) => void;
   onCancel: () => void;
 };
+
+const nutrientFields = [
+  ["n_pct", "N (%)"],
+  ["p_pct", "P (%)"],
+  ["k_pct", "K (%)"],
+  ["ca_pct", "Ca (%)"],
+  ["mg_pct", "Mg (%)"],
+  ["s_pct", "S (%)"],
+  ["fe_pct", "Fe (%)"],
+  ["cu_pct", "Cu (%)"],
+  ["mn_pct", "Mn (%)"],
+  ["b_pct", "B (%)"],
+  ["zn_pct", "Zn (%)"],
+];
+
+const advancedNFields = [
+  ["urea_nitrogen", "Urea N"],
+  ["ammoniacal_nitrogen", "Ammoniacal N"],
+  ["water_insol_nitrogen", "Water Insoluble N"],
+  ["other_water_soluble", "Other Water Soluble N"],
+];
 
 export function ProductForm({
   initialValues = {},
@@ -55,24 +49,24 @@ export function ProductForm({
     sgn: initialValues.sgn || "",
     label: initialValues.label || "",
     sources: initialValues.sources || "",
-    n_pct: initialValues.n_pct ?? 0,
-    p_pct: initialValues.p_pct ?? 0,
-    k_pct: initialValues.k_pct ?? 0,
-    ca_pct: initialValues.ca_pct ?? 0,
-    mg_pct: initialValues.mg_pct ?? 0,
-    s_pct: initialValues.s_pct ?? 0,
-    fe_pct: initialValues.fe_pct ?? 0,
-    cu_pct: initialValues.cu_pct ?? 0,
-    mn_pct: initialValues.mn_pct ?? 0,
-    b_pct: initialValues.b_pct ?? 0,
-    zn_pct: initialValues.zn_pct ?? 0,
-    urea_nitrogen: initialValues.urea_nitrogen ?? 0,
-    ammoniacal_nitrogen: initialValues.ammoniacal_nitrogen ?? 0,
-    water_insol_nitrogen: initialValues.water_insol_nitrogen ?? 0,
-    other_water_soluble: initialValues.other_water_soluble ?? 0,
+    n_pct: initialValues.n_pct ?? undefined,
+    p_pct: initialValues.p_pct ?? undefined,
+    k_pct: initialValues.k_pct ?? undefined,
+    ca_pct: initialValues.ca_pct ?? undefined,
+    mg_pct: initialValues.mg_pct ?? undefined,
+    s_pct: initialValues.s_pct ?? undefined,
+    fe_pct: initialValues.fe_pct ?? undefined,
+    cu_pct: initialValues.cu_pct ?? undefined,
+    mn_pct: initialValues.mn_pct ?? undefined,
+    b_pct: initialValues.b_pct ?? undefined,
+    zn_pct: initialValues.zn_pct ?? undefined,
+    urea_nitrogen: initialValues.urea_nitrogen ?? undefined,
+    ammoniacal_nitrogen: initialValues.ammoniacal_nitrogen ?? undefined,
+    water_insol_nitrogen: initialValues.water_insol_nitrogen ?? undefined,
+    other_water_soluble: initialValues.other_water_soluble ?? undefined,
     slowly_available_from: initialValues.slowly_available_from || "",
-    last_scraped_price: initialValues.last_scraped_price,
-    last_scraped_at: initialValues.last_scraped_at,
+    last_scraped_price: initialValues.last_scraped_price ?? undefined,
+    last_scraped_at: initialValues.last_scraped_at || "",
   });
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -92,20 +86,20 @@ export function ProductForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {/* General Info */}
-      <div>
-        <label className="block text-sm font-medium mb-1" htmlFor="name">
-          Name
-        </label>
-        <Input
-          id="name"
-          name="name"
-          value={form.name}
-          onChange={handleChange}
-          required
-          disabled={submitting}
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium mb-1" htmlFor="name">
+            Name
+          </label>
+          <Input
+            id="name"
+            name="name"
+            value={form.name}
+            onChange={handleChange}
+            required
+            disabled={submitting}
+          />
+        </div>
         <div>
           <label
             className="block text-sm font-medium mb-1"
@@ -143,7 +137,7 @@ export function ProductForm({
             className="block text-sm font-medium mb-1"
             htmlFor="cost_per_bag"
           >
-            Cost/Bag
+            Cost per Bag ($)
           </label>
           <Input
             id="cost_per_bag"
@@ -179,7 +173,7 @@ export function ProductForm({
             disabled={submitting}
           />
         </div>
-        <div>
+        <div className="md:col-span-2">
           <label className="block text-sm font-medium mb-1" htmlFor="sources">
             Sources
           </label>
@@ -192,63 +186,73 @@ export function ProductForm({
           />
         </div>
       </div>
+
       {/* Nutrients Group */}
       <div>
-        <div className="font-semibold mt-4 mb-2">Nutrients</div>
-        <div className="grid grid-cols-6 gap-2">
-          {[
-            ["n_pct", "N (%)"],
-            ["p_pct", "P (%)"],
-            ["k_pct", "K (%)"],
-            ["ca_pct", "Ca (%)"],
-            ["mg_pct", "Mg (%)"],
-            ["s_pct", "S (%)"],
-            ["fe_pct", "Fe (%)"],
-            ["cu_pct", "Cu (%)"],
-            ["mn_pct", "Mn (%)"],
-            ["b_pct", "B (%)"],
-            ["zn_pct", "Zn (%)"],
-            ["urea_nitrogen", "Urea N"],
-            ["ammoniacal_nitrogen", "Ammoniacal N"],
-            ["water_insol_nitrogen", "Water Insoluble N"],
-            ["other_water_soluble", "Other Water Soluble"],
-          ].map(([key, label]) => (
-            <div key={key as string}>
-              <label
-                className="block text-xs font-medium mb-1"
-                htmlFor={key as string}
-              >
+        <div className="font-semibold mt-4 mb-2">Nutrients (%)</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {nutrientFields.map(([field, label]) => (
+            <div key={field}>
+              <label className="block text-sm font-medium mb-1" htmlFor={field}>
                 {label}
               </label>
               <Input
-                id={key as string}
-                name={key as string}
+                id={field}
+                name={field}
                 type="number"
                 step="any"
-                value={form[key as keyof ProductFormValues] ?? ""}
+                value={form[field as keyof ProductFormValues] ?? ""}
                 onChange={handleChange}
                 disabled={submitting}
               />
             </div>
           ))}
         </div>
-        <div className="mt-2">
-          <label
-            className="block text-xs font-medium mb-1"
-            htmlFor="slowly_available_from"
-          >
-            Slowly Available From
-          </label>
-          <Input
-            id="slowly_available_from"
-            name="slowly_available_from"
-            value={form.slowly_available_from}
-            onChange={handleChange}
-            disabled={submitting}
-          />
+      </div>
+
+      {/* Advanced Nitrogen Fields */}
+      <div>
+        <div className="font-semibold mt-4 mb-2">
+          Advanced Nitrogen (optional)
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {advancedNFields.map(([field, label]) => (
+            <div key={field}>
+              <label className="block text-sm font-medium mb-1" htmlFor={field}>
+                {label}
+              </label>
+              <Input
+                id={field}
+                name={field}
+                type="number"
+                step="any"
+                value={form[field as keyof ProductFormValues] ?? ""}
+                onChange={handleChange}
+                disabled={submitting}
+              />
+            </div>
+          ))}
         </div>
       </div>
-      {/* Read-only fields for edit mode */}
+
+      {/* Slowly Available From */}
+      <div>
+        <label
+          className="block text-sm font-medium mb-1"
+          htmlFor="slowly_available_from"
+        >
+          Slowly Available From
+        </label>
+        <Input
+          id="slowly_available_from"
+          name="slowly_available_from"
+          value={form.slowly_available_from}
+          onChange={handleChange}
+          disabled={submitting}
+        />
+      </div>
+
+      {/* Scraping Info (read-only, edit mode) */}
       {mode === "edit" &&
         (form.last_scraped_price !== undefined || form.last_scraped_at) && (
           <div className="mt-4 p-2 bg-muted rounded">
@@ -269,24 +273,24 @@ export function ProductForm({
             )}
           </div>
         )}
+
       {error && <div className="text-red-500 text-sm">{error}</div>}
-      <div className="flex gap-2 justify-end mt-4">
-        <Button type="submit" disabled={submitting}>
-          {submitting
-            ? mode === "add"
-              ? "Adding..."
-              : "Saving..."
-            : mode === "add"
-            ? "Add Product"
-            : "Save Changes"}
-        </Button>
+
+      <div className="flex justify-end gap-2">
         <Button
           type="button"
-          variant="ghost"
+          variant="outline"
           onClick={onCancel}
           disabled={submitting}
         >
           Cancel
+        </Button>
+        <Button type="submit" disabled={submitting}>
+          {submitting
+            ? "Saving..."
+            : mode === "add"
+            ? "Add Product"
+            : "Update Product"}
         </Button>
       </div>
     </form>

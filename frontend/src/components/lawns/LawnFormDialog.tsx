@@ -210,7 +210,7 @@ export const LawnFormDialog: React.FC<LawnFormDialogProps> = ({
           <Select
             value={form.location_id}
             onValueChange={onLocationChange}
-            disabled={submitting || !locations || locations.length === 0}
+            disabled={submitting}
           >
             <SelectTrigger id="location_id" name="location_id">
               <SelectValue placeholder="Select a location" />
@@ -226,15 +226,18 @@ export const LawnFormDialog: React.FC<LawnFormDialogProps> = ({
                   <SelectItem value="__new__">+ Add New Location</SelectItem>
                 </>
               ) : (
-                <div className="px-4 py-2 text-muted-foreground">
-                  No locations found
-                </div>
+                <>
+                  <div className="px-4 py-2 text-muted-foreground">
+                    No locations found
+                  </div>
+                  <SelectItem value="__new__">+ Add New Location</SelectItem>
+                </>
               )}
             </SelectContent>
           </Select>
         </div>
         {form.new_location && (
-          <div className="space-y-2 border rounded p-2 mt-2">
+          <>
             <div>
               <label
                 className="block text-sm font-medium mb-1"
@@ -263,6 +266,7 @@ export const LawnFormDialog: React.FC<LawnFormDialogProps> = ({
                 value={form.new_location_latitude}
                 onChange={onInputChange}
                 disabled={submitting}
+                placeholder="e.g. 40.7128"
               />
             </div>
             <div>
@@ -278,9 +282,10 @@ export const LawnFormDialog: React.FC<LawnFormDialogProps> = ({
                 value={form.new_location_longitude}
                 onChange={onInputChange}
                 disabled={submitting}
+                placeholder="e.g. -74.0060"
               />
             </div>
-          </div>
+          </>
         )}
         <div>
           <label className="block text-sm font-medium mb-1" htmlFor="notes">
