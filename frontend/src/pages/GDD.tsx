@@ -83,12 +83,18 @@ const CustomSliceTooltip = ({ slice }: { slice: any }) => {
 };
 
 // Types
-interface Location {
-  id: number;
-  name: string;
-  latitude: number;
-  longitude: number;
+interface WeatherEntry {
+  date: string;
+  type: "historical" | "forecast";
+  temperature_max_c: number;
+  temperature_max_f: number;
+  temperature_min_c: number;
+  temperature_min_f: number;
+  // ...other fields omitted for brevity
 }
+
+// Custom tooltip for Nivo (formats to 2 decimals and always shows label)
+const seriesLabels = ["Min Temperature", "Max Temperature"];
 
 export default function GDD() {
   const queryClient = useQueryClient();

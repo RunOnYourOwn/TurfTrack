@@ -72,11 +72,7 @@ export default function Lawns() {
   });
 
   // Fetch locations for dropdown
-  const {
-    data: locations,
-    isLoading: locationsLoading,
-    error: locationsError,
-  } = useQuery({
+  const { data: locations, isLoading: locationsLoading } = useQuery({
     queryKey: ["locations"],
     queryFn: () => fetcher("/api/v1/locations/"),
     staleTime: 5 * 60 * 1000,
@@ -90,9 +86,11 @@ export default function Lawns() {
     grass_type: "cold_season",
     notes: "",
     weather_fetch_frequency: "24h",
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+    timezone: "America/New_York",
     weather_enabled: true,
     location_id: "",
+    latitude: "",
+    longitude: "",
     // For new location
     new_location: false,
     new_location_name: "",
@@ -100,7 +98,6 @@ export default function Lawns() {
     new_location_longitude: "",
   });
   const [submitting, setSubmitting] = React.useState(false);
-  const [formError, setFormError] = React.useState<string | null>(null);
 
   // Edit Lawn modal state
   const [editOpen, setEditOpen] = React.useState(false);
@@ -236,7 +233,6 @@ export default function Lawns() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
-    setFormError(null);
     try {
       let locationId = form.location_id;
       if (form.new_location) {
@@ -271,9 +267,11 @@ export default function Lawns() {
         grass_type: "cold_season",
         notes: "",
         weather_fetch_frequency: "24h",
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+        timezone: "America/New_York",
         weather_enabled: true,
         location_id: "",
+        latitude: "",
+        longitude: "",
         new_location: false,
         new_location_name: "",
         new_location_latitude: "",
@@ -282,7 +280,7 @@ export default function Lawns() {
       queryClient.invalidateQueries({ queryKey: ["lawns"] });
       queryClient.invalidateQueries({ queryKey: ["locations"] });
     } catch (err: any) {
-      setFormError(err.message || "Failed to add lawn");
+      setEditError(err.message || "Failed to add lawn");
     } finally {
       setSubmitting(false);
     }
