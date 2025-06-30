@@ -8,19 +8,12 @@ import {
   CardAction,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
 import * as React from "react";
-import { PencilIcon, Trash2Icon, PlusIcon } from "lucide-react";
-import { ApplicationForm } from "@/components/ApplicationForm";
-import { toast } from "sonner";
+import { PlusIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { ChevronUp, ChevronDown } from "lucide-react";
+import { ApplicationsTable } from "@/components/applications/ApplicationsTable";
+import { ApplicationFormDialog } from "@/components/applications/ApplicationFormDialog";
+import { ApplicationDeleteDialog } from "@/components/applications/ApplicationDeleteDialog";
 
 export default function Applications() {
   const queryClient = useQueryClient();
@@ -201,292 +194,93 @@ export default function Applications() {
               </span>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full border-separate border-spacing-0 rounded-lg overflow-hidden bg-background dark:bg-gray-900 text-xs text-black dark:text-white">
-                <thead>
-                  <tr className="bg-muted">
-                    <th
-                      className="px-2 py-1 text-left font-semibold cursor-pointer select-none"
-                      onClick={() => handleSort("application_date")}
-                    >
-                      Date{" "}
-                      {sortBy === "application_date" &&
-                        (sortDir === "asc" ? (
-                          <ChevronUp className="inline w-3 h-3" />
-                        ) : (
-                          <ChevronDown className="inline w-3 h-3" />
-                        ))}
-                    </th>
-                    <th
-                      className="px-2 py-1 text-left font-semibold cursor-pointer select-none"
-                      onClick={() => handleSort("location")}
-                    >
-                      Location{" "}
-                      {sortBy === "location" &&
-                        (sortDir === "asc" ? (
-                          <ChevronUp className="inline w-3 h-3" />
-                        ) : (
-                          <ChevronDown className="inline w-3 h-3" />
-                        ))}
-                    </th>
-                    <th
-                      className="px-2 py-1 text-left font-semibold cursor-pointer select-none"
-                      onClick={() => handleSort("lawn")}
-                    >
-                      Lawn{" "}
-                      {sortBy === "lawn" &&
-                        (sortDir === "asc" ? (
-                          <ChevronUp className="inline w-3 h-3" />
-                        ) : (
-                          <ChevronDown className="inline w-3 h-3" />
-                        ))}
-                    </th>
-                    <th
-                      className="px-2 py-1 text-left font-semibold cursor-pointer select-none"
-                      onClick={() => handleSort("product")}
-                    >
-                      Product{" "}
-                      {sortBy === "product" &&
-                        (sortDir === "asc" ? (
-                          <ChevronUp className="inline w-3 h-3" />
-                        ) : (
-                          <ChevronDown className="inline w-3 h-3" />
-                        ))}
-                    </th>
-                    <th
-                      className="px-2 py-1 text-left font-semibold cursor-pointer select-none"
-                      onClick={() => handleSort("amount_per_area")}
-                    >
-                      Amount{" "}
-                      {sortBy === "amount_per_area" &&
-                        (sortDir === "asc" ? (
-                          <ChevronUp className="inline w-3 h-3" />
-                        ) : (
-                          <ChevronDown className="inline w-3 h-3" />
-                        ))}
-                    </th>
-                    <th
-                      className="px-2 py-1 text-left font-semibold cursor-pointer select-none"
-                      onClick={() => handleSort("status")}
-                    >
-                      Status{" "}
-                      {sortBy === "status" &&
-                        (sortDir === "asc" ? (
-                          <ChevronUp className="inline w-3 h-3" />
-                        ) : (
-                          <ChevronDown className="inline w-3 h-3" />
-                        ))}
-                    </th>
-                    <th
-                      className="px-2 py-1 text-left font-semibold cursor-pointer select-none"
-                      onClick={() => handleSort("notes")}
-                    >
-                      Notes{" "}
-                      {sortBy === "notes" &&
-                        (sortDir === "asc" ? (
-                          <ChevronUp className="inline w-3 h-3" />
-                        ) : (
-                          <ChevronDown className="inline w-3 h-3" />
-                        ))}
-                    </th>
-                    <th
-                      className="px-2 py-1 text-left font-semibold cursor-pointer select-none"
-                      onClick={() => handleSort("gdd")}
-                    >
-                      GDD Model{" "}
-                      {sortBy === "gdd" &&
-                        (sortDir === "asc" ? (
-                          <ChevronUp className="inline w-3 h-3" />
-                        ) : (
-                          <ChevronDown className="inline w-3 h-3" />
-                        ))}
-                    </th>
-                    <th className="px-2 py-1 text-left font-semibold">Edit</th>
-                    <th className="px-2 py-1 text-left font-semibold">
-                      Delete
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredApplications.map((app: any, idx: number) => (
-                    <tr
-                      key={app.id}
-                      className={
-                        "border-b last:border-b-0 group hover:bg-muted/50 dark:hover:bg-gray-800 " +
-                        (idx % 2 === 0
-                          ? "bg-white dark:bg-gray-800"
-                          : "bg-muted/30 dark:bg-gray-900")
-                      }
-                    >
-                      <td className="px-2 py-1 border-b whitespace-nowrap font-medium">
-                        {app.application_date}
-                      </td>
-                      <td className="px-2 py-1 border-b whitespace-nowrap">
-                        {lawnMap[app.lawn_id]?.location?.name || ""}
-                      </td>
-                      <td className="px-2 py-1 border-b whitespace-nowrap">
-                        {lawnMap[app.lawn_id]?.name || app.lawn_id}
-                      </td>
-                      <td className="px-2 py-1 border-b whitespace-nowrap">
-                        {productMap[app.product_id]?.name || app.product_id}
-                      </td>
-                      <td className="px-2 py-1 border-b whitespace-nowrap">
-                        {app.amount_per_area} {app.unit} / {app.area_unit} sq ft
-                      </td>
-                      <td className="px-2 py-1 border-b whitespace-nowrap capitalize">
-                        {app.status}
-                      </td>
-                      <td className="px-2 py-1 border-b whitespace-nowrap">
-                        {app.notes}
-                      </td>
-                      <td className="px-2 py-1 border-b whitespace-nowrap">
-                        {app.tied_gdd_model_id
-                          ? gddModelMap[app.tied_gdd_model_id]?.name ||
-                            app.tied_gdd_model_id
-                          : ""}
-                      </td>
-                      <td className="px-2 py-1 text-center">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={() => {
-                            setEditApp(app);
-                            setModalOpen(true);
-                          }}
-                          aria-label="Edit"
-                        >
-                          <PencilIcon className="w-4 h-4" />
-                        </Button>
-                      </td>
-                      <td className="px-2 py-1 text-center">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={() => setDeleteApp(app)}
-                          aria-label="Delete"
-                        >
-                          <Trash2Icon className="w-4 h-4 text-destructive" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ApplicationsTable
+              applications={filteredApplications}
+              sortBy={sortBy}
+              sortDir={sortDir}
+              onSort={handleSort}
+              lawnMap={lawnMap}
+              productMap={productMap}
+              gddModelMap={gddModelMap}
+              onEdit={(app) => {
+                setEditApp(app);
+                setModalOpen(true);
+              }}
+              onDelete={setDeleteApp}
+            />
           )}
         </CardContent>
       </Card>
       {/* Add/Edit Application Modal */}
-      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editApp ? "Edit Application" : "Add Application"}
-            </DialogTitle>
-            <DialogDescription>
-              Fill out the form to add or edit an application.
-            </DialogDescription>
-          </DialogHeader>
-          <ApplicationForm
-            initialValues={editApp || {}}
-            mode={editApp ? "edit" : "add"}
-            submitting={false}
-            error={null}
-            lawns={lawns || []}
-            products={products || []}
-            gddModels={gddModels || []}
-            onSubmit={async (values) => {
-              try {
-                // Convert empty string to null for tied_gdd_model_id
-                const payload = {
-                  ...values,
-                  tied_gdd_model_id:
-                    values.tied_gdd_model_id === ""
-                      ? null
-                      : values.tied_gdd_model_id,
-                };
-                if (editApp) {
-                  await fetcher(`/api/v1/applications/${editApp.id}`, {
-                    method: "PUT",
-                    data: payload,
-                  });
-                } else {
-                  await fetcher("/api/v1/applications/", {
-                    method: "POST",
-                    data: payload,
-                  });
-                }
-                setModalOpen(false);
-                setEditApp(null);
-                queryClient.invalidateQueries({ queryKey: ["applications"] });
-              } catch (err) {
-                // TODO: handle error state
-                alert((err as Error).message || "Failed to save application");
-              }
-            }}
-            onCancel={() => {
-              setModalOpen(false);
-              setEditApp(null);
-            }}
-          />
-        </DialogContent>
-      </Dialog>
-      {/* Delete Confirmation Dialog */}
-      <Dialog
-        open={!!deleteApp}
-        onOpenChange={(open) => {
-          if (!open) setDeleteApp(null);
+      <ApplicationFormDialog
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        initialValues={editApp || {}}
+        mode={editApp ? "edit" : "add"}
+        lawns={lawns || []}
+        products={products || []}
+        gddModels={gddModels || []}
+        submitting={false}
+        error={null}
+        onSubmit={async (values) => {
+          try {
+            // Convert empty string to null for tied_gdd_model_id
+            const payload = {
+              ...values,
+              tied_gdd_model_id:
+                values.tied_gdd_model_id === ""
+                  ? null
+                  : values.tied_gdd_model_id,
+            };
+            if (editApp) {
+              await fetcher(`/api/v1/applications/${editApp.id}`, {
+                method: "PUT",
+                data: payload,
+              });
+            } else {
+              await fetcher("/api/v1/applications/", {
+                method: "POST",
+                data: payload,
+              });
+            }
+            setModalOpen(false);
+            setEditApp(null);
+            queryClient.invalidateQueries({ queryKey: ["applications"] });
+          } catch (err) {
+            // TODO: handle error state
+            alert((err as Error).message || "Failed to save application");
+          }
         }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Application</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this application? This action
-              cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          {deleteError && (
-            <div className="text-red-500 text-sm mb-2">{deleteError}</div>
-          )}
-          <div className="flex gap-2 justify-end mt-4">
-            <Button
-              variant="ghost"
-              onClick={() => setDeleteApp(null)}
-              disabled={deleting}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={async () => {
-                if (!deleteApp) return;
-                setDeleting(true);
-                setDeleteError(null);
-                try {
-                  await fetcher(`/api/v1/applications/${deleteApp.id}`, {
-                    method: "DELETE",
-                  });
-                  setDeleteApp(null);
-                  queryClient.invalidateQueries({ queryKey: ["applications"] });
-                  toast.success("Application deleted.");
-                } catch (err) {
-                  setDeleteError(
-                    (err as Error).message || "Failed to delete application"
-                  );
-                } finally {
-                  setDeleting(false);
-                }
-              }}
-              disabled={deleting}
-            >
-              {deleting ? "Deleting..." : "Delete"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+        onCancel={() => {
+          setModalOpen(false);
+          setEditApp(null);
+        }}
+      />
+      {/* Delete Confirmation Dialog */}
+      <ApplicationDeleteDialog
+        open={!!deleteApp}
+        error={deleteError}
+        deleting={deleting}
+        onCancel={() => setDeleteApp(null)}
+        onDelete={async () => {
+          if (!deleteApp) return;
+          setDeleting(true);
+          setDeleteError(null);
+          try {
+            await fetcher(`/api/v1/applications/${deleteApp.id}`, {
+              method: "DELETE",
+            });
+            setDeleteApp(null);
+            queryClient.invalidateQueries({ queryKey: ["applications"] });
+          } catch (err) {
+            setDeleteError(
+              (err as Error).message || "Failed to delete application"
+            );
+          } finally {
+            setDeleting(false);
+          }
+        }}
+      />
     </div>
   );
 }
