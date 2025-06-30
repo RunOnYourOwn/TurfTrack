@@ -21,7 +21,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import * as React from "react";
-import { PencilIcon, Trash2Icon } from "lucide-react";
+import { PencilIcon, Trash2Icon, ChevronUp, ChevronDown } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -71,6 +71,13 @@ export default function Lawns() {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
+  // Fetch locations for dropdown
+  const { data: locations, isLoading: locationsLoading } = useQuery({
+    queryKey: ["locations"],
+    queryFn: () => fetcher("/api/v1/locations/"),
+    staleTime: 5 * 60 * 1000,
+  });
+
   // Add Lawn modal state
   const [open, setOpen] = React.useState(false);
   const [form, setForm] = React.useState({
@@ -79,13 +86,18 @@ export default function Lawns() {
     grass_type: "cold_season",
     notes: "",
     weather_fetch_frequency: "24h",
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+    timezone: "America/New_York",
     weather_enabled: true,
+    location_id: "",
     latitude: "",
     longitude: "",
+    // For new location
+    new_location: false,
+    new_location_name: "",
+    new_location_latitude: "",
+    new_location_longitude: "",
   });
   const [submitting, setSubmitting] = React.useState(false);
-  const [formError, setFormError] = React.useState<string | null>(null);
 
   // Edit Lawn modal state
   const [editOpen, setEditOpen] = React.useState(false);
@@ -98,8 +110,11 @@ export default function Lawns() {
     weather_fetch_frequency: "24h",
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
     weather_enabled: true,
-    latitude: "",
-    longitude: "",
+    location_id: "",
+    new_location: false,
+    new_location_name: "",
+    new_location_latitude: "",
+    new_location_longitude: "",
   });
   const [editSubmitting, setEditSubmitting] = React.useState(false);
   const [editError, setEditError] = React.useState<string | null>(null);
@@ -108,6 +123,82 @@ export default function Lawns() {
   const [deleteLawn, setDeleteLawn] = React.useState<Lawn | null>(null);
   const [deleteLoading, setDeleteLoading] = React.useState(false);
   const [deleteError, setDeleteError] = React.useState<string | null>(null);
+
+  // Add search and sorting state
+  const [search, setSearch] = React.useState("");
+  const [sortBy, setSortBy] = React.useState<string>("location");
+  const [sortDir, setSortDir] = React.useState<"asc" | "desc">("asc");
+
+  // Derived filtered and sorted lawns
+  const filteredLawns = React.useMemo(() => {
+    if (!lawns) return [];
+    let filtered = lawns;
+    if (search.trim()) {
+      const s = search.trim().toLowerCase();
+      filtered = filtered.filter((lawn: Lawn) => {
+        return (
+          (lawn.location?.name || "").toLowerCase().includes(s) ||
+          lawn.name.toLowerCase().includes(s) ||
+          String(lawn.area).toLowerCase().includes(s) ||
+          lawn.grass_type.toLowerCase().includes(s) ||
+          lawn.weather_fetch_frequency.toLowerCase().includes(s) ||
+          (lawn.notes || "").toLowerCase().includes(s) ||
+          lawn.timezone.toLowerCase().includes(s)
+        );
+      });
+    }
+    const compare = (a: Lawn, b: Lawn) => {
+      let valA, valB;
+      switch (sortBy) {
+        case "location":
+          valA = a.location?.name || "";
+          valB = b.location?.name || "";
+          break;
+        case "name":
+          valA = a.name;
+          valB = b.name;
+          break;
+        case "area":
+          valA = a.area;
+          valB = b.area;
+          break;
+        case "grass_type":
+          valA = a.grass_type;
+          valB = b.grass_type;
+          break;
+        case "weather_fetch_frequency":
+          valA = a.weather_fetch_frequency;
+          valB = b.weather_fetch_frequency;
+          break;
+        case "weather_enabled":
+          valA = a.weather_enabled;
+          valB = b.weather_enabled;
+          break;
+        default:
+          valA = a[sortBy as keyof Lawn];
+          valB = b[sortBy as keyof Lawn];
+      }
+      if (valA == null && valB == null) return 0;
+      if (valA == null) return sortDir === "asc" ? -1 : 1;
+      if (valB == null) return sortDir === "asc" ? 1 : -1;
+      if (typeof valA === "number" && typeof valB === "number") {
+        return sortDir === "asc" ? valA - valB : valB - valA;
+      }
+      return sortDir === "asc"
+        ? String(valA).localeCompare(String(valB))
+        : String(valB).localeCompare(String(valA));
+    };
+    return [...filtered].sort(compare);
+  }, [lawns, search, sortBy, sortDir]);
+
+  function handleSort(col: string) {
+    if (sortBy === col) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(col);
+      setSortDir("asc");
+    }
+  }
 
   function handleInputChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -131,11 +222,31 @@ export default function Lawns() {
     setForm((f) => ({ ...f, weather_enabled: e.target.checked }));
   }
 
+  function handleLocationChange(value: string) {
+    if (value === "__new__") {
+      setForm((f) => ({ ...f, new_location: true, location_id: "" }));
+    } else {
+      setForm((f) => ({ ...f, new_location: false, location_id: value }));
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
-    setFormError(null);
     try {
+      let locationId = form.location_id;
+      if (form.new_location) {
+        // Create new location first
+        const loc = await fetcher("/api/v1/locations/", {
+          method: "POST",
+          data: {
+            name: form.new_location_name,
+            latitude: parseFloat(form.new_location_latitude),
+            longitude: parseFloat(form.new_location_longitude),
+          },
+        });
+        locationId = loc.id;
+      }
       await fetcher("/api/v1/lawns/", {
         method: "POST",
         data: {
@@ -146,8 +257,7 @@ export default function Lawns() {
           weather_fetch_frequency: form.weather_fetch_frequency,
           timezone: form.timezone,
           weather_enabled: form.weather_enabled,
-          latitude: parseFloat(form.latitude) || null,
-          longitude: parseFloat(form.longitude) || null,
+          location_id: Number(locationId),
         },
       });
       setOpen(false);
@@ -157,14 +267,20 @@ export default function Lawns() {
         grass_type: "cold_season",
         notes: "",
         weather_fetch_frequency: "24h",
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+        timezone: "America/New_York",
         weather_enabled: true,
+        location_id: "",
         latitude: "",
         longitude: "",
+        new_location: false,
+        new_location_name: "",
+        new_location_latitude: "",
+        new_location_longitude: "",
       });
       queryClient.invalidateQueries({ queryKey: ["lawns"] });
+      queryClient.invalidateQueries({ queryKey: ["locations"] });
     } catch (err: any) {
-      setFormError(err.message || "Failed to add lawn");
+      setEditError(err.message || "Failed to add lawn");
     } finally {
       setSubmitting(false);
     }
@@ -180,22 +296,12 @@ export default function Lawns() {
       weather_fetch_frequency: lawn.weather_fetch_frequency,
       timezone: lawn.timezone,
       weather_enabled: lawn.weather_enabled,
-      latitude:
-        lawn.location &&
-        lawn.location.latitude !== undefined &&
-        lawn.location.latitude !== null
-          ? String(lawn.location.latitude)
-          : lawn.latitude !== undefined && lawn.latitude !== null
-          ? String(lawn.latitude)
-          : "",
-      longitude:
-        lawn.location &&
-        lawn.location.longitude !== undefined &&
-        lawn.location.longitude !== null
-          ? String(lawn.location.longitude)
-          : lawn.longitude !== undefined && lawn.longitude !== null
-          ? String(lawn.longitude)
-          : "",
+      location_id:
+        lawn.location && lawn.location.id ? String(lawn.location.id) : "",
+      new_location: false,
+      new_location_name: "",
+      new_location_latitude: "",
+      new_location_longitude: "",
     });
     setEditOpen(true);
   }
@@ -224,12 +330,33 @@ export default function Lawns() {
     setEditForm((f) => ({ ...f, weather_enabled: e.target.checked }));
   }
 
+  function handleEditLocationChange(value: string) {
+    if (value === "__new__") {
+      setEditForm((f) => ({ ...f, new_location: true, location_id: "" }));
+    } else {
+      setEditForm((f) => ({ ...f, new_location: false, location_id: value }));
+    }
+  }
+
   async function handleEditSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!editLawn) return;
     setEditSubmitting(true);
     setEditError(null);
     try {
+      let locationId = editForm.location_id;
+      if (editForm.new_location) {
+        // Create new location first
+        const loc = await fetcher("/api/v1/locations/", {
+          method: "POST",
+          data: {
+            name: editForm.new_location_name,
+            latitude: parseFloat(editForm.new_location_latitude),
+            longitude: parseFloat(editForm.new_location_longitude),
+          },
+        });
+        locationId = loc.id;
+      }
       await fetcher(`/api/v1/lawns/${editLawn.id}`, {
         method: "PUT",
         data: {
@@ -240,15 +367,27 @@ export default function Lawns() {
           weather_fetch_frequency: editForm.weather_fetch_frequency,
           timezone: editForm.timezone,
           weather_enabled: editForm.weather_enabled,
-          latitude:
-            editForm.latitude !== "" ? parseFloat(editForm.latitude) : null,
-          longitude:
-            editForm.longitude !== "" ? parseFloat(editForm.longitude) : null,
+          location_id: Number(locationId),
         },
       });
       setEditOpen(false);
       setEditLawn(null);
+      setEditForm({
+        name: "",
+        area: "",
+        grass_type: "cold_season",
+        notes: "",
+        weather_fetch_frequency: "24h",
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+        weather_enabled: true,
+        location_id: "",
+        new_location: false,
+        new_location_name: "",
+        new_location_latitude: "",
+        new_location_longitude: "",
+      });
       queryClient.invalidateQueries({ queryKey: ["lawns"] });
+      queryClient.invalidateQueries({ queryKey: ["locations"] });
     } catch (err: any) {
       setEditError(err.message || "Failed to update lawn");
     } finally {
@@ -263,6 +402,7 @@ export default function Lawns() {
     try {
       await fetcher(`/api/v1/lawns/${deleteLawn.id}`, { method: "DELETE" });
       await queryClient.resetQueries({ queryKey: ["lawns"] });
+      await queryClient.resetQueries({ queryKey: ["locations"] });
       setDeleteLawn(null);
     } catch (err: any) {
       setDeleteError(err.message || "Failed to delete lawn");
@@ -417,6 +557,58 @@ export default function Lawns() {
                   </label>
                 </div>
                 <div>
+                  <label className="block font-medium mb-1">Location</label>
+                  <Select
+                    value={form.new_location ? "__new__" : form.location_id}
+                    onValueChange={handleLocationChange}
+                    disabled={locationsLoading}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue
+                        placeholder={
+                          locationsLoading ? "Loading..." : "Select a location"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {locations &&
+                        locations.map((loc: any) => (
+                          <SelectItem key={loc.id} value={String(loc.id)}>
+                            {loc.name} ({loc.latitude}, {loc.longitude})
+                          </SelectItem>
+                        ))}
+                      <SelectItem value="__new__">
+                        + Add new location
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {form.new_location && (
+                  <div className="space-y-2">
+                    <Input
+                      name="new_location_name"
+                      placeholder="Location Name"
+                      value={form.new_location_name}
+                      onChange={handleInputChange}
+                      required
+                    />
+                    <Input
+                      name="new_location_latitude"
+                      placeholder="Latitude (e.g. 40.7128)"
+                      value={form.new_location_latitude}
+                      onChange={handleInputChange}
+                      required
+                    />
+                    <Input
+                      name="new_location_longitude"
+                      placeholder="Longitude (e.g. -74.0060)"
+                      value={form.new_location_longitude}
+                      onChange={handleInputChange}
+                      required
+                    />
+                  </div>
+                )}
+                <div>
                   <label
                     className="block text-sm font-medium mb-1"
                     htmlFor="notes"
@@ -431,43 +623,6 @@ export default function Lawns() {
                     disabled={submitting}
                   />
                 </div>
-                <div>
-                  <label
-                    className="block text-sm font-medium mb-1"
-                    htmlFor="latitude"
-                  >
-                    Latitude
-                  </label>
-                  <Input
-                    id="latitude"
-                    name="latitude"
-                    type="number"
-                    value={form.latitude}
-                    onChange={handleInputChange}
-                    placeholder="e.g. 40.7128"
-                    disabled={submitting}
-                  />
-                </div>
-                <div>
-                  <label
-                    className="block text-sm font-medium mb-1"
-                    htmlFor="longitude"
-                  >
-                    Longitude
-                  </label>
-                  <Input
-                    id="longitude"
-                    name="longitude"
-                    type="number"
-                    value={form.longitude}
-                    onChange={handleInputChange}
-                    placeholder="e.g. -74.0060"
-                    disabled={submitting}
-                  />
-                </div>
-                {formError && (
-                  <div className="text-red-500 text-sm">{formError}</div>
-                )}
                 <DialogFooter>
                   <Button type="submit" disabled={submitting}>
                     {submitting ? "Adding..." : "Add Lawn"}
@@ -482,6 +637,15 @@ export default function Lawns() {
             </DialogContent>
           </Dialog>
         </CardHeader>
+        {/* Search input */}
+        <div className="flex flex-col md:flex-row gap-2 md:gap-4 items-start md:items-center px-4 pb-2">
+          <Input
+            placeholder="Search lawns..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full md:w-64"
+          />
+        </div>
         <CardContent
           className={
             !lawns || lawns.length === 0
@@ -509,16 +673,77 @@ export default function Lawns() {
               <table className="min-w-full border-separate border-spacing-0 rounded-lg overflow-hidden bg-background dark:bg-gray-900 text-black dark:text-white">
                 <thead>
                   <tr className="bg-muted">
-                    <th className="px-4 py-2 text-left font-semibold">Name</th>
-                    <th className="px-4 py-2 text-left font-semibold">Area</th>
-                    <th className="px-4 py-2 text-left font-semibold">
-                      Grass Type
+                    <th
+                      className="px-4 py-2 text-left font-semibold cursor-pointer select-none"
+                      onClick={() => handleSort("location")}
+                    >
+                      Location{" "}
+                      {sortBy === "location" &&
+                        (sortDir === "asc" ? (
+                          <ChevronUp className="inline w-3 h-3" />
+                        ) : (
+                          <ChevronDown className="inline w-3 h-3" />
+                        ))}
                     </th>
-                    <th className="px-4 py-2 text-left font-semibold">
-                      Weather Freq
+                    <th
+                      className="px-4 py-2 text-left font-semibold cursor-pointer select-none"
+                      onClick={() => handleSort("name")}
+                    >
+                      Name{" "}
+                      {sortBy === "name" &&
+                        (sortDir === "asc" ? (
+                          <ChevronUp className="inline w-3 h-3" />
+                        ) : (
+                          <ChevronDown className="inline w-3 h-3" />
+                        ))}
                     </th>
-                    <th className="px-4 py-2 text-left font-semibold">
-                      Weather Enabled
+                    <th
+                      className="px-4 py-2 text-left font-semibold cursor-pointer select-none"
+                      onClick={() => handleSort("area")}
+                    >
+                      Area{" "}
+                      {sortBy === "area" &&
+                        (sortDir === "asc" ? (
+                          <ChevronUp className="inline w-3 h-3" />
+                        ) : (
+                          <ChevronDown className="inline w-3 h-3" />
+                        ))}
+                    </th>
+                    <th
+                      className="px-4 py-2 text-left font-semibold cursor-pointer select-none"
+                      onClick={() => handleSort("grass_type")}
+                    >
+                      Grass Type{" "}
+                      {sortBy === "grass_type" &&
+                        (sortDir === "asc" ? (
+                          <ChevronUp className="inline w-3 h-3" />
+                        ) : (
+                          <ChevronDown className="inline w-3 h-3" />
+                        ))}
+                    </th>
+                    <th
+                      className="px-4 py-2 text-left font-semibold cursor-pointer select-none"
+                      onClick={() => handleSort("weather_fetch_frequency")}
+                    >
+                      Weather Freq{" "}
+                      {sortBy === "weather_fetch_frequency" &&
+                        (sortDir === "asc" ? (
+                          <ChevronUp className="inline w-3 h-3" />
+                        ) : (
+                          <ChevronDown className="inline w-3 h-3" />
+                        ))}
+                    </th>
+                    <th
+                      className="px-4 py-2 text-left font-semibold cursor-pointer select-none"
+                      onClick={() => handleSort("weather_enabled")}
+                    >
+                      Weather Enabled{" "}
+                      {sortBy === "weather_enabled" &&
+                        (sortDir === "asc" ? (
+                          <ChevronUp className="inline w-3 h-3" />
+                        ) : (
+                          <ChevronDown className="inline w-3 h-3" />
+                        ))}
                     </th>
                     <th className="px-4 py-2 text-left font-semibold">Edit</th>
                     <th className="px-4 py-2 text-left font-semibold">
@@ -527,7 +752,7 @@ export default function Lawns() {
                   </tr>
                 </thead>
                 <tbody>
-                  {lawns.map((lawn: Lawn, idx: number) => (
+                  {filteredLawns.map((lawn: Lawn, idx: number) => (
                     <tr
                       key={lawn.id}
                       className={
@@ -536,6 +761,9 @@ export default function Lawns() {
                           : "bg-muted/30 dark:bg-gray-900 hover:bg-muted/60 dark:hover:bg-gray-800 transition"
                       }
                     >
+                      <td className="px-4 py-2 border-b whitespace-nowrap">
+                        {lawn.location?.name || ""}
+                      </td>
                       <td className="px-4 py-2 border-b whitespace-nowrap">
                         {lawn.name}
                       </td>
@@ -742,52 +970,70 @@ export default function Lawns() {
               />
             </div>
             <div>
-              <label
-                className="block text-sm font-medium mb-1"
-                htmlFor="edit_latitude"
+              <label className="block font-medium mb-1">Location</label>
+              <Select
+                value={editForm.new_location ? "__new__" : editForm.location_id}
+                onValueChange={handleEditLocationChange}
+                disabled={locationsLoading}
               >
-                Latitude
-              </label>
-              <Input
-                id="edit_latitude"
-                name="latitude"
-                type="number"
-                value={editForm.latitude}
-                onChange={handleEditInputChange}
-                placeholder="e.g. 40.7128"
-                disabled={editSubmitting}
-              />
+                <SelectTrigger className="w-full">
+                  <SelectValue
+                    placeholder={
+                      locationsLoading ? "Loading..." : "Select a location"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {locations &&
+                    locations.map((loc: any) => (
+                      <SelectItem key={loc.id} value={String(loc.id)}>
+                        {loc.name} ({loc.latitude}, {loc.longitude})
+                      </SelectItem>
+                    ))}
+                  <SelectItem value="__new__">+ Add new location</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <div>
-              <label
-                className="block text-sm font-medium mb-1"
-                htmlFor="edit_longitude"
-              >
-                Longitude
-              </label>
-              <Input
-                id="edit_longitude"
-                name="longitude"
-                type="number"
-                value={editForm.longitude}
-                onChange={handleEditInputChange}
-                placeholder="e.g. -74.0060"
-                disabled={editSubmitting}
-              />
-            </div>
-            {editError && (
-              <div className="text-red-500 text-sm">{editError}</div>
+            {editForm.new_location && (
+              <div className="space-y-2">
+                <Input
+                  name="new_location_name"
+                  placeholder="Location Name"
+                  value={editForm.new_location_name}
+                  onChange={handleEditInputChange}
+                  required
+                />
+                <Input
+                  name="new_location_latitude"
+                  placeholder="Latitude (e.g. 40.7128)"
+                  value={editForm.new_location_latitude}
+                  onChange={handleEditInputChange}
+                  required
+                />
+                <Input
+                  name="new_location_longitude"
+                  placeholder="Longitude (e.g. -74.0060)"
+                  value={editForm.new_location_longitude}
+                  onChange={handleEditInputChange}
+                  required
+                />
+              </div>
             )}
-            <DialogFooter>
+            <div className="flex gap-2 justify-end">
               <Button type="submit" disabled={editSubmitting}>
                 {editSubmitting ? "Saving..." : "Save Changes"}
               </Button>
-              <DialogClose asChild>
-                <Button type="button" variant="ghost" disabled={editSubmitting}>
-                  Cancel
-                </Button>
-              </DialogClose>
-            </DialogFooter>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setEditOpen(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+            {editError && (
+              <div className="text-red-500 text-sm mt-2">{editError}</div>
+            )}
           </form>
         </DialogContent>
       </Dialog>

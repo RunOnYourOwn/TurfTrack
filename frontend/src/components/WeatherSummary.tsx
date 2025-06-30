@@ -18,9 +18,11 @@ const MIN_COLOR = "#60a5fa"; // blue
 const MAX_COLOR = "#f59e42"; // orange
 
 // Types
-interface Lawn {
+interface Location {
   id: number;
   name: string;
+  latitude: number;
+  longitude: number;
 }
 
 interface WeatherEntry {
@@ -71,9 +73,9 @@ const CustomTooltip = ({ slice }: { slice: any }) => (
 );
 
 export default function WeatherSummary() {
-  const [selectedLawnId, setSelectedLawnId] = useState<string | undefined>(
-    undefined
-  );
+  const [selectedLocationId, setSelectedLocationId] = useState<
+    string | undefined
+  >(undefined);
   const [unit, setUnit] = useState<"C" | "F">("F");
   const [dateRange, setDateRange] = useState<{
     start: string;
@@ -81,19 +83,21 @@ export default function WeatherSummary() {
   } | null>(null);
   const [allTimeMode, setAllTimeMode] = useState(false);
 
-  // Fetch lawns for dropdown
-  const { data: lawns, isLoading: lawnsLoading } = useQuery<Lawn[]>({
-    queryKey: ["lawns"],
-    queryFn: () => fetcher("/api/v1/lawns/"),
-    staleTime: 5 * 60 * 1000,
-  });
-
-  // Set default lawn on load
-  useEffect(() => {
-    if (selectedLawnId === undefined && lawns && lawns.length > 0) {
-      setSelectedLawnId(String(lawns[0].id));
+  // Fetch locations for dropdown
+  const { data: locations, isLoading: locationsLoading } = useQuery<Location[]>(
+    {
+      queryKey: ["locations"],
+      queryFn: () => fetcher("/api/v1/locations/"),
+      staleTime: 5 * 60 * 1000,
     }
-  }, [lawns, selectedLawnId]);
+  );
+
+  // Set default location on load
+  useEffect(() => {
+    if (selectedLocationId === undefined && locations && locations.length > 0) {
+      setSelectedLocationId(String(locations[0].id));
+    }
+  }, [locations, selectedLocationId]);
 
   // Set default date range on mount (last 30 days to today + 16 days)
   useEffect(() => {
@@ -110,28 +114,28 @@ export default function WeatherSummary() {
     }
   }, [dateRange]);
 
-  // Fetch weather data for selected lawn and date range
+  // Fetch weather data for selected location and date range
   const {
     data: weatherData,
     isLoading: weatherLoading,
     error: weatherError,
   } = useQuery<WeatherEntry[]>({
-    queryKey: ["weather", selectedLawnId, dateRange, allTimeMode],
+    queryKey: ["weather", selectedLocationId, dateRange, allTimeMode],
     queryFn: () => {
-      if (selectedLawnId === undefined) return Promise.resolve([]);
+      if (selectedLocationId === undefined) return Promise.resolve([]);
       if (allTimeMode) {
-        // Fetch all data for the lawn (no date range)
-        return fetcher(`/api/v1/weather/lawn/${selectedLawnId}`);
+        // Fetch all data for the location (no date range)
+        return fetcher(`/api/v1/weather/location/${selectedLocationId}`);
       }
       if (dateRange) {
         return fetcher(
-          `/api/v1/weather/lawn/${selectedLawnId}?start_date=${dateRange.start}&end_date=${dateRange.end}`
+          `/api/v1/weather/location/${selectedLocationId}?start_date=${dateRange.start}&end_date=${dateRange.end}`
         );
       }
       return Promise.resolve([]);
     },
     enabled:
-      selectedLawnId !== undefined && (dateRange !== null || allTimeMode),
+      selectedLocationId !== undefined && (dateRange !== null || allTimeMode),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -226,30 +230,34 @@ export default function WeatherSummary() {
         </div>
       </CardHeader>
       <CardContent>
-        {/* Lawn Selector and Date Range Picker */}
+        {/* Location Selector and Date Range Picker */}
         <div className="mb-4 flex flex-col md:flex-row items-center gap-4">
           <div className="flex items-center gap-2">
-            <span className="font-medium">Lawn:</span>
-            {lawns && lawns.length > 0 && selectedLawnId !== undefined && (
-              <Select
-                value={selectedLawnId}
-                onValueChange={setSelectedLawnId}
-                disabled={lawnsLoading || !lawns}
-              >
-                <SelectTrigger className="w-64">
-                  <SelectValue
-                    placeholder={lawnsLoading ? "Loading..." : "Select a lawn"}
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {lawns.map((lawn: Lawn) => (
-                    <SelectItem key={lawn.id} value={String(lawn.id)}>
-                      {lawn.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+            <span className="font-medium">Location:</span>
+            {locations &&
+              locations.length > 0 &&
+              selectedLocationId !== undefined && (
+                <Select
+                  value={selectedLocationId}
+                  onValueChange={setSelectedLocationId}
+                  disabled={locationsLoading || !locations}
+                >
+                  <SelectTrigger className="w-64">
+                    <SelectValue
+                      placeholder={
+                        locationsLoading ? "Loading..." : "Select a location"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locations.map((location: Location) => (
+                      <SelectItem key={location.id} value={String(location.id)}>
+                        {location.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
           </div>
           <div className="flex items-center gap-2">
             <span className="font-medium">Date Range:</span>

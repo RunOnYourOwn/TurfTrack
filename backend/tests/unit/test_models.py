@@ -20,11 +20,13 @@ async def test_location(db_session: AsyncSession) -> Location:
     lat = 40.0 + random.random()
     lon = -74.0 + random.random()
     location = Location(
+        name=f"Test Location {random.randint(1000, 9999)}",
         latitude=lat,
         longitude=lon,
     )
     db_session.add(location)
     await db_session.commit()
+    await db_session.refresh(location)
     return location
 
 

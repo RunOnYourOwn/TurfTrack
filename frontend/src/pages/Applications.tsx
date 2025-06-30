@@ -88,12 +88,14 @@ export default function Applications() {
       const s = search.trim().toLowerCase();
       filtered = filtered.filter((app: any) => {
         const lawn = lawnMap[app.lawn_id]?.name || app.lawn_id;
+        const location = lawnMap[app.lawn_id]?.location?.name || "";
         const product = productMap[app.product_id]?.name || app.product_id;
         const gdd = app.tied_gdd_model_id
           ? gddModelMap[app.tied_gdd_model_id]?.name || app.tied_gdd_model_id
           : "";
         return (
           String(app.application_date).toLowerCase().includes(s) ||
+          String(location).toLowerCase().includes(s) ||
           String(lawn).toLowerCase().includes(s) ||
           String(product).toLowerCase().includes(s) ||
           String(app.amount_per_area).toLowerCase().includes(s) ||
@@ -108,6 +110,10 @@ export default function Applications() {
     const compare = (a: any, b: any) => {
       let valA, valB;
       switch (sortBy) {
+        case "location":
+          valA = lawnMap[a.lawn_id]?.location?.name || "";
+          valB = lawnMap[b.lawn_id]?.location?.name || "";
+          break;
         case "lawn":
           valA = lawnMap[a.lawn_id]?.name || a.lawn_id;
           valB = lawnMap[b.lawn_id]?.name || b.lawn_id;
@@ -213,6 +219,18 @@ export default function Applications() {
                     </th>
                     <th
                       className="px-2 py-1 text-left font-semibold cursor-pointer select-none"
+                      onClick={() => handleSort("location")}
+                    >
+                      Location{" "}
+                      {sortBy === "location" &&
+                        (sortDir === "asc" ? (
+                          <ChevronUp className="inline w-3 h-3" />
+                        ) : (
+                          <ChevronDown className="inline w-3 h-3" />
+                        ))}
+                    </th>
+                    <th
+                      className="px-2 py-1 text-left font-semibold cursor-pointer select-none"
                       onClick={() => handleSort("lawn")}
                     >
                       Lawn{" "}
@@ -302,6 +320,9 @@ export default function Applications() {
                     >
                       <td className="px-2 py-1 border-b whitespace-nowrap font-medium">
                         {app.application_date}
+                      </td>
+                      <td className="px-2 py-1 border-b whitespace-nowrap">
+                        {lawnMap[app.lawn_id]?.location?.name || ""}
                       </td>
                       <td className="px-2 py-1 border-b whitespace-nowrap">
                         {lawnMap[app.lawn_id]?.name || app.lawn_id}
