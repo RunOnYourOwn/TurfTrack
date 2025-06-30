@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: TurfTrack Discussions
+    url: https://github.com/aaronbassett/TurfTrack/discussions
+    about: Please ask and answer questions here.
+  - name: TurfTrack Documentation
+    url: https://github.com/aaronbassett/TurfTrack/docs
+    about: Check the documentation for usage guides and API references. 
