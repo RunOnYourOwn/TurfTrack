@@ -140,7 +140,7 @@ export default function Products() {
   }
 
   return (
-    <div className="p-4 min-h-screen bg-background w-full">
+    <div className="p-4 min-h-screen bg-background w-full overflow-y-auto">
       <Card className="min-h-[500px] w-full shadow-lg bg-white dark:bg-gray-900 text-black dark:text-white">
         <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 pb-2">
           <CardTitle className="text-2xl font-bold">Products</CardTitle>
