@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+### Changed
+## [0.0.10] - 2025-06-30
+
+### Added
+
+### Fixed
+
 - Fix gdd model calculation error
 - Make sure mobile can scroll on the page
 
