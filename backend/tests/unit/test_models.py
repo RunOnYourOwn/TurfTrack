@@ -134,7 +134,7 @@ async def test_product_required_fields(db_session: AsyncSession):
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_create_gdd_model(db_session: AsyncSession, lawn_for_fk: Lawn):
+async def test_create_gdd_model(db_session: AsyncSession, test_location: Location):
     """Test creating a GDD model with valid data."""
     gdd_model = GDDModel(
         name="Test GDD Model",
@@ -142,7 +142,7 @@ async def test_create_gdd_model(db_session: AsyncSession, lawn_for_fk: Lawn):
         unit=TempUnit.C,
         start_date=date.today(),
         threshold=1000.0,
-        lawn_id=lawn_for_fk.id,
+        location_id=test_location.id,
     )
     db_session.add(gdd_model)
     await db_session.commit()
@@ -155,14 +155,16 @@ async def test_create_gdd_model(db_session: AsyncSession, lawn_for_fk: Lawn):
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_gdd_model_required_fields(db_session: AsyncSession, lawn_for_fk: Lawn):
+async def test_gdd_model_required_fields(
+    db_session: AsyncSession, test_location: Location
+):
     """Test that GDD model creation fails without required fields."""
     gdd_model = GDDModel(
         base_temp=10.0,
         unit=TempUnit.C,
         start_date=date.today(),
         threshold=1000.0,
-        lawn_id=lawn_for_fk.id,
+        location_id=test_location.id,
     )
     db_session.add(gdd_model)
     with pytest.raises(IntegrityError):
