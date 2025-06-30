@@ -1,19 +1,10 @@
-export interface Location {
-  id: number;
-  name: string;
-  latitude: number;
-  longitude: number;
-  city?: string;
-  state?: string;
-  country?: string;
-}
+import { Location } from "./location";
 
 export interface Lawn {
   id: number;
   name: string;
   area: number;
   grass_type: "cold_season" | "warm_season";
-  // location: string; // REMOVE THIS LINE
   notes?: string;
   weather_fetch_frequency: "4h" | "8h" | "12h" | "24h";
   timezone: string;

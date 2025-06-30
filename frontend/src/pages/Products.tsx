@@ -1,27 +1,73 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetcher } from "../lib/fetcher";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogTrigger,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import * as React from "react";
-import {
-  PencilIcon,
-  Trash2Icon,
-  ChevronUp,
-  ChevronDown,
-  ExternalLink,
-} from "lucide-react";
-import { ProductForm, ProductFormValues } from "../components/ProductForm";
+import { ProductFormValues } from "@/types/product";
+import { ProductsTable } from "@/components/products/ProductsTable";
+import { ProductFormDialog } from "@/components/products/ProductFormDialog";
+import { ProductDeleteDialog } from "@/components/products/ProductDeleteDialog";
+
+function toBackendPayload(form: ProductFormValues) {
+  const payload: any = { name: form.name };
+  [
+    "n_pct",
+    "p_pct",
+    "k_pct",
+    "ca_pct",
+    "mg_pct",
+    "s_pct",
+    "fe_pct",
+    "cu_pct",
+    "mn_pct",
+    "b_pct",
+    "zn_pct",
+    "weight_lbs",
+    "cost_per_bag",
+    "sgn",
+    "product_link",
+    "label",
+    "sources",
+    "urea_nitrogen",
+    "ammoniacal_nitrogen",
+    "water_insol_nitrogen",
+    "other_water_soluble",
+    "slowly_available_from",
+    "last_scraped_price",
+    "last_scraped_at",
+  ].forEach((key) => {
+    let value = (form as any)[key];
+    if (typeof value === "string" && value.trim() === "") value = undefined;
+    if (
+      [
+        "n_pct",
+        "p_pct",
+        "k_pct",
+        "ca_pct",
+        "mg_pct",
+        "s_pct",
+        "fe_pct",
+        "cu_pct",
+        "mn_pct",
+        "b_pct",
+        "zn_pct",
+        "weight_lbs",
+        "cost_per_bag",
+        "urea_nitrogen",
+        "ammoniacal_nitrogen",
+        "water_insol_nitrogen",
+        "other_water_soluble",
+        "last_scraped_price",
+      ].includes(key) &&
+      value !== undefined
+    ) {
+      value = Number(value);
+      if (isNaN(value)) value = undefined;
+    }
+    if (value !== undefined) payload[key] = value;
+  });
+  return payload;
+}
 
 export default function Products() {
   const queryClient = useQueryClient();
@@ -82,7 +128,7 @@ export default function Products() {
     try {
       await fetcher("/api/v1/products/", {
         method: "POST",
-        data: values,
+        data: toBackendPayload(values),
       });
       setModalOpen(false);
       setEditProduct(null);
@@ -101,7 +147,7 @@ export default function Products() {
     try {
       await fetcher(`/api/v1/products/${editProduct.id}`, {
         method: "PUT",
-        data: values,
+        data: toBackendPayload(values),
       });
       setModalOpen(false);
       setEditProduct(null);
@@ -139,6 +185,8 @@ export default function Products() {
     }
   }
 
+  const handleFormSubmit = editProduct ? handleEdit : handleAdd;
+
   return (
     <div className="p-4 min-h-screen bg-background w-full overflow-y-auto">
       <Card className="min-h-[500px] w-full shadow-lg bg-white dark:bg-gray-900 text-black dark:text-white">
@@ -151,50 +199,17 @@ export default function Products() {
               onChange={(e) => setSearch(e.target.value)}
               className="w-full md:w-64"
             />
-            <Dialog
+            <ProductFormDialog
               open={modalOpen}
               onOpenChange={(open) => {
                 setModalOpen(open);
                 if (!open) setEditProduct(null);
               }}
-            >
-              <DialogTrigger asChild>
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => {
-                    setEditProduct(null);
-                    setModalOpen(true);
-                  }}
-                  className="w-full md:w-auto"
-                >
-                  + Add Product
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>
-                    {editProduct ? "Edit Product" : "Add Product"}
-                  </DialogTitle>
-                  <DialogDescription>
-                    {editProduct
-                      ? "Update the product details."
-                      : "Fill out the form to add a new product."}
-                  </DialogDescription>
-                </DialogHeader>
-                <ProductForm
-                  initialValues={editProduct || {}}
-                  mode={editProduct ? "edit" : "add"}
-                  submitting={submitting}
-                  error={formError}
-                  onSubmit={editProduct ? handleEdit : handleAdd}
-                  onCancel={() => {
-                    setModalOpen(false);
-                    setEditProduct(null);
-                  }}
-                />
-              </DialogContent>
-            </Dialog>
+              editProduct={editProduct}
+              onSubmit={handleFormSubmit}
+              submitting={submitting}
+              error={formError}
+            />
           </div>
         </CardHeader>
         <CardContent className="p-2 md:p-6">
@@ -214,324 +229,27 @@ export default function Products() {
               </span>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full border-separate border-spacing-0 rounded-lg overflow-hidden bg-background dark:bg-gray-900 text-xs text-black dark:text-white">
-                <thead>
-                  <tr className="bg-muted">
-                    <th
-                      className="px-2 py-1 text-left font-semibold cursor-pointer select-none"
-                      onClick={() => handleSort("name")}
-                    >
-                      Name{" "}
-                      {sortBy === "name" &&
-                        (sortDir === "asc" ? (
-                          <ChevronUp className="inline w-3 h-3" />
-                        ) : (
-                          <ChevronDown className="inline w-3 h-3" />
-                        ))}
-                    </th>
-                    <th
-                      className="px-1 py-1 font-semibold cursor-pointer select-none"
-                      onClick={() => handleSort("n_pct")}
-                    >
-                      N{" "}
-                      {sortBy === "n_pct" &&
-                        (sortDir === "asc" ? (
-                          <ChevronUp className="inline w-3 h-3" />
-                        ) : (
-                          <ChevronDown className="inline w-3 h-3" />
-                        ))}
-                    </th>
-                    <th
-                      className="px-1 py-1 font-semibold cursor-pointer select-none"
-                      onClick={() => handleSort("p_pct")}
-                    >
-                      P{" "}
-                      {sortBy === "p_pct" &&
-                        (sortDir === "asc" ? (
-                          <ChevronUp className="inline w-3 h-3" />
-                        ) : (
-                          <ChevronDown className="inline w-3 h-3" />
-                        ))}
-                    </th>
-                    <th
-                      className="px-1 py-1 font-semibold cursor-pointer select-none"
-                      onClick={() => handleSort("k_pct")}
-                    >
-                      K{" "}
-                      {sortBy === "k_pct" &&
-                        (sortDir === "asc" ? (
-                          <ChevronUp className="inline w-3 h-3" />
-                        ) : (
-                          <ChevronDown className="inline w-3 h-3" />
-                        ))}
-                    </th>
-                    <th
-                      className="px-1 py-1 font-semibold cursor-pointer select-none"
-                      onClick={() => handleSort("ca_pct")}
-                    >
-                      Ca{" "}
-                      {sortBy === "ca_pct" &&
-                        (sortDir === "asc" ? (
-                          <ChevronUp className="inline w-3 h-3" />
-                        ) : (
-                          <ChevronDown className="inline w-3 h-3" />
-                        ))}
-                    </th>
-                    <th
-                      className="px-1 py-1 font-semibold cursor-pointer select-none"
-                      onClick={() => handleSort("mg_pct")}
-                    >
-                      Mg{" "}
-                      {sortBy === "mg_pct" &&
-                        (sortDir === "asc" ? (
-                          <ChevronUp className="inline w-3 h-3" />
-                        ) : (
-                          <ChevronDown className="inline w-3 h-3" />
-                        ))}
-                    </th>
-                    <th
-                      className="px-1 py-1 font-semibold cursor-pointer select-none"
-                      onClick={() => handleSort("s_pct")}
-                    >
-                      S{" "}
-                      {sortBy === "s_pct" &&
-                        (sortDir === "asc" ? (
-                          <ChevronUp className="inline w-3 h-3" />
-                        ) : (
-                          <ChevronDown className="inline w-3 h-3" />
-                        ))}
-                    </th>
-                    <th
-                      className="px-1 py-1 font-semibold cursor-pointer select-none"
-                      onClick={() => handleSort("fe_pct")}
-                    >
-                      Fe{" "}
-                      {sortBy === "fe_pct" &&
-                        (sortDir === "asc" ? (
-                          <ChevronUp className="inline w-3 h-3" />
-                        ) : (
-                          <ChevronDown className="inline w-3 h-3" />
-                        ))}
-                    </th>
-                    <th
-                      className="px-1 py-1 font-semibold cursor-pointer select-none"
-                      onClick={() => handleSort("cu_pct")}
-                    >
-                      Cu{" "}
-                      {sortBy === "cu_pct" &&
-                        (sortDir === "asc" ? (
-                          <ChevronUp className="inline w-3 h-3" />
-                        ) : (
-                          <ChevronDown className="inline w-3 h-3" />
-                        ))}
-                    </th>
-                    <th
-                      className="px-1 py-1 font-semibold cursor-pointer select-none"
-                      onClick={() => handleSort("mn_pct")}
-                    >
-                      Mn{" "}
-                      {sortBy === "mn_pct" &&
-                        (sortDir === "asc" ? (
-                          <ChevronUp className="inline w-3 h-3" />
-                        ) : (
-                          <ChevronDown className="inline w-3 h-3" />
-                        ))}
-                    </th>
-                    <th
-                      className="px-1 py-1 font-semibold cursor-pointer select-none"
-                      onClick={() => handleSort("b_pct")}
-                    >
-                      B{" "}
-                      {sortBy === "b_pct" &&
-                        (sortDir === "asc" ? (
-                          <ChevronUp className="inline w-3 h-3" />
-                        ) : (
-                          <ChevronDown className="inline w-3 h-3" />
-                        ))}
-                    </th>
-                    <th
-                      className="px-1 py-1 font-semibold cursor-pointer select-none"
-                      onClick={() => handleSort("zn_pct")}
-                    >
-                      Zn{" "}
-                      {sortBy === "zn_pct" &&
-                        (sortDir === "asc" ? (
-                          <ChevronUp className="inline w-3 h-3" />
-                        ) : (
-                          <ChevronDown className="inline w-3 h-3" />
-                        ))}
-                    </th>
-                    <th
-                      className="px-1 py-1 font-semibold cursor-pointer select-none"
-                      onClick={() => handleSort("weight_lbs")}
-                    >
-                      Weight (lbs){" "}
-                      {sortBy === "weight_lbs" &&
-                        (sortDir === "asc" ? (
-                          <ChevronUp className="inline w-3 h-3" />
-                        ) : (
-                          <ChevronDown className="inline w-3 h-3" />
-                        ))}
-                    </th>
-                    <th
-                      className="px-1 py-1 font-semibold cursor-pointer select-none"
-                      onClick={() => handleSort("cost_per_bag")}
-                    >
-                      Cost/Bag{" "}
-                      {sortBy === "cost_per_bag" &&
-                        (sortDir === "asc" ? (
-                          <ChevronUp className="inline w-3 h-3" />
-                        ) : (
-                          <ChevronDown className="inline w-3 h-3" />
-                        ))}
-                    </th>
-                    <th className="px-1 py-1 font-semibold">Product Link</th>
-                    <th className="px-1 py-1 font-semibold">Edit</th>
-                    <th className="px-1 py-1 font-semibold">Delete</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredProducts.map((product: any, idx: number) => (
-                    <tr
-                      key={product.id}
-                      className={
-                        "border-b last:border-b-0 group hover:bg-muted/50 dark:hover:bg-gray-800 " +
-                        (idx % 2 === 0
-                          ? "bg-white dark:bg-gray-800"
-                          : "bg-muted/30 dark:bg-gray-900")
-                      }
-                    >
-                      <td className="px-2 py-1 border-b whitespace-nowrap font-medium">
-                        {product.name}
-                      </td>
-                      <td className="px-1 py-1 border-b text-right">
-                        {product.n_pct}
-                      </td>
-                      <td className="px-1 py-1 border-b text-right">
-                        {product.p_pct}
-                      </td>
-                      <td className="px-1 py-1 border-b text-right">
-                        {product.k_pct}
-                      </td>
-                      <td className="px-1 py-1 border-b text-right">
-                        {product.ca_pct}
-                      </td>
-                      <td className="px-1 py-1 border-b text-right">
-                        {product.mg_pct}
-                      </td>
-                      <td className="px-1 py-1 border-b text-right">
-                        {product.s_pct}
-                      </td>
-                      <td className="px-1 py-1 border-b text-right">
-                        {product.fe_pct}
-                      </td>
-                      <td className="px-1 py-1 border-b text-right">
-                        {product.cu_pct}
-                      </td>
-                      <td className="px-1 py-1 border-b text-right">
-                        {product.mn_pct}
-                      </td>
-                      <td className="px-1 py-1 border-b text-right">
-                        {product.b_pct}
-                      </td>
-                      <td className="px-1 py-1 border-b text-right">
-                        {product.zn_pct}
-                      </td>
-                      <td className="px-1 py-1 border-b text-right">
-                        {product.weight_lbs}
-                      </td>
-                      <td className="px-1 py-1 border-b text-right">
-                        {product.cost_per_bag !== null &&
-                        product.cost_per_bag !== undefined
-                          ? Number(product.cost_per_bag).toLocaleString(
-                              undefined,
-                              {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              }
-                            )
-                          : ""}
-                      </td>
-                      <td className="px-2 py-1 text-center">
-                        {product.product_link && (
-                          <a
-                            href={product.product_link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <ExternalLink className="w-4 h-4 inline" />
-                          </a>
-                        )}
-                      </td>
-                      <td className="px-2 py-1 text-center">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={() => {
-                            setEditProduct(product);
-                            setModalOpen(true);
-                          }}
-                          aria-label="Edit"
-                        >
-                          <PencilIcon className="w-4 h-4" />
-                        </Button>
-                      </td>
-                      <td className="px-2 py-1 text-center">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={() => setDeleteProduct(product)}
-                          aria-label="Delete"
-                        >
-                          <Trash2Icon className="w-4 h-4 text-destructive" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ProductsTable
+              products={filteredProducts}
+              sortBy={sortBy}
+              sortDir={sortDir}
+              onSort={handleSort}
+              onEdit={(product) => {
+                setEditProduct(product);
+                setModalOpen(true);
+              }}
+              onDelete={setDeleteProduct}
+            />
           )}
         </CardContent>
       </Card>
-      {/* Delete Confirmation Dialog */}
-      <Dialog
-        open={!!deleteProduct}
-        onOpenChange={(open) => {
-          if (!open) setDeleteProduct(null);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Product</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete{" "}
-              <span className="font-semibold">{deleteProduct?.name}</span>? This
-              action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          {deleteError && (
-            <div className="text-red-500 text-sm mb-2">{deleteError}</div>
-          )}
-          <DialogFooter>
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={deleting}
-            >
-              {deleting ? "Deleting..." : "Delete"}
-            </Button>
-            <DialogClose asChild>
-              <Button variant="ghost" disabled={deleting}>
-                Cancel
-              </Button>
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ProductDeleteDialog
+        deleteProduct={deleteProduct}
+        onDelete={handleDelete}
+        onClose={() => setDeleteProduct(null)}
+        deleting={deleting}
+        error={deleteError}
+      />
     </div>
   );
 }
