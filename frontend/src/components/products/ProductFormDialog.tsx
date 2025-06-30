@@ -7,7 +7,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ProductForm, ProductFormValues } from "../ProductForm";
+import { ProductForm } from "../ProductForm";
+import { ProductFormValues } from "@/types/product";
 
 interface ProductFormDialogProps {
   open: boolean;

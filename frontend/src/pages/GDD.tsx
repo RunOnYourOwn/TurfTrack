@@ -161,11 +161,6 @@ export default function GDD() {
 
   // Responsive Nivo chart margins and font size
   const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
-  const chartMargin = isMobile
-    ? { top: 20, right: 10, bottom: 60, left: 40 }
-    : { top: 20, right: 30, bottom: 110, left: 60 };
-  const axisFontSize = isMobile ? 10 : 13;
-
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value, type, checked } = e.target;
     setForm((f) => ({
