@@ -160,7 +160,6 @@ export default function GDD() {
   );
 
   // Responsive Nivo chart margins and font size
-  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value, type, checked } = e.target;
     setForm((f) => ({
