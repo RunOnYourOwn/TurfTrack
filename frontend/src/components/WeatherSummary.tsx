@@ -3,13 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { fetcher } from "../lib/fetcher";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
 import { ResponsiveLine } from "@nivo/line";
 import DateRangePopover from "./DateRangePopover";
 import { format, parseISO } from "date-fns";
@@ -72,32 +65,14 @@ const CustomTooltip = ({ slice }: { slice: any }) => (
   </div>
 );
 
-export default function WeatherSummary() {
-  const [selectedLocationId, setSelectedLocationId] = useState<
-    string | undefined
-  >(undefined);
+// Accept location as a prop
+export default function WeatherSummary({ location }: { location: Location }) {
   const [unit, setUnit] = useState<"C" | "F">("F");
   const [dateRange, setDateRange] = useState<{
     start: string;
     end: string;
   } | null>(null);
   const [allTimeMode, setAllTimeMode] = useState(false);
-
-  // Fetch locations for dropdown
-  const { data: locations, isLoading: locationsLoading } = useQuery<Location[]>(
-    {
-      queryKey: ["locations"],
-      queryFn: () => fetcher("/api/v1/locations/"),
-      staleTime: 5 * 60 * 1000,
-    }
-  );
-
-  // Set default location on load
-  useEffect(() => {
-    if (selectedLocationId === undefined && locations && locations.length > 0) {
-      setSelectedLocationId(String(locations[0].id));
-    }
-  }, [locations, selectedLocationId]);
 
   // Set default date range on mount (last 30 days to today + 16 days)
   useEffect(() => {
@@ -106,7 +81,6 @@ export default function WeatherSummary() {
       const start = new Date(today);
       start.setDate(today.getDate() - 5);
       const startStr = start.toISOString().slice(0, 10);
-      // Set a wide end date initially; will adjust after data fetch
       const end = new Date(today);
       end.setDate(today.getDate() + 16);
       const endStr = end.toISOString().slice(0, 10);
@@ -120,38 +94,21 @@ export default function WeatherSummary() {
     isLoading: weatherLoading,
     error: weatherError,
   } = useQuery<WeatherEntry[]>({
-    queryKey: ["weather", selectedLocationId, dateRange, allTimeMode],
+    queryKey: ["weather", location.id, dateRange, allTimeMode],
     queryFn: () => {
-      if (selectedLocationId === undefined) return Promise.resolve([]);
       if (allTimeMode) {
-        // Fetch all data for the location (no date range)
-        return fetcher(`/api/v1/weather/location/${selectedLocationId}`);
+        return fetcher(`/api/v1/weather/location/${location.id}`);
       }
       if (dateRange) {
         return fetcher(
-          `/api/v1/weather/location/${selectedLocationId}?start_date=${dateRange.start}&end_date=${dateRange.end}`
+          `/api/v1/weather/location/${location.id}?start_date=${dateRange.start}&end_date=${dateRange.end}`
         );
       }
       return Promise.resolve([]);
     },
-    enabled:
-      selectedLocationId !== undefined && (dateRange !== null || allTimeMode),
+    enabled: !!location.id && (dateRange !== null || allTimeMode),
     staleTime: 5 * 60 * 1000,
   });
-
-  // When allTimeMode is true and weatherData loads, set dateRange to min/max and turn off allTimeMode
-  useEffect(() => {
-    if (allTimeMode && weatherData && weatherData.length > 0) {
-      const sorted = [...weatherData].sort((a, b) =>
-        a.date.localeCompare(b.date)
-      );
-      setDateRange({
-        start: sorted[0].date,
-        end: sorted[sorted.length - 1].date,
-      });
-      setAllTimeMode(false);
-    }
-  }, [allTimeMode, weatherData]);
 
   // Prepare Nivo data
   const nivoData = useMemo(() => {
@@ -234,30 +191,7 @@ export default function WeatherSummary() {
         <div className="mb-4 flex flex-col md:flex-row items-center gap-4">
           <div className="flex items-center gap-2">
             <span className="font-medium">Location:</span>
-            {locations &&
-              locations.length > 0 &&
-              selectedLocationId !== undefined && (
-                <Select
-                  value={selectedLocationId}
-                  onValueChange={setSelectedLocationId}
-                  disabled={locationsLoading || !locations}
-                >
-                  <SelectTrigger className="w-64">
-                    <SelectValue
-                      placeholder={
-                        locationsLoading ? "Loading..." : "Select a location"
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {locations.map((location: Location) => (
-                      <SelectItem key={location.id} value={String(location.id)}>
-                        {location.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+            <span className="font-medium">{location.name}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="font-medium">Date Range:</span>

@@ -132,3 +132,20 @@ class GDDResetRead(BaseModel):
 
     class Config:
         from_attributes = True  # For Pydantic v2, replaces orm_mode
+
+
+class GDDModelDashboardRead(BaseModel):
+    id: int
+    location_id: int
+    name: str
+    base_temp: float
+    unit: TempUnit
+    threshold: float
+    created_at: datetime
+    updated_at: datetime
+    current_gdd: Optional[float] = None
+    last_reset: Optional[date] = None
+    run_number: Optional[int] = None
+
+    class Config:
+        from_attributes = True

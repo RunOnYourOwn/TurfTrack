@@ -48,3 +48,4 @@ USER celery
 
 # Set the entrypoint for the container
 ENTRYPOINT ["/app/entrypoint.sh"]
+

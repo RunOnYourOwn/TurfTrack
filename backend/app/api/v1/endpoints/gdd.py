@@ -1,7 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload
 from app.core.database import get_db, SessionLocal
 from app.models.gdd import (
     GDDModel,
@@ -18,6 +17,7 @@ from app.schemas.gdd import (
     GDDResetRead,
     GDDParameterUpdate,
     GDDParameterHistory,
+    GDDModelDashboardRead,
 )
 from typing import List
 from datetime import date as datetime_date
@@ -29,6 +29,8 @@ from app.utils.gdd import (
 )
 from app.models.lawn import Lawn
 from app.models.location import Location
+from datetime import datetime
+import time
 
 try:
     from asyncio import run_in_threadpool
@@ -324,3 +326,79 @@ async def delete_gdd_model(model_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="GDD model not found")
     await db.delete(db_model)
     await db.commit()
+
+
+@router.get(
+    "/location/{location_id}/dashboard", response_model=List[GDDModelDashboardRead]
+)
+async def list_gdd_models_dashboard_by_location(
+    location_id: int, db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(
+        select(GDDModel).where(GDDModel.location_id == location_id)
+    )
+    models = result.scalars().all()
+    dashboard_models = []
+    today = datetime_date.today()
+
+    now = datetime.now()
+    utcnow = datetime.utcnow()
+    print(
+        f"Backend datetime.now(): {now.isoformat()} | datetime.utcnow(): {utcnow.isoformat()} | date.today(): {today.isoformat()} | Server timezone: {time.tzname}"
+    )
+
+    for model in models:
+        # Get latest reset that is not in the future
+        reset_result = await db.execute(
+            select(GDDReset)
+            .where(GDDReset.gdd_model_id == model.id, GDDReset.reset_date <= today)
+            .order_by(GDDReset.reset_date.desc())
+            .limit(1)
+        )
+        latest_reset = reset_result.scalars().first()
+
+        if latest_reset:
+            run_number = latest_reset.run_number
+            last_reset = latest_reset.reset_date
+        else:
+            # fallback: get the latest reset regardless of date
+            reset_result = await db.execute(
+                select(GDDReset)
+                .where(GDDReset.gdd_model_id == model.id)
+                .order_by(GDDReset.reset_date.desc())
+                .limit(1)
+            )
+            fallback_reset = reset_result.scalars().first()
+            run_number = fallback_reset.run_number if fallback_reset else 1
+            last_reset = fallback_reset.reset_date if fallback_reset else None
+
+        # Get GDD value for today or the most recent date <= today for that run
+        gdd_result = await db.execute(
+            select(GDDValue)
+            .where(
+                GDDValue.gdd_model_id == model.id,
+                GDDValue.run == run_number,
+                GDDValue.date <= today,
+            )
+            .order_by(GDDValue.date.desc())
+            .limit(1)
+        )
+        latest_gdd = gdd_result.scalars().first()
+        current_gdd = latest_gdd.cumulative_gdd if latest_gdd else 0.0
+
+        dashboard_models.append(
+            GDDModelDashboardRead(
+                id=model.id,
+                location_id=model.location_id,
+                name=model.name,
+                base_temp=model.base_temp,
+                unit=model.unit,
+                threshold=model.threshold,
+                created_at=model.created_at,
+                updated_at=model.updated_at,
+                current_gdd=current_gdd,
+                last_reset=last_reset,
+                run_number=run_number,
+            )
+        )
+    return dashboard_models
