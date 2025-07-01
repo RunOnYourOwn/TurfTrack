@@ -58,5 +58,19 @@ export interface GDDParameterEditFormValues {
   effective_from: string;
 }
 
+export interface GDDModelDashboard {
+  id: number;
+  location_id: number;
+  name: string;
+  base_temp: number;
+  unit: string;
+  threshold: number;
+  created_at: string;
+  updated_at: string;
+  current_gdd?: number;
+  last_reset?: string;
+  run_number?: number;
+}
+
 // Import Location type from location.ts
 import { Location } from "./location";

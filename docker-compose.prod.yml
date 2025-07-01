@@ -12,6 +12,7 @@ services:
       - REDBEAT_REDIS_URL=redis://${REDIS_HOST}:${REDIS_PORT}/1
       - REDBEAT_LOCK_KEY=${REDBEAT_LOCK_KEY}
       - REDBEAT_LOCK_TIMEOUT=${REDBEAT_LOCK_TIMEOUT}
+      - TZ=${TZ}
     depends_on:
       db:
         condition: service_healthy
@@ -48,6 +49,7 @@ services:
       - REDBEAT_REDIS_URL=redis://${REDIS_HOST}:${REDIS_PORT}/1
       - REDBEAT_LOCK_KEY=${REDBEAT_LOCK_KEY}
       - REDBEAT_LOCK_TIMEOUT=${REDBEAT_LOCK_TIMEOUT}
+      - TZ=${TZ}
     depends_on:
       - redis
       - db
@@ -68,6 +70,7 @@ services:
       - REDBEAT_LOCK_TIMEOUT=${REDBEAT_LOCK_TIMEOUT}
       - CELERY_BROKER_URL=redis://${REDIS_HOST}:${REDIS_PORT}/0
       - CELERY_RESULT_BACKEND=redis://${REDIS_HOST}:${REDIS_PORT}/0
+      - TZ=${TZ}
     depends_on:
       - redis
       - celery_worker
