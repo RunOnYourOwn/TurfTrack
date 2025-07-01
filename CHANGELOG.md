@@ -12,6 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 ### Changed
+## [0.0.12] - 2025-06-30
+
+### Added
+
+- Added gdd model cards to dashboard and now one drop down to select location in dashboard
+
+### Fixed
+
+### Changed
+
 ## [0.0.11] - 2025-06-30
 
 ### Added
