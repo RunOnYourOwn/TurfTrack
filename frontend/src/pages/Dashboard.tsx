@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import WeatherSummary from "../components/WeatherSummary";
 import DashboardGDDModels from "../components/dashboard/DashboardGDDModels";
 import { fetcher } from "../lib/fetcher";
