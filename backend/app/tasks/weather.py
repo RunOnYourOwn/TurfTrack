@@ -14,6 +14,7 @@ from app.models.gdd import GDDModel
 from app.utils.gdd import calculate_and_store_gdd_values_sync_segmented
 from sqlalchemy.exc import SQLAlchemyError
 import requests
+from app.models.gdd import GDDReset, ResetType
 
 logger = logging.getLogger(__name__)
 
@@ -195,9 +196,6 @@ def _fetch_and_store_weather_sync(
             "dew_point_2m_min",
             "dew_point_2m_mean",
             "sunshine_duration",
-            "uv_index",
-            "mean_surface_pressure",
-            "mean_wet_bulb_temperature_2m",
         ],
         "timezone": "auto",
     }

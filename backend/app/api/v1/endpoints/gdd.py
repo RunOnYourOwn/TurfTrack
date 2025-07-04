@@ -174,31 +174,69 @@ async def update_gdd_parameters(
     if not db_model:
         raise HTTPException(status_code=404, detail="GDD model not found")
 
-    # Store current parameters in history if any are changing
-    effective_from = update.effective_from or datetime_date.today()
-    if any(
-        [
-            update.base_temp is not None and update.base_temp != db_model.base_temp,
-            update.threshold is not None and update.threshold != db_model.threshold,
-            update.reset_on_threshold is not None
-            and update.reset_on_threshold != db_model.reset_on_threshold,
-        ]
-    ):
-
-        def sync_store_params():
+    # Handle replace_all_history logic
+    if update.replace_all_history:
+        # Delete all previous parameter sets for this model
+        def sync_delete_all_params():
             with SessionLocal() as sync_session:
-                store_parameter_history(
-                    sync_session,
-                    db_model.id,
-                    update.base_temp or db_model.base_temp,
-                    update.threshold or db_model.threshold,
-                    update.reset_on_threshold
-                    if update.reset_on_threshold is not None
-                    else db_model.reset_on_threshold,
-                    effective_from,
-                )
+                sync_session.query(GDDModelParameters).filter(
+                    GDDModelParameters.gdd_model_id == model_id
+                ).delete()
+                sync_session.commit()
 
-        await run_in_threadpool(sync_store_params)
+        await run_in_threadpool(sync_delete_all_params)
+
+        # Store new parameters effective from model start date
+        effective_from = db_model.start_date
+        if any(
+            [
+                update.base_temp is not None and update.base_temp != db_model.base_temp,
+                update.threshold is not None and update.threshold != db_model.threshold,
+                update.reset_on_threshold is not None
+                and update.reset_on_threshold != db_model.reset_on_threshold,
+            ]
+        ):
+
+            def sync_store_params():
+                with SessionLocal() as sync_session:
+                    store_parameter_history(
+                        sync_session,
+                        db_model.id,
+                        update.base_temp or db_model.base_temp,
+                        update.threshold or db_model.threshold,
+                        update.reset_on_threshold
+                        if update.reset_on_threshold is not None
+                        else db_model.reset_on_threshold,
+                        effective_from,
+                    )
+
+            await run_in_threadpool(sync_store_params)
+    else:
+        # Original logic for incremental parameter updates
+        effective_from = update.effective_from or datetime_date.today()
+        if any(
+            [
+                update.base_temp is not None and update.base_temp != db_model.base_temp,
+                update.threshold is not None and update.threshold != db_model.threshold,
+                update.reset_on_threshold is not None
+                and update.reset_on_threshold != db_model.reset_on_threshold,
+            ]
+        ):
+
+            def sync_store_params():
+                with SessionLocal() as sync_session:
+                    store_parameter_history(
+                        sync_session,
+                        db_model.id,
+                        update.base_temp or db_model.base_temp,
+                        update.threshold or db_model.threshold,
+                        update.reset_on_threshold
+                        if update.reset_on_threshold is not None
+                        else db_model.reset_on_threshold,
+                        effective_from,
+                    )
+
+            await run_in_threadpool(sync_store_params)
 
     # Update model parameters
     if update.base_temp is not None:
@@ -211,27 +249,22 @@ async def update_gdd_parameters(
     await db.commit()
     await db.refresh(db_model)
 
-    # Handle historical recalculation if requested
-    if update.recalculate_history:
-        location = await db.get(Location, db_model.location_id)
-        if not location:
-            raise HTTPException(
-                status_code=400, detail="Location not found for GDD model."
-            )
+    # Handle recalculation
+    location = await db.get(Location, db_model.location_id)
+    if not location:
+        raise HTTPException(status_code=400, detail="Location not found for GDD model.")
 
+    if update.replace_all_history or update.recalculate_history:
+        # Recalculate all GDD values from the start
         def sync_recalc():
             with SessionLocal() as sync_session:
-                recalculate_historical_gdd(sync_session, model_id, effective_from)
+                calculate_and_store_gdd_values_sync_segmented(
+                    sync_session, db_model.id, location.id
+                )
 
         await run_in_threadpool(sync_recalc)
     else:
         # Just recalculate from effective date forward
-        location = await db.get(Location, db_model.location_id)
-        if not location:
-            raise HTTPException(
-                status_code=400, detail="Location not found for GDD model."
-            )
-
         def sync_calc():
             with SessionLocal() as sync_session:
                 calculate_and_store_gdd_values_sync_segmented(

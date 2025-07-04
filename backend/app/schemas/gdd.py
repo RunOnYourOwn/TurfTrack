@@ -59,6 +59,7 @@ class GDDParameterUpdate(BaseModel):
     reset_on_threshold: Optional[bool] = None
     recalculate_history: bool = False
     effective_from: Optional[date] = None
+    replace_all_history: bool = False
 
     @field_validator("base_temp")
     def validate_base_temp(cls, v):

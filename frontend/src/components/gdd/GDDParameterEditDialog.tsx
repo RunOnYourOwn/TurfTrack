@@ -21,6 +21,7 @@ interface GDDParameterEditDialogProps {
     reset_on_threshold: boolean;
     effective_from: string;
     recalculate_history: boolean;
+    replace_all_history: boolean;
   };
   parameterEditSubmitting: boolean;
   parameterEditError: string | null;
@@ -115,7 +116,9 @@ export function GDDParameterEditDialog({
               type="date"
               value={parameterEditForm.effective_from}
               onChange={onInputChange}
-              disabled={parameterEditSubmitting}
+              disabled={
+                parameterEditSubmitting || parameterEditForm.replace_all_history
+              }
             />
           </div>
           <div className="flex items-center gap-2">
@@ -135,8 +138,27 @@ export function GDDParameterEditDialog({
               Recalculate Historical Data
             </label>
           </div>
+          <div className="flex items-center gap-2">
+            <input
+              id="param_replace_all_history"
+              name="replace_all_history"
+              type="checkbox"
+              checked={parameterEditForm.replace_all_history}
+              onChange={onInputChange}
+              disabled={parameterEditSubmitting}
+              className="h-4 w-4 rounded border-gray-300 focus:ring-primary"
+            />
+            <label
+              htmlFor="param_replace_all_history"
+              className="text-sm font-medium"
+            >
+              Apply to all history (replace all previous parameter sets)
+            </label>
+          </div>
           <div className="text-sm text-muted-foreground">
-            {parameterEditForm.recalculate_history
+            {parameterEditForm.replace_all_history
+              ? "All previous parameter sets will be deleted. These parameters will be used for all dates, and all GDD values will be recalculated."
+              : parameterEditForm.recalculate_history
               ? "This will recalculate all GDD values from the effective date forward using the new parameters."
               : "This will only apply the new parameters to future calculations. Historical data will remain unchanged."}
           </div>
