@@ -188,6 +188,16 @@ def _fetch_and_store_weather_sync(
             "wind_gusts_10m_max",
             "wind_direction_10m_dominant",
             "et0_fao_evapotranspiration",
+            "relative_humidity_2m_mean",
+            "relative_humidity_2m_max",
+            "relative_humidity_2m_min",
+            "dew_point_2m_max",
+            "dew_point_2m_min",
+            "dew_point_2m_mean",
+            "sunshine_duration",
+            "uv_index",
+            "mean_surface_pressure",
+            "mean_wet_bulb_temperature_2m",
         ],
         "timezone": "auto",
     }
@@ -217,7 +227,7 @@ def _get_dates(daily):
 
 
 def _extract_weather_data(daily, i):
-    return {
+    data = {
         "temperature_max_c": float(daily.Variables(0).ValuesAsNumpy()[i]),
         "temperature_max_f": float(daily.Variables(0).ValuesAsNumpy()[i] * 9 / 5 + 32),
         "temperature_min_c": float(daily.Variables(1).ValuesAsNumpy()[i]),
@@ -234,7 +244,19 @@ def _extract_weather_data(daily, i):
         "et0_evapotranspiration_in": float(
             daily.Variables(7).ValuesAsNumpy()[i] / 25.4
         ),
+        "relative_humidity_mean": float(daily.Variables(8).ValuesAsNumpy()[i]),
+        "relative_humidity_max": float(daily.Variables(9).ValuesAsNumpy()[i]),
+        "relative_humidity_min": float(daily.Variables(10).ValuesAsNumpy()[i]),
+        "dew_point_max_c": float(daily.Variables(11).ValuesAsNumpy()[i]),
+        "dew_point_max_f": float(daily.Variables(11).ValuesAsNumpy()[i] * 9 / 5 + 32),
+        "dew_point_min_c": float(daily.Variables(12).ValuesAsNumpy()[i]),
+        "dew_point_min_f": float(daily.Variables(12).ValuesAsNumpy()[i] * 9 / 5 + 32),
+        "dew_point_mean_c": float(daily.Variables(13).ValuesAsNumpy()[i]),
+        "dew_point_mean_f": float(daily.Variables(13).ValuesAsNumpy()[i] * 9 / 5 + 32),
+        "sunshine_duration_s": float(daily.Variables(14).ValuesAsNumpy()[i]),
+        "sunshine_duration_h": float(daily.Variables(14).ValuesAsNumpy()[i] / 3600),
     }
+    return data
 
 
 def _get_historical_start_date(session, location_id: int) -> datetime.date:
@@ -315,6 +337,13 @@ def _update_recent_weather_for_location_sync(
                 "wind_gusts_10m_max",
                 "wind_direction_10m_dominant",
                 "et0_fao_evapotranspiration",
+                "relative_humidity_2m_mean",
+                "relative_humidity_2m_max",
+                "relative_humidity_2m_min",
+                "dew_point_2m_max",
+                "dew_point_2m_min",
+                "dew_point_2m_mean",
+                "sunshine_duration",
             ],
             "timezone": "auto",
         }
@@ -343,6 +372,13 @@ def _update_recent_weather_for_location_sync(
                 "wind_gusts_10m_max",
                 "wind_direction_10m_dominant",
                 "et0_fao_evapotranspiration",
+                "relative_humidity_2m_mean",
+                "relative_humidity_2m_max",
+                "relative_humidity_2m_min",
+                "dew_point_2m_max",
+                "dew_point_2m_min",
+                "dew_point_2m_mean",
+                "sunshine_duration",
             ],
             "timezone": "auto",
         }
@@ -396,7 +432,7 @@ def update_weather_for_all_lawns(self):
                 session,
                 task_id,
                 "update_weather_for_all_lawns",
-                1,  # No specific location_id for this task
+                None,  # No specific location_id for this task
                 TaskStatusEnum.started,
                 started=True,
             )
@@ -438,7 +474,7 @@ def update_weather_for_all_lawns(self):
                 session,
                 task_id,
                 "update_weather_for_all_lawns",
-                1,  # No specific location_id for this task
+                None,  # No specific location_id for this task
                 TaskStatusEnum.success,
                 finished=True,
             )
@@ -451,7 +487,7 @@ def update_weather_for_all_lawns(self):
                     session,
                     task_id,
                     "update_weather_for_all_lawns",
-                    1,  # No specific location_id for this task
+                    None,  # No specific location_id for this task
                     TaskStatusEnum.failure,
                     error=str(e),
                     finished=True,
@@ -470,7 +506,7 @@ def update_weather_for_all_lawns(self):
                     session,
                     task_id,
                     "update_weather_for_all_lawns",
-                    1,  # No specific location_id for this task
+                    None,  # No specific location_id for this task
                     TaskStatusEnum.failure,
                     error="An unexpected error occurred.",
                     finished=True,
