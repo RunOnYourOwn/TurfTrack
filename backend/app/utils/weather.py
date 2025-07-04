@@ -111,7 +111,10 @@ def upsert_daily_weather_sync(
             wind_speed_max_ms, wind_speed_max_mph,
             wind_gusts_max_ms, wind_gusts_max_mph,
             wind_direction_dominant_deg,
-            et0_evapotranspiration_mm, et0_evapotranspiration_in
+            et0_evapotranspiration_mm, et0_evapotranspiration_in,
+            relative_humidity_mean, relative_humidity_max, relative_humidity_min,
+            dew_point_max_c, dew_point_max_f, dew_point_min_c, dew_point_min_f, dew_point_mean_c, dew_point_mean_f,
+            sunshine_duration_s, sunshine_duration_h
         ) VALUES (
             :date, :location_id, :type,
             :temperature_max_c, :temperature_max_f,
@@ -121,7 +124,10 @@ def upsert_daily_weather_sync(
             :wind_speed_max_ms, :wind_speed_max_mph,
             :wind_gusts_max_ms, :wind_gusts_max_mph,
             :wind_direction_dominant_deg,
-            :et0_evapotranspiration_mm, :et0_evapotranspiration_in
+            :et0_evapotranspiration_mm, :et0_evapotranspiration_in,
+            :relative_humidity_mean, :relative_humidity_max, :relative_humidity_min,
+            :dew_point_max_c, :dew_point_max_f, :dew_point_min_c, :dew_point_min_f, :dew_point_mean_c, :dew_point_mean_f,
+            :sunshine_duration_s, :sunshine_duration_h
         )
         ON CONFLICT (date, location_id, type) DO UPDATE SET
             temperature_max_c = EXCLUDED.temperature_max_c,
@@ -137,7 +143,18 @@ def upsert_daily_weather_sync(
             wind_gusts_max_mph = EXCLUDED.wind_gusts_max_mph,
             wind_direction_dominant_deg = EXCLUDED.wind_direction_dominant_deg,
             et0_evapotranspiration_mm = EXCLUDED.et0_evapotranspiration_mm,
-            et0_evapotranspiration_in = EXCLUDED.et0_evapotranspiration_in
+            et0_evapotranspiration_in = EXCLUDED.et0_evapotranspiration_in,
+            relative_humidity_mean = EXCLUDED.relative_humidity_mean,
+            relative_humidity_max = EXCLUDED.relative_humidity_max,
+            relative_humidity_min = EXCLUDED.relative_humidity_min,
+            dew_point_max_c = EXCLUDED.dew_point_max_c,
+            dew_point_max_f = EXCLUDED.dew_point_max_f,
+            dew_point_min_c = EXCLUDED.dew_point_min_c,
+            dew_point_min_f = EXCLUDED.dew_point_min_f,
+            dew_point_mean_c = EXCLUDED.dew_point_mean_c,
+            dew_point_mean_f = EXCLUDED.dew_point_mean_f,
+            sunshine_duration_s = EXCLUDED.sunshine_duration_s,
+            sunshine_duration_h = EXCLUDED.sunshine_duration_h
     """)
 
     params = {

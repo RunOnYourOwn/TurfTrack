@@ -33,6 +33,17 @@ class DailyWeather(Base):
     wind_direction_dominant_deg: Mapped[float] = mapped_column(Float, nullable=False)
     et0_evapotranspiration_mm: Mapped[float] = mapped_column(Float, nullable=False)
     et0_evapotranspiration_in: Mapped[float] = mapped_column(Float, nullable=False)
+    relative_humidity_mean: Mapped[float] = mapped_column(Float, nullable=True)
+    relative_humidity_max: Mapped[float] = mapped_column(Float, nullable=True)
+    relative_humidity_min: Mapped[float] = mapped_column(Float, nullable=True)
+    dew_point_max_c: Mapped[float] = mapped_column(Float, nullable=True)
+    dew_point_max_f: Mapped[float] = mapped_column(Float, nullable=True)
+    dew_point_min_c: Mapped[float] = mapped_column(Float, nullable=True)
+    dew_point_min_f: Mapped[float] = mapped_column(Float, nullable=True)
+    dew_point_mean_c: Mapped[float] = mapped_column(Float, nullable=True)
+    dew_point_mean_f: Mapped[float] = mapped_column(Float, nullable=True)
+    sunshine_duration_s: Mapped[float] = mapped_column(Float, nullable=True)
+    sunshine_duration_h: Mapped[float] = mapped_column(Float, nullable=True)
 
     location = relationship("Location", back_populates="weather_entries")
 
