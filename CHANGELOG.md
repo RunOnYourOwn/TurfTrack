@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Fixed
+
+### Changed
+## [0.0.13] - 2025-07-04
+
+### Added
+
 - GDD parameter update improvements: Added "Apply to all history" option for parameter updates
 - Enhanced GDD parameter editing dialog with clearer options for historical data recalculation
 - Improved GDD threshold reset logic to prevent infinite recursion and ensure accurate resets
