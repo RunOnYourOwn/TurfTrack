@@ -12,6 +12,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 ### Changed
+## [0.0.13] - 2025-07-04
+
+### Added
+
+- GDD parameter update improvements: Added "Apply to all history" option for parameter updates
+- Enhanced GDD parameter editing dialog with clearer options for historical data recalculation
+- Improved GDD threshold reset logic to prevent infinite recursion and ensure accurate resets
+
+### Fixed
+
+- Fixed GDD cumulative values exceeding threshold before resetting due to stale threshold resets
+- Resolved infinite recursion bug in GDD calculation when adding threshold resets
+- Improved GDD parameter update logic to handle both incremental and full historical recalculation
+
+### Changed
+
+- Enhanced GDD parameter update workflow with better UX for choosing between incremental updates and full historical replacement
+- Updated GDD calculation logic to always clear threshold resets before recalculation to prevent stale data
+- Improved backend parameter update endpoint to support replacing all previous parameter sets
+
 ## [0.0.12] - 2025-06-30
 
 ### Added
