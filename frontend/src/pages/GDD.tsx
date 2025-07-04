@@ -137,6 +137,7 @@ export default function GDD() {
     reset_on_threshold: false,
     recalculate_history: false,
     effective_from: format(new Date(), "yyyy-MM-dd"),
+    replace_all_history: false,
   });
   const [parameterEditSubmitting, setParameterEditSubmitting] = useState(false);
   const [parameterEditError, setParameterEditError] = useState<string | null>(
@@ -243,6 +244,7 @@ export default function GDD() {
       updateData.reset_on_threshold = parameterEditForm.reset_on_threshold;
       updateData.recalculate_history = parameterEditForm.recalculate_history;
       updateData.effective_from = parameterEditForm.effective_from;
+      updateData.replace_all_history = parameterEditForm.replace_all_history;
 
       await fetcher(`/api/v1/gdd_models/${selectedModel.id}/parameters`, {
         method: "PUT",
@@ -256,6 +258,7 @@ export default function GDD() {
         reset_on_threshold: false,
         recalculate_history: false,
         effective_from: format(new Date(), "yyyy-MM-dd"),
+        replace_all_history: false,
       });
       setParameterEditDialogOpen(false);
 

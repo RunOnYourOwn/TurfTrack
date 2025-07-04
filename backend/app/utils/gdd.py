@@ -146,12 +146,23 @@ def manual_gdd_reset_sync(
 
 
 def calculate_and_store_gdd_values_sync_segmented(
-    session: Session, gdd_model_id: int, location_id: int
+    session: Session,
+    gdd_model_id: int,
+    location_id: int,
+    clear_threshold_resets: bool = True,
 ):
     """
     Calculate and store daily/cumulative GDD values for a GDD model, segmented by runs using the gdd_resets table.
     Handles both manual and threshold resets robustly. Uses parameter history for date-specific calculations.
     """
+    # Only clear on the outermost call
+    if clear_threshold_resets:
+        session.query(GDDReset).filter(
+            GDDReset.gdd_model_id == gdd_model_id,
+            GDDReset.reset_type == ResetType.threshold,
+        ).delete()
+        session.commit()
+
     gdd_model = session.get(GDDModel, gdd_model_id)
     if not gdd_model:
         raise ValueError("GDD model not found")
@@ -258,9 +269,9 @@ def calculate_and_store_gdd_values_sync_segmented(
             session.add(new_reset)
             session.commit()
 
-            # Recalculate from this point with the new reset
+            # Recalculate from this point with the new reset, but do not clear resets again
             calculate_and_store_gdd_values_sync_segmented(
-                session, gdd_model_id, location_id
+                session, gdd_model_id, location_id, clear_threshold_resets=False
             )
             return
 
