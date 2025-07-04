@@ -196,9 +196,6 @@ def _fetch_and_store_weather_sync(
             "dew_point_2m_min",
             "dew_point_2m_mean",
             "sunshine_duration",
-            "uv_index",
-            "mean_surface_pressure",
-            "mean_wet_bulb_temperature_2m",
         ],
         "timezone": "auto",
     }
@@ -544,12 +541,6 @@ def recalculate_gdd_for_location(self, location_id: int):
 
             for model in gdd_models:
                 try:
-                    # Clear all threshold resets before recalculation
-                    session.query(GDDReset).filter(
-                        GDDReset.gdd_model_id == model.id,
-                        GDDReset.reset_type == ResetType.threshold,
-                    ).delete()
-                    session.commit()
                     calculate_and_store_gdd_values_sync_segmented(
                         session, model.id, location_id
                     )

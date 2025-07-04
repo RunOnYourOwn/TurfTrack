@@ -56,6 +56,7 @@ export interface GDDParameterEditFormValues {
   reset_on_threshold: boolean;
   recalculate_history: boolean;
   effective_from: string;
+  replace_all_history: boolean;
 }
 
 export interface GDDModelDashboard {
