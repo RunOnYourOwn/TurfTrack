@@ -18,7 +18,6 @@ export const VersionProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     fetcher("/api/v1/version", { method: "GET" })
       .then((data) => {
-        console.log("Fetched version info:", data);
         setVersionInfo(data);
       })
       .catch(() => setVersionInfo({ version: "unknown" }));
