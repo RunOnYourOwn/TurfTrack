@@ -171,10 +171,3 @@ main {
     flex: 0 0 auto;
   }
 }
-
-.nivo-tooltip-value-max {
-  color: #f59e42 !important;
-}
-.nivo-tooltip-value-min {
-  color: #60a5fa !important;
-}
