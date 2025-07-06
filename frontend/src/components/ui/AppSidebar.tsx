@@ -22,7 +22,6 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useTheme } from "../../ThemeProvider";
-import { useVersion } from "@/contexts/VersionContext";
 
 const navigationItems = [
   {
@@ -103,7 +102,6 @@ export function AppSidebar() {
   const location = useLocation();
   const { state, isMobile, setOpenMobile } = useSidebar();
   const isActive = (path: string) => location.pathname === path;
-  const versionInfo = useVersion();
 
   return (
     <Sidebar className="overflow-x-hidden h-full" collapsible="icon">
@@ -157,14 +155,11 @@ export function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
-        <SidebarFooter className="border-t p-4 flex flex-col gap-1">
+        <SidebarFooter className="border-t p-4">
           {state === "collapsed" ? null : (
-            <>
-              <span className="text-xs text-muted-foreground">
-                TurfTrack v{versionInfo?.version}
-                {versionInfo?.environment === "development" && " (dev)"}
-              </span>
-            </>
+            <span className="text-xs text-muted-foreground">
+              © 2025 TurfTrack
+            </span>
           )}
         </SidebarFooter>
         <DarkModeToggle />
