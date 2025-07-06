@@ -28,54 +28,42 @@ interface WeatherEntry {
   // ...other fields omitted for brevity
 }
 
-const CustomTooltip = ({ slice, unit }: { slice: any; unit: "C" | "F" }) => {
-  if (!slice.points || slice.points.length === 0) return null;
-  const dateLabel =
-    typeof slice.points[0].data.x === "string"
-      ? format(parseISO(slice.points[0].data.x), "MM/dd")
-      : String(slice.points[0].data.x);
-  // Map series id to label
-  const labelMap: Record<string, string> = {
-    "Min Temperature": "Min Temperature",
-    "Max Temperature": "Max Temperature",
-  };
-  return (
-    <div
-      style={{
-        background: "#222",
-        color: "#fff",
-        padding: 10,
-        borderRadius: 8,
-        fontSize: 14,
-        boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-        minWidth: 210,
-        border: "2px solid #444",
-      }}
-    >
-      <div style={{ fontWeight: 700, marginBottom: 2 }}>{dateLabel}</div>
-      {slice.points.map((point: any, idx: number) => (
-        <div
-          key={idx}
-          style={{ fontWeight: 600, color: undefined, marginBottom: 2 }}
-        >
-          {labelMap[point.seriesId] || point.seriesId}:{" "}
-          <span
-            className={
-              point.seriesId === "Max Temperature"
-                ? "nivo-tooltip-value-max"
-                : point.seriesId === "Min Temperature"
-                ? "nivo-tooltip-value-min"
-                : undefined
-            }
-            style={{ fontWeight: 700 }}
-          >
-            {Number(point.data.y).toFixed(1)}°{unit}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-};
+// Custom tooltip for Nivo (formats to 2 decimals and always shows label)
+const seriesLabels = ["Min Temperature", "Max Temperature"];
+
+const CustomTooltip = ({ slice }: { slice: any }) => (
+  <div
+    style={{
+      background: "#222",
+      color: "#fff",
+      padding: 8,
+      borderRadius: 6,
+      fontSize: 13,
+      boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+      minWidth: 120,
+    }}
+  >
+    {slice.points.map((point: any, idx: number) => (
+      <div key={idx} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span
+          style={{
+            width: 12,
+            height: 12,
+            background: point.serieColor,
+            display: "inline-block",
+            borderRadius: 2,
+          }}
+        />
+        <span style={{ minWidth: 90, color: "#fff", fontWeight: 500 }}>
+          {seriesLabels[idx] || `Series ${idx + 1}`}
+        </span>
+        <span style={{ fontWeight: 600, color: "#fff" }}>
+          {Number(point.data.y).toFixed(2)}
+        </span>
+      </div>
+    ))}
+  </div>
+);
 
 // Accept location as a prop
 export default function WeatherSummary({ location }: { location: Location }) {
@@ -297,7 +285,7 @@ export default function WeatherSummary({ location }: { location: Location }) {
                     },
                   },
                   tooltip: {
-                    container: { background: "#222", color: "inherit" },
+                    container: { background: "#222", color: "#fff" },
                   },
                   grid: {
                     line: { stroke: "#444", strokeDasharray: "3 3" },
@@ -359,9 +347,7 @@ export default function WeatherSummary({ location }: { location: Location }) {
                   "slices",
                   "axes",
                 ]}
-                sliceTooltip={(props) => (
-                  <CustomTooltip {...props} unit={unit} />
-                )}
+                sliceTooltip={CustomTooltip}
                 lineWidth={3}
                 pointSymbol={(props) => {
                   return (
