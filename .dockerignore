@@ -88,4 +88,7 @@ htmlcov/
 .pytest_cache/
 .tox/
 coverage/
-.nyc_output/ 
+.nyc_output/
+
+# Release workflow
+RELEASE_WORKFLOW.md 
