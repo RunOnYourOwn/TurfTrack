@@ -18,5 +18,8 @@ class Location(Base):
     gdd_models = relationship(
         "GDDModel", back_populates="location", cascade="all, delete-orphan"
     )
+    disease_pressures = relationship(
+        "DiseasePressure", back_populates="location", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (UniqueConstraint("latitude", "longitude", name="uix_lat_lon"),)
