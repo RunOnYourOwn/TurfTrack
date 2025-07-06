@@ -14,7 +14,7 @@ from app.models.gdd import GDDModel
 from app.utils.gdd import calculate_and_store_gdd_values_sync_segmented
 from sqlalchemy.exc import SQLAlchemyError
 import requests
-from app.models.gdd import GDDReset, ResetType
+from app.utils.disease import calculate_smith_kerns_for_location
 
 logger = logging.getLogger(__name__)
 
@@ -210,6 +210,12 @@ def _fetch_and_store_weather_sync(
             WeatherType.historical if date.date() < today else WeatherType.forecast
         )
         upsert_daily_weather_sync(session, location_id, date, weather_type, data)
+
+    # Calculate disease pressure for this location (Smith-Kerns)
+    forecast_end = today + datetime.timedelta(days=16)
+    calculate_smith_kerns_for_location(
+        session, location_id, today - datetime.timedelta(days=60), forecast_end
+    )
 
 
 def _get_dates(daily):
@@ -408,6 +414,12 @@ def _update_recent_weather_for_location_sync(
         from app.tasks.weather import recalculate_gdd_for_location
 
         recalculate_gdd_for_location.delay(location_id)
+
+        # Calculate disease pressure for this location (Smith-Kerns)
+        forecast_end = today + datetime.timedelta(days=16)
+        calculate_smith_kerns_for_location(
+            session, location_id, today - datetime.timedelta(days=30), forecast_end
+        )
 
 
 @app.task(name="update_weather_for_all_lawns", bind=True)
