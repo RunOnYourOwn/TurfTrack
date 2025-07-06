@@ -137,23 +137,27 @@ def get_build_info() -> Dict[str, Any]:
         version = "unknown"
 
     git_info = get_git_info()
-    environment = {
+    environment_info = {
         "python_version": f"{os.sys.version_info.major}.{os.sys.version_info.minor}.{os.sys.version_info.micro}",
         "platform": os.sys.platform,
     }
 
+    # Get ENVIRONMENT variable for top-level field
+    environment = os.getenv("ENVIRONMENT", "production")
+
     result = {
         "version": version,
         "build_date": datetime.utcnow().isoformat() + "Z",
+        "environment": environment,
     }
 
     # Only include git if at least one value is not 'unknown'
     if any(v != "unknown" for v in git_info.values()):
         result["git"] = git_info
 
-    # Only include environment if at least one value is not 'unknown'
-    if any(v != "unknown" for v in environment.values()):
-        result["environment"] = environment
+    # Only include environment_info if at least one value is not 'unknown'
+    if any(v != "unknown" for v in environment_info.values()):
+        result["environment_info"] = environment_info
 
     return result
 
