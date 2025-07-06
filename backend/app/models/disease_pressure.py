@@ -1,18 +1,28 @@
-from sqlalchemy import Column, Integer, Float, String, Date, DateTime, ForeignKey, func
-from sqlalchemy.orm import relationship
-from app.core.database import Base
+from pydantic import BaseModel
+from datetime import date, datetime
+from typing import Optional
 
 
-class DiseasePressure(Base):
-    __tablename__ = "disease_pressure"
+class DiseasePressureRead(BaseModel):
+    id: int
+    date: date
+    location_id: int
+    disease: str
+    risk_score: float
+    created_at: Optional[datetime] = None
+    is_forecast: Optional[bool] = None
 
-    id = Column(Integer, primary_key=True, index=True)
-    date = Column(Date, nullable=False, index=True)
-    location_id = Column(
-        Integer, ForeignKey("locations.id"), nullable=False, index=True
-    )
-    disease = Column(String(32), nullable=False, index=True)
-    risk_score = Column(Float, nullable=False)
-    created_at = Column(DateTime, server_default=func.now())
+    class Config:
+        from_attributes = True
 
-    location = relationship("Location", back_populates="disease_pressures")
+
+class DiseasePressureList(BaseModel):
+    id: int
+    date: date
+    location_id: int
+    disease: str
+    risk_score: float
+    is_forecast: Optional[bool] = None
+
+    class Config:
+        from_attributes = True
