@@ -8,7 +8,7 @@ class DiseasePressureRead(BaseModel):
     date: date
     location_id: int
     disease: str
-    risk_score: float
+    risk_score: Optional[float] = None
     created_at: Optional[datetime] = None
     is_forecast: Optional[bool] = None
 
@@ -21,7 +21,7 @@ class DiseasePressureList(BaseModel):
     date: date
     location_id: int
     disease: str
-    risk_score: float
+    risk_score: Optional[float] = None
     is_forecast: Optional[bool] = None
 
     class Config:

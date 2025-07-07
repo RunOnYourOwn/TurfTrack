@@ -3,7 +3,7 @@ export interface DiseasePressure {
   date: string;
   location_id: number;
   disease: string;
-  risk_score: number;
+  risk_score: number | null;
   created_at?: string;
   type: string; // 'historical' or 'forecast'
   is_forecast?: boolean;
@@ -14,7 +14,7 @@ export interface DiseasePressureList {
   date: string;
   location_id: number;
   disease: string;
-  risk_score: number;
+  risk_score: number | null;
   type: string; // 'historical' or 'forecast'
   is_forecast?: boolean;
 }

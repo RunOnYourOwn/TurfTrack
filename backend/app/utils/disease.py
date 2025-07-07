@@ -53,24 +53,86 @@ def calculate_smith_kerns_for_location(
         for i in range((end_date - start_date).days + 1)
     ]
 
+    required_fields = [
+        "temperature_max_c",
+        "temperature_min_c",
+        "relative_humidity_mean",
+    ]
+
     for target_date in all_dates:
+        # Only process if we have a weather record for the target date
+        if target_date not in weather_by_date:
+            continue
+
         # Gather 5-day window ending on target_date
         window = []
         for offset in range(4, -1, -1):
             d = target_date - datetime.timedelta(days=offset)
             if d in weather_by_date:
                 window.append(weather_by_date[d])
+
+        # Check if we have enough data for calculation
         if len(window) < 5:
-            continue  # Not enough data
+            # Only insert pending/null if weather exists for target_date
+            existing = (
+                session.execute(
+                    select(DiseasePressure).where(
+                        DiseasePressure.date == target_date,
+                        DiseasePressure.location_id == location_id,
+                        DiseasePressure.disease == "dollar_spot",
+                    )
+                )
+                .scalars()
+                .first()
+            )
+            if not existing:
+                dp = DiseasePressure(
+                    date=target_date,
+                    location_id=location_id,
+                    disease="dollar_spot",
+                    risk_score=None,  # Null indicates pending/incomplete data
+                )
+                session.add(dp)
+            continue  # Skip calculation for this date
+
+        # Check all required fields are present for all 5 days
+        incomplete = False
+        for w in window:
+            for field in required_fields:
+                if getattr(w, field) is None:
+                    incomplete = True
+                    break
+            if incomplete:
+                break
+        if incomplete:
+            # Only insert pending/null if weather exists for target_date
+            existing = (
+                session.execute(
+                    select(DiseasePressure).where(
+                        DiseasePressure.date == target_date,
+                        DiseasePressure.location_id == location_id,
+                        DiseasePressure.disease == "dollar_spot",
+                    )
+                )
+                .scalars()
+                .first()
+            )
+            if not existing:
+                dp = DiseasePressure(
+                    date=target_date,
+                    location_id=location_id,
+                    disease="dollar_spot",
+                    risk_score=None,  # Null indicates pending/incomplete data
+                )
+                session.add(dp)
+            continue  # Skip calculation for this date
+
         # Calculate 5-day moving averages
         avg_temp = (
-            sum(
-                ((w.temperature_max_c or 0) + (w.temperature_min_c or 0)) / 2
-                for w in window
-            )
-            / 5
+            sum(((w.temperature_max_c) + (w.temperature_min_c)) / 2 for w in window) / 5
         )
-        avg_rh = sum((w.relative_humidity_mean or 0) for w in window) / 5
+        avg_rh = sum((w.relative_humidity_mean) for w in window) / 5
+
         # Smith-Kerns formula (with cutoff)
         b0 = SMITH_KERNS_COEFFICIENTS["b0"]
         b1 = SMITH_KERNS_COEFFICIENTS["b1"]
@@ -80,6 +142,7 @@ def calculate_smith_kerns_for_location(
         else:
             logit = b0 + b1 * avg_temp + b2 * avg_rh
             risk_score = math.exp(logit) / (1 + math.exp(logit))
+
         # Upsert into disease_pressure table
         existing = (
             session.execute(

@@ -8,6 +8,7 @@ from app.schemas.disease_pressure import DiseasePressureList
 from typing import List, Optional
 from datetime import date, timedelta
 from app.models.daily_weather import DailyWeather
+import math
 
 router = APIRouter(prefix="/disease_pressure", tags=["disease_pressure"])
 
@@ -28,28 +29,28 @@ async def get_disease_pressure_for_lawn(
         raise HTTPException(status_code=404, detail="Lawn not found")
     location_id = lawn.location_id
 
-    # Default date range: last 30 days to next 16 days
-    today = date.today()
-    default_start = today - timedelta(days=30)
-    default_end = today + timedelta(days=16)
-    start = start_date or default_start
-    end = end_date or default_end
-
-    # Build query
-    query = select(DiseasePressure).where(
-        DiseasePressure.location_id == location_id,
-        DiseasePressure.date >= start,
-        DiseasePressure.date <= end,
-    )
-
+    # If no date filters, return all records for this location
+    if start_date is None and end_date is None:
+        query = select(DiseasePressure).where(
+            DiseasePressure.location_id == location_id
+        )
+    else:
+        # Default date range: last 30 days to next 16 days
+        today = date.today()
+        default_start = today - timedelta(days=30)
+        default_end = today + timedelta(days=16)
+        start = start_date or default_start
+        end = end_date or default_end
+        query = select(DiseasePressure).where(
+            DiseasePressure.location_id == location_id,
+            DiseasePressure.date >= start,
+            DiseasePressure.date <= end,
+        )
     if disease:
         query = query.where(DiseasePressure.disease == disease)
-
     query = query.order_by(DiseasePressure.date.asc())
-
     result = await db.execute(query)
     disease_pressure_entries = result.scalars().all()
-
     # Batch fetch weather types for all dates
     dates = [dp.date for dp in disease_pressure_entries]
     if dates:
@@ -64,13 +65,16 @@ async def get_disease_pressure_for_lawn(
         }
     else:
         weather_type_map = {}
-
-    # Attach is_forecast to each disease pressure record
     enriched = []
     for dp in disease_pressure_entries:
         is_forecast = weather_type_map.get(dp.date) == "forecast"
         dp_dict = dp.__dict__.copy()
         dp_dict["is_forecast"] = is_forecast
+        risk_score = dp_dict.get("risk_score")
+        if risk_score is not None and (
+            math.isnan(risk_score) or math.isinf(risk_score)
+        ):
+            dp_dict["risk_score"] = None
         enriched.append(dp_dict)
     return enriched
 
@@ -85,28 +89,28 @@ async def get_disease_pressure_for_location(
     ),
     db: AsyncSession = Depends(get_db),
 ):
-    # Default date range: last 30 days to next 16 days
-    today = date.today()
-    default_start = today - timedelta(days=30)
-    default_end = today + timedelta(days=16)
-    start = start_date or default_start
-    end = end_date or default_end
-
-    # Build query
-    query = select(DiseasePressure).where(
-        DiseasePressure.location_id == location_id,
-        DiseasePressure.date >= start,
-        DiseasePressure.date <= end,
-    )
-
+    # If no date filters, return all records for this location
+    if start_date is None and end_date is None:
+        query = select(DiseasePressure).where(
+            DiseasePressure.location_id == location_id
+        )
+    else:
+        # Default date range: last 30 days to next 16 days
+        today = date.today()
+        default_start = today - timedelta(days=30)
+        default_end = today + timedelta(days=16)
+        start = start_date or default_start
+        end = end_date or default_end
+        query = select(DiseasePressure).where(
+            DiseasePressure.location_id == location_id,
+            DiseasePressure.date >= start,
+            DiseasePressure.date <= end,
+        )
     if disease:
         query = query.where(DiseasePressure.disease == disease)
-
     query = query.order_by(DiseasePressure.date.asc())
-
     result = await db.execute(query)
     disease_pressure_entries = result.scalars().all()
-
     # Batch fetch weather types for all dates
     dates = [dp.date for dp in disease_pressure_entries]
     if dates:
@@ -121,12 +125,15 @@ async def get_disease_pressure_for_location(
         }
     else:
         weather_type_map = {}
-
-    # Attach is_forecast to each disease pressure record
     enriched = []
     for dp in disease_pressure_entries:
         is_forecast = weather_type_map.get(dp.date) == "forecast"
         dp_dict = dp.__dict__.copy()
         dp_dict["is_forecast"] = is_forecast
+        risk_score = dp_dict.get("risk_score")
+        if risk_score is not None and (
+            math.isnan(risk_score) or math.isinf(risk_score)
+        ):
+            dp_dict["risk_score"] = None
         enriched.append(dp_dict)
     return enriched
