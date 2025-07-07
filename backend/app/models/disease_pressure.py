@@ -12,7 +12,7 @@ class DiseasePressure(Base):
         Integer, ForeignKey("locations.id"), nullable=False, index=True
     )
     disease = Column(String(32), nullable=False, index=True)
-    risk_score = Column(Float, nullable=False)
+    risk_score = Column(Float, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
     location = relationship("Location", back_populates="disease_pressures")

@@ -30,12 +30,20 @@ const getRiskLevel = (score: number, disease: string) => {
 
 const getTrend = (data: DiseasePressureList[]) => {
   if (data.length < 2) return "stable";
-  const recent = data.slice(-3); // Last 3 days
+
+  // Filter out null values for trend calculation
+  const validData = data.filter((item) => item.risk_score !== null);
+  if (validData.length < 2) return "stable";
+
+  const recent = validData.slice(-3); // Last 3 days
   const avg =
-    recent.reduce((sum, item) => sum + item.risk_score, 0) / recent.length;
-  const previous = data.slice(-6, -3); // 3 days before that
+    recent.reduce((sum, item) => sum + (item.risk_score || 0), 0) /
+    recent.length;
+  const previous = validData.slice(-6, -3); // 3 days before that
+  if (previous.length === 0) return "stable";
   const prevAvg =
-    previous.reduce((sum, item) => sum + item.risk_score, 0) / previous.length;
+    previous.reduce((sum, item) => sum + (item.risk_score || 0), 0) /
+    previous.length;
 
   if (avg > prevAvg + 0.1) return "increasing";
   if (avg < prevAvg - 0.1) return "decreasing";
@@ -126,13 +134,24 @@ export default function DiseasePressureSummary({
     () => [
       {
         id: "Smith-Kerns Dollar Spot",
-        data: smithKernsData.map((d) => ({
-          x: d.date,
-          y: d.risk_score * 100,
-          isForecast: d.is_forecast,
-        })),
+        data: smithKernsData
+          .filter(
+            (d): d is DiseasePressureList & { risk_score: number } =>
+              d.risk_score !== null
+          ) // Filter out pending data points
+          .map((d) => ({
+            x: d.date,
+            y: d.risk_score * 100,
+            isForecast: d.is_forecast,
+          })),
       },
     ],
+    [smithKernsData]
+  );
+
+  // Separate pending data for display
+  const pendingData = useMemo(
+    () => smithKernsData.filter((d) => d.risk_score === null),
     [smithKernsData]
   );
 
@@ -201,9 +220,10 @@ export default function DiseasePressureSummary({
 
   // Get current risk and trend for Smith-Kerns
   const currentSmithKerns = smithKernsData[smithKernsData.length - 1];
-  const smithKernsRisk = currentSmithKerns
-    ? getRiskLevel(currentSmithKerns.risk_score, "smith_kerns")
-    : null;
+  const smithKernsRisk =
+    currentSmithKerns && currentSmithKerns.risk_score !== null
+      ? getRiskLevel(currentSmithKerns.risk_score, "smith_kerns")
+      : null;
   const smithKernsTrend = getTrend(smithKernsData);
 
   if (loading) {
@@ -382,7 +402,10 @@ export default function DiseasePressureSummary({
               // Find today's risk value using local date
               const todayStr = format(new Date(), "yyyy-MM-dd");
               const todayData = smithKernsData.find((d) => d.date === todayStr);
-              const todayRisk = todayData ? todayData.risk_score * 100 : null;
+              const todayRisk =
+                todayData && todayData.risk_score !== null
+                  ? todayData.risk_score * 100
+                  : null;
               const band = todayRisk !== null ? getRiskBand(todayRisk) : null;
               return (
                 <div className="space-y-1 mt-2">
@@ -409,6 +432,30 @@ export default function DiseasePressureSummary({
                 </div>
               );
             })()}
+
+            {/* Show pending data indicator if there are any */}
+            {pendingData.length > 0 && (
+              <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                <div className="flex items-center gap-2 text-sm">
+                  <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                  <span className="font-medium text-yellow-800 dark:text-yellow-200">
+                    Pending Data
+                  </span>
+                </div>
+                <div className="mt-1 text-xs text-yellow-700 dark:text-yellow-300">
+                  Disease pressure calculation pending for {pendingData.length}{" "}
+                  day{pendingData.length > 1 ? "s" : ""} due to incomplete
+                  weather data. This will be updated when weather data becomes
+                  available.
+                </div>
+                <div className="mt-2 text-xs text-yellow-600 dark:text-yellow-400">
+                  Pending dates:{" "}
+                  {pendingData
+                    .map((d) => format(parseISO(d.date), "MMM d"))
+                    .join(", ")}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </CardContent>

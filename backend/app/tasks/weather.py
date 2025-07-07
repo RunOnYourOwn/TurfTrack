@@ -15,6 +15,7 @@ from app.utils.gdd import calculate_and_store_gdd_values_sync_segmented
 from sqlalchemy.exc import SQLAlchemyError
 import requests
 from app.utils.disease import calculate_smith_kerns_for_location
+import math
 
 logger = logging.getLogger(__name__)
 
@@ -166,6 +167,110 @@ def fetch_and_store_weather(self, location_id: int, latitude: float, longitude: 
         raise
 
 
+def _sanitize(value, default_for_not_null=None):
+    try:
+        f = float(value)
+        if math.isnan(f) or math.isinf(f):
+            return default_for_not_null
+        return f
+    except Exception:
+        return default_for_not_null
+
+
+def _extract_weather_data(daily, i, date=None):
+    # Log raw and sanitized value for relative_humidity_2m_mean
+    raw_rh = daily.Variables(8).ValuesAsNumpy()[i]
+    sanitized_rh = _sanitize(raw_rh)
+    # Log raw and sanitized value for precipitation_mm
+    raw_precip = daily.Variables(2).ValuesAsNumpy()[i]
+    sanitized_precip = _sanitize(raw_precip)
+
+    # Add comprehensive logging for debugging
+    if date is not None:
+        print(
+            f"[WeatherIngest] Date: {date}, raw RH: {raw_rh}, sanitized RH: {sanitized_rh}, raw Precip: {raw_precip}, sanitized Precip: {sanitized_precip}"
+        )
+
+        # Log all raw values for this date
+        print(f"[WeatherIngest] Raw values for {date}:")
+        for var_idx in range(daily.VariablesLength()):
+            try:
+                var_name = daily.Variables(var_idx).Name()
+                var_value = daily.Variables(var_idx).ValuesAsNumpy()[i]
+                print(
+                    f"  Variable {var_idx} ({var_name}): {var_value} (type: {type(var_value)})"
+                )
+            except Exception as e:
+                print(f"  Variable {var_idx}: ERROR - {e}")
+
+    data = {
+        # NOT NULL fields - provide sensible defaults for NaN values
+        "temperature_max_c": _sanitize(daily.Variables(0).ValuesAsNumpy()[i], 0.0),
+        "temperature_max_f": _sanitize(
+            daily.Variables(0).ValuesAsNumpy()[i] * 9 / 5 + 32, 32.0
+        ),
+        "temperature_min_c": _sanitize(daily.Variables(1).ValuesAsNumpy()[i], 0.0),
+        "temperature_min_f": _sanitize(
+            daily.Variables(1).ValuesAsNumpy()[i] * 9 / 5 + 32, 32.0
+        ),
+        "precipitation_mm": _sanitize(daily.Variables(2).ValuesAsNumpy()[i], 0.0),
+        "precipitation_in": _sanitize(
+            daily.Variables(2).ValuesAsNumpy()[i] / 25.4, 0.0
+        ),
+        "precipitation_probability_max": _sanitize(
+            daily.Variables(3).ValuesAsNumpy()[i], 0.0
+        ),
+        "wind_speed_max_ms": _sanitize(daily.Variables(4).ValuesAsNumpy()[i], 0.0),
+        "wind_speed_max_mph": _sanitize(
+            daily.Variables(4).ValuesAsNumpy()[i] * 2.237, 0.0
+        ),
+        "wind_gusts_max_ms": _sanitize(daily.Variables(5).ValuesAsNumpy()[i], 0.0),
+        "wind_gusts_max_mph": _sanitize(
+            daily.Variables(5).ValuesAsNumpy()[i] * 2.237, 0.0
+        ),
+        "wind_direction_dominant_deg": _sanitize(
+            daily.Variables(6).ValuesAsNumpy()[i], 0.0
+        ),
+        "et0_evapotranspiration_mm": _sanitize(
+            daily.Variables(7).ValuesAsNumpy()[i], 0.0
+        ),
+        "et0_evapotranspiration_in": _sanitize(
+            daily.Variables(7).ValuesAsNumpy()[i] / 25.4, 0.0
+        ),
+        # Nullable fields - can be None
+        "relative_humidity_mean": _sanitize(daily.Variables(8).ValuesAsNumpy()[i]),
+        "relative_humidity_max": _sanitize(daily.Variables(9).ValuesAsNumpy()[i]),
+        "relative_humidity_min": _sanitize(daily.Variables(10).ValuesAsNumpy()[i]),
+        "dew_point_max_c": _sanitize(daily.Variables(11).ValuesAsNumpy()[i]),
+        "dew_point_max_f": _sanitize(
+            daily.Variables(11).ValuesAsNumpy()[i] * 9 / 5 + 32
+        ),
+        "dew_point_min_c": _sanitize(daily.Variables(12).ValuesAsNumpy()[i]),
+        "dew_point_min_f": _sanitize(
+            daily.Variables(12).ValuesAsNumpy()[i] * 9 / 5 + 32
+        ),
+        "dew_point_mean_c": _sanitize(daily.Variables(13).ValuesAsNumpy()[i]),
+        "dew_point_mean_f": _sanitize(
+            daily.Variables(13).ValuesAsNumpy()[i] * 9 / 5 + 32
+        ),
+        "sunshine_duration_s": _sanitize(daily.Variables(14).ValuesAsNumpy()[i]),
+        "sunshine_duration_h": _sanitize(daily.Variables(14).ValuesAsNumpy()[i] / 3600),
+    }
+    return data
+
+
+def _get_dates(daily):
+    import pandas as pd
+
+    dates = pd.date_range(
+        start=pd.to_datetime(daily.Time(), unit="s"),
+        end=pd.to_datetime(daily.TimeEnd(), unit="s"),
+        freq=pd.Timedelta(seconds=daily.Interval()),
+        inclusive="left",
+    )
+    return dates
+
+
 def _fetch_and_store_weather_sync(
     location_id: int, latitude: float, longitude: float, session
 ):
@@ -205,7 +310,7 @@ def _fetch_and_store_weather_sync(
 
     # Build and upsert data
     for i, date in enumerate(_get_dates(daily)):
-        data = _extract_weather_data(daily, i)
+        data = _extract_weather_data(daily, i, date)
         weather_type = (
             WeatherType.historical if date.date() < today else WeatherType.forecast
         )
@@ -217,50 +322,10 @@ def _fetch_and_store_weather_sync(
         session, location_id, today - datetime.timedelta(days=60), forecast_end
     )
 
-
-def _get_dates(daily):
-    import pandas as pd
-
-    dates = pd.date_range(
-        start=pd.to_datetime(daily.Time(), unit="s"),
-        end=pd.to_datetime(daily.TimeEnd(), unit="s"),
-        freq=pd.Timedelta(seconds=daily.Interval()),
-        inclusive="left",
+    # Add comprehensive logging for debugging
+    print(
+        f"[WeatherIngest] Fetching forecast for location {location_id} (lat: {latitude}, lon: {longitude})"
     )
-    return dates
-
-
-def _extract_weather_data(daily, i):
-    data = {
-        "temperature_max_c": float(daily.Variables(0).ValuesAsNumpy()[i]),
-        "temperature_max_f": float(daily.Variables(0).ValuesAsNumpy()[i] * 9 / 5 + 32),
-        "temperature_min_c": float(daily.Variables(1).ValuesAsNumpy()[i]),
-        "temperature_min_f": float(daily.Variables(1).ValuesAsNumpy()[i] * 9 / 5 + 32),
-        "precipitation_mm": float(daily.Variables(2).ValuesAsNumpy()[i]),
-        "precipitation_in": float(daily.Variables(2).ValuesAsNumpy()[i] / 25.4),
-        "precipitation_probability_max": float(daily.Variables(3).ValuesAsNumpy()[i]),
-        "wind_speed_max_ms": float(daily.Variables(4).ValuesAsNumpy()[i]),
-        "wind_speed_max_mph": float(daily.Variables(4).ValuesAsNumpy()[i] * 2.23694),
-        "wind_gusts_max_ms": float(daily.Variables(5).ValuesAsNumpy()[i]),
-        "wind_gusts_max_mph": float(daily.Variables(5).ValuesAsNumpy()[i] * 2.23694),
-        "wind_direction_dominant_deg": float(daily.Variables(6).ValuesAsNumpy()[i]),
-        "et0_evapotranspiration_mm": float(daily.Variables(7).ValuesAsNumpy()[i]),
-        "et0_evapotranspiration_in": float(
-            daily.Variables(7).ValuesAsNumpy()[i] / 25.4
-        ),
-        "relative_humidity_mean": float(daily.Variables(8).ValuesAsNumpy()[i]),
-        "relative_humidity_max": float(daily.Variables(9).ValuesAsNumpy()[i]),
-        "relative_humidity_min": float(daily.Variables(10).ValuesAsNumpy()[i]),
-        "dew_point_max_c": float(daily.Variables(11).ValuesAsNumpy()[i]),
-        "dew_point_max_f": float(daily.Variables(11).ValuesAsNumpy()[i] * 9 / 5 + 32),
-        "dew_point_min_c": float(daily.Variables(12).ValuesAsNumpy()[i]),
-        "dew_point_min_f": float(daily.Variables(12).ValuesAsNumpy()[i] * 9 / 5 + 32),
-        "dew_point_mean_c": float(daily.Variables(13).ValuesAsNumpy()[i]),
-        "dew_point_mean_f": float(daily.Variables(13).ValuesAsNumpy()[i] * 9 / 5 + 32),
-        "sunshine_duration_s": float(daily.Variables(14).ValuesAsNumpy()[i]),
-        "sunshine_duration_h": float(daily.Variables(14).ValuesAsNumpy()[i] / 3600),
-    }
-    return data
 
 
 def _get_historical_start_date(session, location_id: int) -> datetime.date:
@@ -357,7 +422,7 @@ def _update_recent_weather_for_location_sync(
         response_hist = responses_hist[0]
         daily_hist = response_hist.Daily()
         for i, date in enumerate(_get_dates(daily_hist)):
-            data = _extract_weather_data(daily_hist, i)
+            data = _extract_weather_data(daily_hist, i, date)
             upsert_daily_weather_sync(
                 session, location_id, date, WeatherType.historical, data
             )
@@ -392,7 +457,7 @@ def _update_recent_weather_for_location_sync(
         response_forecast = responses_forecast[0]
         daily_forecast = response_forecast.Daily()
         for i, date in enumerate(_get_dates(daily_forecast)):
-            data = _extract_weather_data(daily_forecast, i)
+            data = _extract_weather_data(daily_forecast, i, date)
             upsert_daily_weather_sync(
                 session, location_id, date, WeatherType.forecast, data
             )

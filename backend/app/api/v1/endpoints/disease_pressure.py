@@ -8,6 +8,7 @@ from app.schemas.disease_pressure import DiseasePressureList
 from typing import List, Optional
 from datetime import date, timedelta
 from app.models.daily_weather import DailyWeather
+import math
 
 router = APIRouter(prefix="/disease_pressure", tags=["disease_pressure"])
 
@@ -71,6 +72,12 @@ async def get_disease_pressure_for_lawn(
         is_forecast = weather_type_map.get(dp.date) == "forecast"
         dp_dict = dp.__dict__.copy()
         dp_dict["is_forecast"] = is_forecast
+        # Sanitize risk_score
+        risk_score = dp_dict.get("risk_score")
+        if risk_score is not None and (
+            math.isnan(risk_score) or math.isinf(risk_score)
+        ):
+            dp_dict["risk_score"] = None
         enriched.append(dp_dict)
     return enriched
 
@@ -128,5 +135,11 @@ async def get_disease_pressure_for_location(
         is_forecast = weather_type_map.get(dp.date) == "forecast"
         dp_dict = dp.__dict__.copy()
         dp_dict["is_forecast"] = is_forecast
+        # Sanitize risk_score
+        risk_score = dp_dict.get("risk_score")
+        if risk_score is not None and (
+            math.isnan(risk_score) or math.isinf(risk_score)
+        ):
+            dp_dict["risk_score"] = None
         enriched.append(dp_dict)
     return enriched
