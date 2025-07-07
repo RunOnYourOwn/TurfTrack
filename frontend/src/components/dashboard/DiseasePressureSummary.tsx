@@ -7,6 +7,7 @@ import { Badge } from "../ui/badge";
 import { AlertTriangle, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { ResponsiveLine } from "@nivo/line";
 import { format, parseISO } from "date-fns";
+import DateRangePopover from "../DateRangePopover";
 
 interface DiseasePressureSummaryProps {
   location: Location;
@@ -95,21 +96,41 @@ export default function DiseasePressureSummary({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Calculate date range: last 5 days to last available forecast
+  // Date range state: default to past 5 days and next 16 days
   const today = new Date();
-  const startDate = useMemo(() => {
+  const defaultStart = useMemo(() => {
     const d = new Date(today);
     d.setDate(d.getDate() - 5);
     return d.toISOString().split("T")[0];
   }, [location.id]);
+  const defaultEnd = useMemo(() => {
+    const d = new Date(today);
+    d.setDate(d.getDate() + 16);
+    return d.toISOString().split("T")[0];
+  }, [location.id]);
+  const [dateRange, setDateRange] = useState<{
+    start: string;
+    end: string;
+  } | null>(null);
+  const [allTimeMode, setAllTimeMode] = useState(false);
+
+  // Compute start and end for API
+  const startDate = dateRange?.start || defaultStart;
+  const endDate = dateRange?.end || defaultEnd;
 
   useEffect(() => {
     setLoading(true);
     setError(null);
-    diseasePressureApi
-      .getForLocation(location.id, {
+    let fetchPromise;
+    if (allTimeMode) {
+      fetchPromise = diseasePressureApi.getForLocation(location.id);
+    } else {
+      fetchPromise = diseasePressureApi.getForLocation(location.id, {
         start_date: startDate,
-      })
+        end_date: endDate,
+      });
+    }
+    fetchPromise
       .then((data) => {
         setDiseaseData(data);
       })
@@ -120,7 +141,18 @@ export default function DiseasePressureSummary({
       .finally(() => {
         setLoading(false);
       });
-  }, [location.id, startDate]);
+  }, [location.id, startDate, endDate, allTimeMode]);
+
+  // Handler for All Time
+  const handleAllTime = () => {
+    setAllTimeMode(true);
+    setDateRange(null);
+  };
+  // Handler for date range change
+  const handleDateRange = (range: { start: string; end: string } | null) => {
+    setDateRange(range);
+    setAllTimeMode(false);
+  };
 
   // Only show Smith-Kerns (dollar_spot) chart, past 5 historical + all forecast
   const smithKernsData = useMemo(
@@ -256,10 +288,24 @@ export default function DiseasePressureSummary({
 
   return (
     <Card className="bg-white dark:bg-gray-900 text-black dark:text-white">
-      <CardHeader>
-        <CardTitle>Disease Pressure</CardTitle>
+      <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
+        <CardTitle className="text-2xl font-bold">Disease Pressure</CardTitle>
       </CardHeader>
       <CardContent>
+        {/* Date Range Picker */}
+        <div className="mb-4 flex flex-col md:flex-row items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="font-medium">Date Range:</span>
+            <div className="w-[260px]">
+              <DateRangePopover
+                dateRange={dateRange}
+                setDateRange={handleDateRange}
+                onAllTime={handleAllTime}
+                allTimeMode={allTimeMode}
+              />
+            </div>
+          </div>
+        </div>
         <div className="space-y-8">
           {/* Smith-Kerns Dollar Spot Chart */}
           <div>

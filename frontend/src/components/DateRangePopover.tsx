@@ -14,12 +14,14 @@ interface DateRangePopoverProps {
   dateRange: { start: string; end: string } | null;
   setDateRange: (r: { start: string; end: string } | null) => void;
   onAllTime?: () => void;
+  allTimeMode?: boolean;
 }
 
 const DateRangePopover: React.FC<DateRangePopoverProps> = ({
   dateRange,
   setDateRange,
   onAllTime,
+  allTimeMode = false,
 }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -66,13 +68,14 @@ const DateRangePopover: React.FC<DateRangePopoverProps> = ({
     },
   ];
   // Format display value
-  const display =
-    dateRange?.start && dateRange?.end
-      ? `${format(new Date(dateRange.start), "MMM d, yyyy")} - ${format(
-          new Date(dateRange.end),
-          "MMM d, yyyy"
-        )}`
-      : "Select range";
+  const display = allTimeMode
+    ? "All Time"
+    : dateRange?.start && dateRange?.end
+    ? `${format(new Date(dateRange.start), "MMM d, yyyy")} - ${format(
+        new Date(dateRange.end),
+        "MMM d, yyyy"
+      )}`
+    : "Select range";
   // Handle outside click
   React.useEffect(() => {
     function handleClick(e: MouseEvent) {

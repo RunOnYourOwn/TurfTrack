@@ -202,10 +202,6 @@ export default function WeatherSummary({ location }: { location: Location }) {
         {/* Location Selector and Date Range Picker */}
         <div className="mb-4 flex flex-col md:flex-row items-center gap-4">
           <div className="flex items-center gap-2">
-            <span className="font-medium">Location:</span>
-            <span className="font-medium">{location.name}</span>
-          </div>
-          <div className="flex items-center gap-2">
             <span className="font-medium">Date Range:</span>
             <div className="w-[260px]">
               <DateRangePopover
@@ -215,6 +211,7 @@ export default function WeatherSummary({ location }: { location: Location }) {
                   setAllTimeMode(true);
                   setDateRange(null);
                 }}
+                allTimeMode={allTimeMode}
               />
             </div>
           </div>
