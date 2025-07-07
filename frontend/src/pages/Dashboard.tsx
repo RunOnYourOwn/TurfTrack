@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import WeatherSummary from "../components/WeatherSummary";
 import DashboardGDDModels from "../components/dashboard/DashboardGDDModels";
 import DiseasePressureSummary from "../components/dashboard/DiseasePressureSummary";
+import GrowthPotentialSummary from "../components/dashboard/GrowthPotentialSummary";
 import { fetcher } from "../lib/fetcher";
 import { Location } from "../types/location";
 import {
@@ -56,6 +57,9 @@ export default function Dashboard() {
           <WeatherSummary location={selectedLocation} />
           <div className="mt-6">
             <DiseasePressureSummary location={selectedLocation} />
+          </div>
+          <div className="mt-6">
+            <GrowthPotentialSummary location={selectedLocation} />
           </div>
           <div className="mt-8">
             <DashboardGDDModels location={selectedLocation} />
