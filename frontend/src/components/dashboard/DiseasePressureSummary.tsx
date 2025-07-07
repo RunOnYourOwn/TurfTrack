@@ -3,31 +3,25 @@ import { Location } from "../../types/location";
 import { DiseasePressureList } from "../../types/disease-pressure";
 import { diseasePressureApi } from "../../lib/diseasePressureApi";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
-import { Badge } from "../ui/badge";
-import { AlertTriangle, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import {
+  AlertTriangle,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  Info,
+} from "lucide-react";
 import { ResponsiveLine } from "@nivo/line";
 import { format, parseISO } from "date-fns";
 import DateRangePopover from "../DateRangePopover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface DiseasePressureSummaryProps {
   location: Location;
 }
-
-const getRiskLevel = (score: number, disease: string) => {
-  if (disease === "smith_kerns" || disease === "dollar_spot") {
-    if (score >= 0.7)
-      return { level: "High", color: "destructive", icon: AlertTriangle };
-    if (score >= 0.4)
-      return { level: "Medium", color: "warning", icon: TrendingUp };
-    return { level: "Low", color: "blue", icon: Minus };
-  }
-  // For general disease pressure (you can adjust thresholds)
-  if (score >= 0.8)
-    return { level: "High", color: "destructive", icon: AlertTriangle };
-  if (score >= 0.5)
-    return { level: "Medium", color: "warning", icon: TrendingUp };
-  return { level: "Low", color: "blue", icon: Minus };
-};
 
 const getTrend = (data: DiseasePressureList[]) => {
   if (data.length < 2) return "stable";
@@ -251,11 +245,6 @@ export default function DiseasePressureSummary({
   };
 
   // Get current risk and trend for Smith-Kerns
-  const currentSmithKerns = smithKernsData[smithKernsData.length - 1];
-  const smithKernsRisk =
-    currentSmithKerns && currentSmithKerns.risk_score !== null
-      ? getRiskLevel(currentSmithKerns.risk_score, "smith_kerns")
-      : null;
   const smithKernsTrend = getTrend(smithKernsData);
 
   if (loading) {
@@ -310,12 +299,25 @@ export default function DiseasePressureSummary({
           {/* Smith-Kerns Dollar Spot Chart */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <h3 className="font-medium">Smith-Kerns Dollar Spot</h3>
-              {smithKernsRisk && (
-                <Badge variant={smithKernsRisk.color as any}>
-                  {smithKernsRisk.level}
-                </Badge>
-              )}
+              <h3 className="font-medium flex items-center gap-1">
+                Smith-Kerns Dollar Spot
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-4 h-4 text-muted-foreground cursor-pointer" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top" align="start">
+                    <>
+                      Smith-Kerns Dollar Spot risk quantifies the probability of
+                      dollar spot disease development
+                      <br />
+                      based on weather and model parameters.
+                      <br />
+                      Higher values indicate greater risk and need for
+                      preventive fungicide applications.
+                    </>
+                  </TooltipContent>
+                </Tooltip>
+              </h3>
             </div>
             <div className="h-[350px] w-full">
               <ResponsiveLine

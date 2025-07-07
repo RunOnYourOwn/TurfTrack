@@ -16,6 +16,7 @@ from sqlalchemy.exc import SQLAlchemyError
 import requests
 from app.utils.disease import calculate_smith_kerns_for_location
 import math
+from app.utils.growth_potential import calculate_growth_potential_for_location
 
 logger = logging.getLogger(__name__)
 
@@ -321,6 +322,10 @@ def _fetch_and_store_weather_sync(
     calculate_smith_kerns_for_location(
         session, location_id, today - datetime.timedelta(days=60), forecast_end
     )
+    # Calculate growth potential for this location (same date range)
+    calculate_growth_potential_for_location(
+        session, location_id, today - datetime.timedelta(days=60), forecast_end
+    )
 
     # Add comprehensive logging for debugging
     print(
@@ -482,8 +487,12 @@ def _update_recent_weather_for_location_sync(
 
         # Calculate disease pressure for this location (Smith-Kerns)
         forecast_end = today + datetime.timedelta(days=16)
+        # Use historical_start_date for both calculations
         calculate_smith_kerns_for_location(
-            session, location_id, today - datetime.timedelta(days=30), forecast_end
+            session, location_id, historical_start_date, forecast_end
+        )
+        calculate_growth_potential_for_location(
+            session, location_id, historical_start_date, forecast_end
         )
 
 
