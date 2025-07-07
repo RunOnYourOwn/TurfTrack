@@ -23,22 +23,6 @@ interface DiseasePressureSummaryProps {
   location: Location;
 }
 
-const getRiskLevel = (score: number, disease: string) => {
-  if (disease === "smith_kerns" || disease === "dollar_spot") {
-    if (score >= 0.7)
-      return { level: "High", color: "destructive", icon: AlertTriangle };
-    if (score >= 0.4)
-      return { level: "Medium", color: "warning", icon: TrendingUp };
-    return { level: "Low", color: "blue", icon: Minus };
-  }
-  // For general disease pressure (you can adjust thresholds)
-  if (score >= 0.8)
-    return { level: "High", color: "destructive", icon: AlertTriangle };
-  if (score >= 0.5)
-    return { level: "Medium", color: "warning", icon: TrendingUp };
-  return { level: "Low", color: "blue", icon: Minus };
-};
-
 const getTrend = (data: DiseasePressureList[]) => {
   if (data.length < 2) return "stable";
 
@@ -261,11 +245,6 @@ export default function DiseasePressureSummary({
   };
 
   // Get current risk and trend for Smith-Kerns
-  const currentSmithKerns = smithKernsData[smithKernsData.length - 1];
-  const smithKernsRisk =
-    currentSmithKerns && currentSmithKerns.risk_score !== null
-      ? getRiskLevel(currentSmithKerns.risk_score, "smith_kerns")
-      : null;
   const smithKernsTrend = getTrend(smithKernsData);
 
   if (loading) {

@@ -116,15 +116,6 @@ export default function GrowthPotentialSummary({
       .finally(() => setLoading(false));
   }, [location, startDate, endDate, allTimeMode]);
 
-  // Format date range display
-  let displayRange = "All Time";
-  if (dateRange && !allTimeMode) {
-    displayRange = `${format(
-      parseISO(dateRange.start),
-      "MMM d, yyyy"
-    )} - ${format(parseISO(dateRange.end), "MMM d, yyyy")}`;
-  }
-
   const chartData = useMemo(
     () => [
       {
