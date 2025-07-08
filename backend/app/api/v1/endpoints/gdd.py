@@ -24,7 +24,6 @@ from datetime import date as datetime_date
 from app.utils.gdd import (
     calculate_and_store_gdd_values_sync_segmented,
     manual_gdd_reset_sync,
-    recalculate_historical_gdd,
     store_parameter_history,
 )
 from app.models.lawn import Lawn

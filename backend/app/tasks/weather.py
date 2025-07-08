@@ -684,3 +684,284 @@ def recalculate_gdd_for_location(self, location_id: int):
             # Cannot update task status if DB is down, Celery will retry
             pass
         raise
+
+
+@app.task(name="backfill_weather_for_location", bind=True)
+def backfill_weather_for_location(
+    self, location_id: int, start_date: str, end_date: str
+):
+    """
+    Backfill weather data for a specific location and date range.
+    Marks each date as historical (if before today) or forecast (if today or later).
+    Tracks progress in TaskStatus.
+    """
+    import pandas as pd
+    from app.utils.weather import upsert_daily_weather_sync
+    from app.models.daily_weather import WeatherType
+    from app.models.task_status import TaskStatusEnum
+
+    task_id = self.request.id
+    try:
+        with SessionLocal() as session:
+            # TaskStatus: started
+            create_or_update_task_status_sync(
+                session,
+                task_id,
+                "backfill_weather_for_location",
+                location_id,
+                TaskStatusEnum.started,
+                started=True,
+            )
+            # Look up location
+            loc = session.execute(
+                select(Location).where(Location.id == location_id)
+            ).scalar_one_or_none()
+            if not loc:
+                raise ValueError(f"Location {location_id} not found")
+            latitude = loc.latitude
+            longitude = loc.longitude
+
+            # Parse dates
+            start = pd.to_datetime(start_date).date()
+            end = pd.to_datetime(end_date).date()
+            today = datetime.date.today()
+
+            # Fetch weather data for the range
+            om = openmeteo_requests.Client()
+            params = {
+                "latitude": latitude,
+                "longitude": longitude,
+                "start_date": start.isoformat(),
+                "end_date": end.isoformat(),
+                "daily": [
+                    "temperature_2m_max",
+                    "temperature_2m_min",
+                    "precipitation_sum",
+                    "precipitation_probability_max",
+                    "wind_speed_10m_max",
+                    "wind_gusts_10m_max",
+                    "wind_direction_10m_dominant",
+                    "et0_fao_evapotranspiration",
+                    "relative_humidity_2m_mean",
+                    "relative_humidity_2m_max",
+                    "relative_humidity_2m_min",
+                    "dew_point_2m_max",
+                    "dew_point_2m_min",
+                    "dew_point_2m_mean",
+                    "sunshine_duration",
+                ],
+                "timezone": "auto",
+            }
+            responses = om.weather_api(
+                "https://api.open-meteo.com/v1/forecast", params=params
+            )
+            response = responses[0]
+            daily = response.Daily()
+            dates = _get_dates(daily)
+            for i, date in enumerate(dates):
+                data = _extract_weather_data(daily, i, date)
+                weather_type = (
+                    WeatherType.historical
+                    if date.date() < today
+                    else WeatherType.forecast
+                )
+                upsert_daily_weather_sync(
+                    session, location_id, date, weather_type, data
+                )
+
+            # TaskStatus: success
+            create_or_update_task_status_sync(
+                session,
+                task_id,
+                "backfill_weather_for_location",
+                location_id,
+                TaskStatusEnum.success,
+                finished=True,
+            )
+
+    except Exception as e:
+        logger.error(f"Backfill weather task failed for location {location_id}: {e}")
+        try:
+            with SessionLocal() as session:
+                create_or_update_task_status_sync(
+                    session,
+                    task_id,
+                    "backfill_weather_for_location",
+                    location_id,
+                    TaskStatusEnum.failure,
+                    error=str(e),
+                    finished=True,
+                )
+        except Exception:
+            pass
+        raise
+
+
+@app.task(name="backfill_gdd_for_model", bind=True)
+def backfill_gdd_for_model(self, gdd_model_id: int):
+    """
+    Recalculate all GDD values for a given GDD model (full history backfill).
+    Tracks progress in TaskStatus.
+    """
+    from app.models.task_status import TaskStatusEnum
+
+    task_id = self.request.id
+    try:
+        with SessionLocal() as session:
+            # TaskStatus: started
+            create_or_update_task_status_sync(
+                session,
+                task_id,
+                "backfill_gdd_for_model",
+                gdd_model_id,  # Use gdd_model_id as related_location_id for tracking
+                TaskStatusEnum.started,
+                started=True,
+            )
+            # Look up GDD model and location
+            gdd_model = session.get(GDDModel, gdd_model_id)
+            if not gdd_model:
+                raise ValueError(f"GDD model {gdd_model_id} not found")
+            location_id = gdd_model.location_id
+            # Recalculate all GDD values
+            calculate_and_store_gdd_values_sync_segmented(
+                session, gdd_model_id, location_id
+            )
+            # TaskStatus: success
+            create_or_update_task_status_sync(
+                session,
+                task_id,
+                "backfill_gdd_for_model",
+                gdd_model_id,
+                TaskStatusEnum.success,
+                finished=True,
+            )
+    except Exception as e:
+        logger.error(f"Backfill GDD task failed for model {gdd_model_id}: {e}")
+        try:
+            with SessionLocal() as session:
+                create_or_update_task_status_sync(
+                    session,
+                    task_id,
+                    "backfill_gdd_for_model",
+                    gdd_model_id,
+                    TaskStatusEnum.failure,
+                    error=str(e),
+                    finished=True,
+                )
+        except Exception:
+            pass
+        raise
+
+
+@app.task(name="backfill_disease_pressure_for_location", bind=True)
+def backfill_disease_pressure_for_location(
+    self, location_id: int, start_date: str, end_date: str
+):
+    """
+    Recalculate disease pressure for a location and date range.
+    Tracks progress in TaskStatus.
+    """
+    from app.models.task_status import TaskStatusEnum
+    import pandas as pd
+
+    task_id = self.request.id
+    try:
+        with SessionLocal() as session:
+            # TaskStatus: started
+            create_or_update_task_status_sync(
+                session,
+                task_id,
+                "backfill_disease_pressure_for_location",
+                location_id,
+                TaskStatusEnum.started,
+                started=True,
+            )
+            # Parse dates
+            start = pd.to_datetime(start_date).date()
+            end = pd.to_datetime(end_date).date()
+            # Recalculate disease pressure for the range
+            calculate_smith_kerns_for_location(session, location_id, start, end)
+            # TaskStatus: success
+            create_or_update_task_status_sync(
+                session,
+                task_id,
+                "backfill_disease_pressure_for_location",
+                location_id,
+                TaskStatusEnum.success,
+                finished=True,
+            )
+    except Exception as e:
+        logger.error(
+            f"Backfill disease pressure task failed for location {location_id}: {e}"
+        )
+        try:
+            with SessionLocal() as session:
+                create_or_update_task_status_sync(
+                    session,
+                    task_id,
+                    "backfill_disease_pressure_for_location",
+                    location_id,
+                    TaskStatusEnum.failure,
+                    error=str(e),
+                    finished=True,
+                )
+        except Exception:
+            pass
+        raise
+
+
+@app.task(name="backfill_growth_potential_for_location", bind=True)
+def backfill_growth_potential_for_location(
+    self, location_id: int, start_date: str, end_date: str
+):
+    """
+    Recalculate growth potential for a location and date range.
+    Tracks progress in TaskStatus.
+    """
+    from app.models.task_status import TaskStatusEnum
+    import pandas as pd
+
+    task_id = self.request.id
+    try:
+        with SessionLocal() as session:
+            # TaskStatus: started
+            create_or_update_task_status_sync(
+                session,
+                task_id,
+                "backfill_growth_potential_for_location",
+                location_id,
+                TaskStatusEnum.started,
+                started=True,
+            )
+            # Parse dates
+            start = pd.to_datetime(start_date).date()
+            end = pd.to_datetime(end_date).date()
+            # Recalculate growth potential for the range
+            calculate_growth_potential_for_location(session, location_id, start, end)
+            # TaskStatus: success
+            create_or_update_task_status_sync(
+                session,
+                task_id,
+                "backfill_growth_potential_for_location",
+                location_id,
+                TaskStatusEnum.success,
+                finished=True,
+            )
+    except Exception as e:
+        logger.error(
+            f"Backfill growth potential task failed for location {location_id}: {e}"
+        )
+        try:
+            with SessionLocal() as session:
+                create_or_update_task_status_sync(
+                    session,
+                    task_id,
+                    "backfill_growth_potential_for_location",
+                    location_id,
+                    TaskStatusEnum.failure,
+                    error=str(e),
+                    finished=True,
+                )
+        except Exception:
+            pass
+        raise

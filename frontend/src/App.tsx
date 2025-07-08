@@ -19,7 +19,7 @@ function App() {
           <Route path="/products" element={<Products />} />
           <Route path="/applications" element={<Applications />} />
           <Route path="/reports" element={<Reports />} />
-          <Route path="/tasks" element={<TaskMonitor />} />
+          <Route path="/admin" element={<TaskMonitor />} />
           <Route path="/gdd" element={<GDD />} />
         </Routes>
       </AppLayout>

@@ -62,10 +62,10 @@ const navigationItems = [
     description: "Analytics and reports",
   },
   {
-    title: "Task Monitor",
-    url: "/tasks",
+    title: "Admin Panel",
+    url: "/admin",
     icon: ClipboardListIcon,
-    description: "Monitor background tasks",
+    description: "Monitor background tasks and admin actions",
   },
 ];
 
