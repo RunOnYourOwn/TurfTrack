@@ -7,6 +7,9 @@ from app.schemas.task_status import TaskStatusRead, TaskStatusList
 from typing import List, Optional
 from app.tasks.weather import update_weather_for_all_lawns
 from fastapi.responses import JSONResponse
+from datetime import datetime, timezone
+from app.core.database import SessionLocal
+from app.models.task_status import TaskStatusEnum
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -40,7 +43,25 @@ async def get_task(task_id: str, db: AsyncSession = Depends(get_db)):
     return task
 
 
+def create_initial_task_status(task_id: str, task_name: str, location_id: int = None):
+    """Create initial task status record when task is queued"""
+    with SessionLocal() as session:
+        task_status = TaskStatus(
+            task_id=task_id,
+            task_name=task_name,
+            related_location_id=location_id,
+            status=TaskStatusEnum.pending,
+            created_at=datetime.now(timezone.utc),
+        )
+        session.add(task_status)
+        session.commit()
+
+
 @router.post("/trigger-weather-update", tags=["tasks"])
 def trigger_weather_update():
     task = update_weather_for_all_lawns.delay()
+
+    # Create initial task status record
+    create_initial_task_status(task.id, "update_weather_for_all_lawns")
+
     return JSONResponse({"task_id": task.id, "status": "started"})
