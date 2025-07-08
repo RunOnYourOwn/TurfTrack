@@ -31,14 +31,8 @@ def create_or_update_task_status_sync(
     finished: bool = False,
     error: str = None,
 ):
-    # Check if record exists
-    stmt = select(TaskStatus).where(
-        and_(
-            TaskStatus.task_id == task_id,
-            TaskStatus.task_name == task_name,
-            TaskStatus.related_location_id == location_id,
-        )
-    )
+    # Check if record exists - only use task_id since it's unique
+    stmt = select(TaskStatus).where(TaskStatus.task_id == task_id)
     result = session.execute(stmt)
     existing_status = result.scalar_one_or_none()
 
