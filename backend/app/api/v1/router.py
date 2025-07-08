@@ -9,6 +9,8 @@ from .endpoints.weather import router as weather_router
 from .endpoints.location import router as location_router
 from .endpoints.disease_pressure import router as disease_pressure_router
 from .endpoints.growth_potential import router as growth_potential_router
+from .endpoints.data_health import router as data_health_router
+from .endpoints.backfill import router as backfill_router
 
 api_router = APIRouter()
 api_router.include_router(lawn_router)
@@ -21,3 +23,5 @@ api_router.include_router(weather_router)
 api_router.include_router(location_router)
 api_router.include_router(disease_pressure_router)
 api_router.include_router(growth_potential_router)
+api_router.include_router(data_health_router)
+api_router.include_router(backfill_router)
