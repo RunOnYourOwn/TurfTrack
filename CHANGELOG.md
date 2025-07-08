@@ -9,9 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Growth potential graph
+- Update admin panel with backfill options for missing data
+
 ### Fixed
 
+- Disease pressure calculations and frontend date picker
+
 ### Changed
+
 ## [0.0.14] - 2025-07-05
 
 ### Added
