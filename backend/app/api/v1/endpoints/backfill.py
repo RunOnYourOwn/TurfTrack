@@ -9,6 +9,7 @@ from app.tasks.weather import (
 )
 from app.core.database import SessionLocal
 from app.models.task_status import TaskStatus, TaskStatusEnum
+from sqlalchemy.future import select
 import logging
 
 logger = logging.getLogger(__name__)
@@ -41,14 +42,26 @@ class GrowthPotentialBackfillRequest(BaseModel):
 def create_initial_task_status(task_id: str, task_name: str, location_id: int):
     """Create initial task status record when task is queued"""
     with SessionLocal() as session:
-        task_status = TaskStatus(
-            task_id=task_id,
-            task_name=task_name,
-            related_location_id=location_id,
-            status=TaskStatusEnum.pending,
-            created_at=datetime.now(timezone.utc),
-        )
-        session.add(task_status)
+        # Check if record already exists
+        stmt = select(TaskStatus).where(TaskStatus.task_id == task_id)
+        result = session.execute(stmt)
+        existing_status = result.scalar_one_or_none()
+
+        if existing_status:
+            # Update existing record
+            existing_status.status = TaskStatusEnum.pending
+            existing_status.created_at = datetime.now(timezone.utc)
+        else:
+            # Create new record
+            task_status = TaskStatus(
+                task_id=task_id,
+                task_name=task_name,
+                related_location_id=location_id,
+                status=TaskStatusEnum.pending,
+                created_at=datetime.now(timezone.utc),
+            )
+            session.add(task_status)
+
         session.commit()
 
 
