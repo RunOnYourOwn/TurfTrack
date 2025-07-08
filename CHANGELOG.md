@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Fixed
+
+### Changed
+## [0.0.15] - 2025-07-07
+
+### Added
+
 - Growth potential graph
 - Update admin panel with backfill options for missing data
 
