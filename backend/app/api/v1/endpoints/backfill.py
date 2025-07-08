@@ -9,6 +9,9 @@ from app.tasks.weather import (
 )
 from app.core.database import SessionLocal
 from app.models.task_status import TaskStatus, TaskStatusEnum
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/backfill", tags=["backfill"])
 
@@ -51,62 +54,98 @@ def create_initial_task_status(task_id: str, task_name: str, location_id: int):
 
 @router.post("/weather/")
 async def weather_backfill(request: WeatherBackfillRequest):
-    # Trigger new Celery backfill task
-    celery_result = backfill_weather_for_location.delay(
-        request.location_id,
-        str(request.start_date),
-        str(request.end_date),
-    )
+    try:
+        # Trigger new Celery backfill task
+        logger.info(f"Queuing weather backfill task for location {request.location_id}")
+        celery_result = backfill_weather_for_location.delay(
+            request.location_id,
+            str(request.start_date),
+            str(request.end_date),
+        )
+        logger.info(f"Weather backfill task queued with ID: {celery_result.id}")
 
-    # Create initial task status record
-    create_initial_task_status(
-        celery_result.id, "backfill_weather_for_location", request.location_id
-    )
+        # Create initial task status record
+        create_initial_task_status(
+            celery_result.id, "backfill_weather_for_location", request.location_id
+        )
 
-    return {"task_id": celery_result.id, "status": "started"}
+        return {"task_id": celery_result.id, "status": "started"}
+    except Exception as e:
+        logger.error(f"Failed to queue weather backfill task: {e}")
+        raise
 
 
 @router.post("/gdd/")
 async def gdd_backfill(request: GDDBackfillRequest):
-    celery_result = backfill_gdd_for_model.delay(request.gdd_model_id)
+    try:
+        logger.info(f"Queuing GDD backfill task for model {request.gdd_model_id}")
+        celery_result = backfill_gdd_for_model.delay(request.gdd_model_id)
+        logger.info(f"GDD backfill task queued with ID: {celery_result.id}")
 
-    # Create initial task status record
-    create_initial_task_status(
-        celery_result.id,
-        "backfill_gdd_for_model",
-        request.gdd_model_id,  # Use gdd_model_id as location_id for tracking
-    )
+        # Create initial task status record
+        create_initial_task_status(
+            celery_result.id,
+            "backfill_gdd_for_model",
+            request.gdd_model_id,  # Use gdd_model_id as location_id for tracking
+        )
 
-    return {"task_id": celery_result.id, "status": "started"}
+        return {"task_id": celery_result.id, "status": "started"}
+    except Exception as e:
+        logger.error(f"Failed to queue GDD backfill task: {e}")
+        raise
 
 
 @router.post("/disease_pressure/")
 async def disease_pressure_backfill(request: DiseasePressureBackfillRequest):
-    celery_result = backfill_disease_pressure_for_location.delay(
-        request.location_id,
-        str(request.start_date),
-        str(request.end_date),
-    )
+    try:
+        logger.info(
+            f"Queuing disease pressure backfill task for location {request.location_id}"
+        )
+        celery_result = backfill_disease_pressure_for_location.delay(
+            request.location_id,
+            str(request.start_date),
+            str(request.end_date),
+        )
+        logger.info(
+            f"Disease pressure backfill task queued with ID: {celery_result.id}"
+        )
 
-    # Create initial task status record
-    create_initial_task_status(
-        celery_result.id, "backfill_disease_pressure_for_location", request.location_id
-    )
+        # Create initial task status record
+        create_initial_task_status(
+            celery_result.id,
+            "backfill_disease_pressure_for_location",
+            request.location_id,
+        )
 
-    return {"task_id": celery_result.id, "status": "started"}
+        return {"task_id": celery_result.id, "status": "started"}
+    except Exception as e:
+        logger.error(f"Failed to queue disease pressure backfill task: {e}")
+        raise
 
 
 @router.post("/growth_potential/")
 async def growth_potential_backfill(request: GrowthPotentialBackfillRequest):
-    celery_result = backfill_growth_potential_for_location.delay(
-        request.location_id,
-        str(request.start_date),
-        str(request.end_date),
-    )
+    try:
+        logger.info(
+            f"Queuing growth potential backfill task for location {request.location_id}"
+        )
+        celery_result = backfill_growth_potential_for_location.delay(
+            request.location_id,
+            str(request.start_date),
+            str(request.end_date),
+        )
+        logger.info(
+            f"Growth potential backfill task queued with ID: {celery_result.id}"
+        )
 
-    # Create initial task status record
-    create_initial_task_status(
-        celery_result.id, "backfill_growth_potential_for_location", request.location_id
-    )
+        # Create initial task status record
+        create_initial_task_status(
+            celery_result.id,
+            "backfill_growth_potential_for_location",
+            request.location_id,
+        )
 
-    return {"task_id": celery_result.id, "status": "started"}
+        return {"task_id": celery_result.id, "status": "started"}
+    except Exception as e:
+        logger.error(f"Failed to queue growth potential backfill task: {e}")
+        raise

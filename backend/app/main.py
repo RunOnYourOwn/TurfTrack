@@ -4,6 +4,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.v1.router import api_router
 
+# Import Celery app to ensure tasks are registered
+from app.celery_app import app as celery_app
+
 app = FastAPI(
     title=settings.APP_NAME,
     openapi_url=f"{settings.API_V1_PREFIX}/openapi.json",
