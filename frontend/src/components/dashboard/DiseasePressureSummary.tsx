@@ -175,9 +175,12 @@ export default function DiseasePressureSummary({
     [smithKernsData]
   );
 
-  // Separate pending data for display
+  // Separate pending data for display (exclude first 4 days, which are always null for Smith-Kerns)
   const pendingData = useMemo(
-    () => smithKernsData.filter((d) => d.risk_score === null),
+    () =>
+      smithKernsData
+        .map((d, i) => ({ ...d, idx: i }))
+        .filter((d) => d.risk_score === null && d.idx >= 4),
     [smithKernsData]
   );
 
