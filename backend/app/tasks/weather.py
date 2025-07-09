@@ -17,6 +17,7 @@ import requests
 from app.utils.disease import calculate_smith_kerns_for_location
 import math
 from app.utils.growth_potential import calculate_growth_potential_for_location
+from sqlalchemy.dialects.postgresql import insert
 
 logger = logging.getLogger(__name__)
 
@@ -31,37 +32,32 @@ def create_or_update_task_status_sync(
     finished: bool = False,
     error: str = None,
 ):
-    # Check if record exists - only use task_id since it's unique
-    stmt = select(TaskStatus).where(TaskStatus.task_id == task_id)
-    result = session.execute(stmt)
-    existing_status = result.scalar_one_or_none()
-
-    if existing_status:
-        # Update existing record
-        existing_status.status = status
-        if started:
-            existing_status.started_at = datetime.datetime.now(datetime.timezone.utc)
-        if finished:
-            existing_status.finished_at = datetime.datetime.now(datetime.timezone.utc)
-        if error:
-            existing_status.error = error
-    else:
-        # Create new record
-        new_status = TaskStatus(
-            task_id=task_id,
-            task_name=task_name,
-            related_location_id=location_id,
-            status=status,
-            started_at=datetime.datetime.now(datetime.timezone.utc)
-            if started
-            else None,
-            finished_at=datetime.datetime.now(datetime.timezone.utc)
-            if finished
-            else None,
-            error=error,
-        )
-        session.add(new_status)
-
+    now = datetime.datetime.now(datetime.timezone.utc)
+    insert_stmt = insert(TaskStatus).values(
+        task_id=task_id,
+        task_name=task_name,
+        related_location_id=location_id,
+        status=status,
+        started_at=now if started else None,
+        finished_at=now if finished else None,
+        error=error,
+    )
+    update_dict = {
+        "status": status,
+        "task_name": task_name,
+        "related_location_id": location_id,
+    }
+    if started:
+        update_dict["started_at"] = now
+    if finished:
+        update_dict["finished_at"] = now
+    if error:
+        update_dict["error"] = error
+    upsert_stmt = insert_stmt.on_conflict_do_update(
+        index_elements=["task_id"],
+        set_=update_dict,
+    )
+    session.execute(upsert_stmt)
     session.commit()
 
 
