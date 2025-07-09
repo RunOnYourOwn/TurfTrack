@@ -11,7 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed weather summary 'All Time' bug defaulting to only showing past 30 days and 16 day forecast
+
 ### Changed
+
 ## [0.0.15] - 2025-07-07
 
 ### Added
