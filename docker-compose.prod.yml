@@ -1,8 +1,9 @@
 services:
   api:
-    # To use a specific version for production, change 'latest' to a version tag, e.g.:
-    # image: ghcr.io/runonyourown/turftrack/turftrack-backend:1.0.0
-    image: ghcr.io/runonyourown/turftrack-backend:0.0.1
+    # Use local build for testing
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.prod
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       - ALEMBIC_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
@@ -22,8 +23,10 @@ services:
       - turftrack_network
 
   frontend:
-    # To use a specific version for production, change 'latest' to a version tag.
-    image: ghcr.io/runonyourown/turftrack-frontend:0.0.1
+    # Use local build for testing
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
     ports:
       - "3000:3000" # Expose on port 3000 for Nginx Proxy Manager
     environment:
@@ -36,8 +39,10 @@ services:
       - turftrack_network
 
   celery_worker:
-    # To use a specific version for production, change 'latest' to a version tag.
-    image: ghcr.io/runonyourown/turftrack-celery:0.0.1
+    # Use local build for testing
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.celery
     command: worker
     environment:
       - CELERY_LOG_LEVEL=${CELERY_LOG_LEVEL}
@@ -57,8 +62,10 @@ services:
       - turftrack_network
 
   celery_beat:
-    # To use a specific version for production, change 'latest' to a version tag.
-    image: ghcr.io/runonyourown/turftrack-celery:0.0.1
+    # Use local build for testing
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.celery
     command: beat
     environment:
       - CELERY_LOG_LEVEL=${CELERY_LOG_LEVEL}
