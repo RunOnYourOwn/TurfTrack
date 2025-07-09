@@ -85,25 +85,33 @@ async def get_weather_for_location(
     end_date: Optional[date] = Query(None, description="End date (YYYY-MM-DD)"),
     db: AsyncSession = Depends(get_db),
 ):
-    # Default date range: last 30 days to next 16 days
-    today = date.today()
-    default_start = today - timedelta(days=30)
-    default_end = today + timedelta(days=16)
-    start = start_date or default_start
-    end = end_date or default_end
-
-    # Query daily_weather for this location and date range
-    stmt = (
-        select(DailyWeather)
-        .where(
-            DailyWeather.location_id == location_id,
-            DailyWeather.date >= start,
-            DailyWeather.date <= end,
+    # If either start_date or end_date is provided, use date filtering
+    if start_date is not None or end_date is not None:
+        today = date.today()
+        default_start = today - timedelta(days=30)
+        default_end = today + timedelta(days=16)
+        start = start_date or default_start
+        end = end_date or default_end
+        stmt = (
+            select(DailyWeather)
+            .where(
+                DailyWeather.location_id == location_id,
+                DailyWeather.date >= start,
+                DailyWeather.date <= end,
+            )
+            .order_by(DailyWeather.date.asc())
         )
-        .order_by(DailyWeather.date.asc())
-    )
-    result = await db.execute(stmt)
-    weather_entries = result.scalars().all()
+        result = await db.execute(stmt)
+        weather_entries = result.scalars().all()
+    else:
+        # No date filters: return all data for this location
+        stmt = (
+            select(DailyWeather)
+            .where(DailyWeather.location_id == location_id)
+            .order_by(DailyWeather.date.asc())
+        )
+        result = await db.execute(stmt)
+        weather_entries = result.scalars().all()
 
     # Helper to sanitize float values
     def safe_float(val):
