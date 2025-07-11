@@ -73,6 +73,25 @@ async def get_data_health(db: AsyncSession = Depends(get_db)):
                 .all()
             )
 
+        async def get_complete_weather_dates(location_id):
+            """Check for weather records with all required fields for disease pressure calculation"""
+            return set(
+                (
+                    await db.execute(
+                        select(DailyWeather.date).where(
+                            and_(
+                                DailyWeather.location_id == location_id,
+                                DailyWeather.temperature_max_c.isnot(None),
+                                DailyWeather.temperature_min_c.isnot(None),
+                                DailyWeather.relative_humidity_mean.isnot(None),
+                            )
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+
         missing = {}
         value_fields = {
             "weather": "temperature_max_c",  # or another key field for weather
@@ -144,6 +163,15 @@ async def get_data_health(db: AsyncSession = Depends(get_db)):
                     model, value_fields[name], loc.id
                 )
                 missing[name] = find_missing_ranges(present_dates, expected_dates[4:])
+            elif name == "weather":
+                # Use comprehensive weather check that includes all required fields
+                present_dates = await get_complete_weather_dates(loc.id)
+                missing[name] = find_missing_ranges(present_dates, expected_dates)
+            elif name == "growth_potential":
+                # Check for weather data with required fields for growth potential calculation
+                # (uses same function as weather since it requires temperature fields)
+                present_dates = await get_complete_weather_dates(loc.id)
+                missing[name] = find_missing_ranges(present_dates, expected_dates)
             else:
                 present_dates = await get_present_dates(
                     model, value_fields[name], loc.id
