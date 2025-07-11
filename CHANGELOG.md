@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed weather summary 'All Time' bug defaulting to only showing past 30 days and 16 day forecast
 - Fixed Smith-Kerns graph showing first 4 points as null. First 4 points will always be null as the calculation uses a 5 day window
+- Fixed to look for nulls in all weather data used in calculations
 
 ### Changed
 
