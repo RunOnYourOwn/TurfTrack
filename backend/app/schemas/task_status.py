@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
@@ -15,6 +15,7 @@ class TaskStatusRead(BaseModel):
     finished_at: Optional[datetime]
     result: Optional[str]
     error: Optional[str]
+    request_id: Optional[str]
 
     model_config = {"from_attributes": True}
 
@@ -28,5 +29,6 @@ class TaskStatusList(BaseModel):
     finished_at: Optional[datetime]
     result: Optional[str]
     error: Optional[str]
+    request_id: Optional[str]
 
     model_config = {"from_attributes": True}

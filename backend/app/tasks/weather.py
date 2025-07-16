@@ -18,6 +18,8 @@ from app.utils.disease import calculate_smith_kerns_for_location
 import math
 from app.utils.growth_potential import calculate_growth_potential_for_location
 from sqlalchemy.dialects.postgresql import insert
+from app.core.logging_config import log_performance_metric
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +33,7 @@ def create_or_update_task_status_sync(
     started: bool = False,
     finished: bool = False,
     error: str = None,
+    request_id: str = None,  # New argument
 ):
     now = datetime.datetime.now(datetime.timezone.utc)
     insert_stmt = insert(TaskStatus).values(
@@ -41,11 +44,13 @@ def create_or_update_task_status_sync(
         started_at=now if started else None,
         finished_at=now if finished else None,
         error=error,
+        request_id=request_id,  # Save request_id
     )
     update_dict = {
         "status": status,
         "task_name": task_name,
         "related_location_id": location_id,
+        "request_id": request_id,  # Save request_id
     }
     if started:
         update_dict["started_at"] = now
@@ -71,6 +76,7 @@ async def create_or_update_task_status(
     result=None,
     started=False,
     finished=False,
+    request_id=None,  # New argument
 ):
     result_db = await session.execute(
         select(TaskStatus).where(TaskStatus.task_id == task_id)
@@ -88,6 +94,7 @@ async def create_or_update_task_status(
             finished_at=now if finished else None,
             error=error,
             result=result,
+            request_id=request_id,  # Save request_id
         )
         session.add(task_status)
     else:
@@ -100,12 +107,15 @@ async def create_or_update_task_status(
             task_status.error = error
         if result:
             task_status.result = result
+        if request_id:
+            task_status.request_id = request_id
     await session.commit()
 
 
 @app.task(name="fetch_and_store_weather", bind=True)
 def fetch_and_store_weather(self, location_id: int, latitude: float, longitude: float):
     task_id = self.request.id
+    request_id = self.request.headers.get("request_id")
     try:
         with SessionLocal() as session:
             try:
@@ -116,6 +126,7 @@ def fetch_and_store_weather(self, location_id: int, latitude: float, longitude: 
                     location_id,
                     TaskStatusEnum.started,
                     started=True,
+                    request_id=request_id,
                 )
                 _fetch_and_store_weather_sync(location_id, latitude, longitude, session)
                 create_or_update_task_status_sync(
@@ -125,9 +136,13 @@ def fetch_and_store_weather(self, location_id: int, latitude: float, longitude: 
                     location_id,
                     TaskStatusEnum.success,
                     finished=True,
+                    request_id=request_id,
                 )
             except (requests.exceptions.RequestException, SQLAlchemyError) as e:
-                logger.error(f"Weather task failed for loc {location_id}: {e}")
+                logger.error(
+                    f"Weather task failed for loc {location_id}: {e}",
+                    extra={"request_id": request_id},
+                )
                 create_or_update_task_status_sync(
                     session,
                     task_id,
@@ -136,11 +151,13 @@ def fetch_and_store_weather(self, location_id: int, latitude: float, longitude: 
                     TaskStatusEnum.failure,
                     error=str(e),
                     finished=True,
+                    request_id=request_id,
                 )
                 raise
             except Exception as e:
                 logger.error(
-                    f"An unexpected error occurred in weather task for loc {location_id}: {e}"
+                    f"An unexpected error occurred in weather task for loc {location_id}: {e}",
+                    extra={"request_id": request_id},
                 )
                 create_or_update_task_status_sync(
                     session,
@@ -150,10 +167,14 @@ def fetch_and_store_weather(self, location_id: int, latitude: float, longitude: 
                     TaskStatusEnum.failure,
                     error="An unexpected error occurred.",
                     finished=True,
+                    request_id=request_id,
                 )
                 raise
     except SQLAlchemyError as e:
-        logger.critical(f"Database connection failed for weather task: {e}")
+        logger.critical(
+            f"Database connection failed for weather task: {e}",
+            extra={"request_id": request_id},
+        )
         # Cannot update task status if DB is down, Celery will retry
         raise
 
@@ -295,9 +316,34 @@ def _fetch_and_store_weather_sync(
         ],
         "timezone": "auto",
     }
-    responses = om.weather_api("https://api.open-meteo.com/v1/forecast", params=params)
-    response = responses[0]
-    daily = response.Daily()
+
+    # Time the weather API call
+    start_time = time.time()
+    try:
+        responses = om.weather_api(
+            "https://api.open-meteo.com/v1/forecast", params=params
+        )
+        response = responses[0]
+        daily = response.Daily()
+        duration_ms = (time.time() - start_time) * 1000
+        log_performance_metric(
+            "weather_api_call",
+            duration_ms,
+            success=True,
+            location_id=location_id,
+            api_endpoint="openmeteo_forecast",
+        )
+    except Exception as e:
+        duration_ms = (time.time() - start_time) * 1000
+        log_performance_metric(
+            "weather_api_call",
+            duration_ms,
+            success=False,
+            location_id=location_id,
+            api_endpoint="openmeteo_forecast",
+            error=str(e),
+        )
+        raise
 
     # Build and upsert data
     for i, date in enumerate(_get_dates(daily)):
@@ -411,11 +457,35 @@ def _update_recent_weather_for_location_sync(
             ],
             "timezone": "auto",
         }
-        responses_hist = om.weather_api(
-            "https://api.open-meteo.com/v1/forecast", params=params_hist
-        )
-        response_hist = responses_hist[0]
-        daily_hist = response_hist.Daily()
+
+        # Time the historical weather API call
+        start_time = time.time()
+        try:
+            responses_hist = om.weather_api(
+                "https://api.open-meteo.com/v1/forecast", params=params_hist
+            )
+            response_hist = responses_hist[0]
+            daily_hist = response_hist.Daily()
+            duration_ms = (time.time() - start_time) * 1000
+            log_performance_metric(
+                "weather_api_call",
+                duration_ms,
+                success=True,
+                location_id=location_id,
+                api_endpoint="openmeteo_historical",
+            )
+        except Exception as e:
+            duration_ms = (time.time() - start_time) * 1000
+            log_performance_metric(
+                "weather_api_call",
+                duration_ms,
+                success=False,
+                location_id=location_id,
+                api_endpoint="openmeteo_historical",
+                error=str(e),
+            )
+            raise
+
         for i, date in enumerate(_get_dates(daily_hist)):
             data = _extract_weather_data(daily_hist, i, date)
             upsert_daily_weather_sync(
@@ -446,11 +516,35 @@ def _update_recent_weather_for_location_sync(
             ],
             "timezone": "auto",
         }
-        responses_forecast = om.weather_api(
-            "https://api.open-meteo.com/v1/forecast", params=params_forecast
-        )
-        response_forecast = responses_forecast[0]
-        daily_forecast = response_forecast.Daily()
+
+        # Time the forecast weather API call
+        start_time = time.time()
+        try:
+            responses_forecast = om.weather_api(
+                "https://api.open-meteo.com/v1/forecast", params=params_forecast
+            )
+            response_forecast = responses_forecast[0]
+            daily_forecast = response_forecast.Daily()
+            duration_ms = (time.time() - start_time) * 1000
+            log_performance_metric(
+                "weather_api_call",
+                duration_ms,
+                success=True,
+                location_id=location_id,
+                api_endpoint="openmeteo_forecast",
+            )
+        except Exception as e:
+            duration_ms = (time.time() - start_time) * 1000
+            log_performance_metric(
+                "weather_api_call",
+                duration_ms,
+                success=False,
+                location_id=location_id,
+                api_endpoint="openmeteo_forecast",
+                error=str(e),
+            )
+            raise
+
         for i, date in enumerate(_get_dates(daily_forecast)):
             data = _extract_weather_data(daily_forecast, i, date)
             upsert_daily_weather_sync(
@@ -499,6 +593,7 @@ def update_weather_for_all_lawns(self):
     - This ensures weather data continuity even if the app has been offline
     """
     task_id = self.request.id
+    request_id = self.request.headers.get("request_id")
     try:
         with SessionLocal() as session:
             # Create task status record for start
@@ -509,6 +604,7 @@ def update_weather_for_all_lawns(self):
                 None,  # No specific location_id for this task
                 TaskStatusEnum.started,
                 started=True,
+                request_id=request_id,
             )
 
             # One row per unique Location that has an enabled Lawn
@@ -535,12 +631,14 @@ def update_weather_for_all_lawns(self):
                 except (requests.exceptions.RequestException, SQLAlchemyError) as e:
                     logger.error(
                         f"[{task_id}] Weather update failed for location "
-                        f"{loc.location_id}: {e}"
+                        f"{loc.location_id}: {e}",
+                        extra={"request_id": request_id},
                     )
                 except Exception as e:
                     logger.error(
                         f"[{task_id}] Unexpected error updating location "
-                        f"{loc.location_id}: {e}"
+                        f"{loc.location_id}: {e}",
+                        extra={"request_id": request_id},
                     )
 
             # Create task status record for success
@@ -551,10 +649,14 @@ def update_weather_for_all_lawns(self):
                 None,  # No specific location_id for this task
                 TaskStatusEnum.success,
                 finished=True,
+                request_id=request_id,
             )
 
     except (requests.exceptions.RequestException, SQLAlchemyError) as e:
-        logger.error(f"All-lawn weather update task failed: {e}")
+        logger.error(
+            f"All-lawn weather update task failed: {e}",
+            extra={"request_id": request_id},
+        )
         try:
             with SessionLocal() as session:
                 create_or_update_task_status_sync(
@@ -565,6 +667,7 @@ def update_weather_for_all_lawns(self):
                     TaskStatusEnum.failure,
                     error=str(e),
                     finished=True,
+                    request_id=request_id,
                 )
         except SQLAlchemyError:
             # Cannot update task status if DB is down, Celery will retry
@@ -572,7 +675,8 @@ def update_weather_for_all_lawns(self):
         raise
     except Exception as e:
         logger.error(
-            f"An unexpected error occurred in all-lawn weather update task: {e}"
+            f"An unexpected error occurred in all-lawn weather update task: {e}",
+            extra={"request_id": request_id},
         )
         try:
             with SessionLocal() as session:
@@ -584,6 +688,7 @@ def update_weather_for_all_lawns(self):
                     TaskStatusEnum.failure,
                     error="An unexpected error occurred.",
                     finished=True,
+                    request_id=request_id,
                 )
         except SQLAlchemyError:
             # Cannot update task status if DB is down, Celery will retry
@@ -598,6 +703,7 @@ def recalculate_gdd_for_location(self, location_id: int):
     Triggered after weather data is updated.
     """
     task_id = self.request.id
+    request_id = self.request.headers.get("request_id")
     try:
         with SessionLocal() as session:
             # Create task status record for start
@@ -608,6 +714,7 @@ def recalculate_gdd_for_location(self, location_id: int):
                 location_id,
                 TaskStatusEnum.started,
                 started=True,
+                request_id=request_id,
             )
 
             # Find all GDD models for the given location_id
@@ -622,7 +729,8 @@ def recalculate_gdd_for_location(self, location_id: int):
                     )
                 except Exception as e:
                     logger.error(
-                        f"Failed to recalculate GDD for model {model.id} at location {location_id}: {e}"
+                        f"Failed to recalculate GDD for model {model.id} at location {location_id}: {e}",
+                        extra={"request_id": request_id},
                     )
                     # Log and continue
 
@@ -634,11 +742,13 @@ def recalculate_gdd_for_location(self, location_id: int):
                 location_id,
                 TaskStatusEnum.success,
                 finished=True,
+                request_id=request_id,
             )
 
     except SQLAlchemyError as e:
         logger.critical(
-            f"Database connection failed for GDD recalculation task for loc {location_id}: {e}"
+            f"Database connection failed for GDD recalculation task for loc {location_id}: {e}",
+            extra={"request_id": request_id},
         )
         try:
             with SessionLocal() as session:
@@ -650,6 +760,7 @@ def recalculate_gdd_for_location(self, location_id: int):
                     TaskStatusEnum.failure,
                     error=str(e),
                     finished=True,
+                    request_id=request_id,
                 )
         except SQLAlchemyError:
             # Cannot update task status if DB is down, Celery will retry
@@ -657,7 +768,8 @@ def recalculate_gdd_for_location(self, location_id: int):
         raise
     except Exception as e:
         logger.error(
-            f"An unexpected error occurred in GDD recalculation task for loc {location_id}: {e}"
+            f"An unexpected error occurred in GDD recalculation task for loc {location_id}: {e}",
+            extra={"request_id": request_id},
         )
         try:
             with SessionLocal() as session:
@@ -669,6 +781,7 @@ def recalculate_gdd_for_location(self, location_id: int):
                     TaskStatusEnum.failure,
                     error="An unexpected error occurred.",
                     finished=True,
+                    request_id=request_id,
                 )
         except SQLAlchemyError:
             # Cannot update task status if DB is down, Celery will retry
@@ -691,6 +804,7 @@ def backfill_weather_for_location(
     from app.models.task_status import TaskStatusEnum
 
     task_id = self.request.id
+    request_id = self.request.headers.get("request_id")
     try:
         with SessionLocal() as session:
             # TaskStatus: started
@@ -701,6 +815,7 @@ def backfill_weather_for_location(
                 location_id,
                 TaskStatusEnum.started,
                 started=True,
+                request_id=request_id,
             )
             # Look up location
             loc = session.execute(
@@ -767,10 +882,14 @@ def backfill_weather_for_location(
                 location_id,
                 TaskStatusEnum.success,
                 finished=True,
+                request_id=request_id,
             )
 
     except Exception as e:
-        logger.error(f"Backfill weather task failed for location {location_id}: {e}")
+        logger.error(
+            f"Backfill weather task failed for location {location_id}: {e}",
+            extra={"request_id": request_id},
+        )
         try:
             with SessionLocal() as session:
                 create_or_update_task_status_sync(
@@ -781,6 +900,7 @@ def backfill_weather_for_location(
                     TaskStatusEnum.failure,
                     error=str(e),
                     finished=True,
+                    request_id=request_id,
                 )
         except Exception:
             pass
@@ -796,6 +916,7 @@ def backfill_gdd_for_model(self, gdd_model_id: int):
     from app.models.task_status import TaskStatusEnum
 
     task_id = self.request.id
+    request_id = self.request.headers.get("request_id")
     try:
         with SessionLocal() as session:
             # TaskStatus: started
@@ -806,6 +927,7 @@ def backfill_gdd_for_model(self, gdd_model_id: int):
                 gdd_model_id,  # Use gdd_model_id as related_location_id for tracking
                 TaskStatusEnum.started,
                 started=True,
+                request_id=request_id,
             )
             # Look up GDD model and location
             gdd_model = session.get(GDDModel, gdd_model_id)
@@ -824,9 +946,13 @@ def backfill_gdd_for_model(self, gdd_model_id: int):
                 gdd_model_id,
                 TaskStatusEnum.success,
                 finished=True,
+                request_id=request_id,
             )
     except Exception as e:
-        logger.error(f"Backfill GDD task failed for model {gdd_model_id}: {e}")
+        logger.error(
+            f"Backfill GDD task failed for model {gdd_model_id}: {e}",
+            extra={"request_id": request_id},
+        )
         try:
             with SessionLocal() as session:
                 create_or_update_task_status_sync(
@@ -837,6 +963,7 @@ def backfill_gdd_for_model(self, gdd_model_id: int):
                     TaskStatusEnum.failure,
                     error=str(e),
                     finished=True,
+                    request_id=request_id,
                 )
         except Exception:
             pass
@@ -855,6 +982,7 @@ def backfill_disease_pressure_for_location(
     import pandas as pd
 
     task_id = self.request.id
+    request_id = self.request.headers.get("request_id")
     try:
         with SessionLocal() as session:
             # TaskStatus: started
@@ -865,6 +993,7 @@ def backfill_disease_pressure_for_location(
                 location_id,
                 TaskStatusEnum.started,
                 started=True,
+                request_id=request_id,
             )
             # Parse dates
             start = pd.to_datetime(start_date).date()
@@ -879,10 +1008,12 @@ def backfill_disease_pressure_for_location(
                 location_id,
                 TaskStatusEnum.success,
                 finished=True,
+                request_id=request_id,
             )
     except Exception as e:
         logger.error(
-            f"Backfill disease pressure task failed for location {location_id}: {e}"
+            f"Backfill disease pressure task failed for location {location_id}: {e}",
+            extra={"request_id": request_id},
         )
         try:
             with SessionLocal() as session:
@@ -894,6 +1025,7 @@ def backfill_disease_pressure_for_location(
                     TaskStatusEnum.failure,
                     error=str(e),
                     finished=True,
+                    request_id=request_id,
                 )
         except Exception:
             pass
@@ -912,6 +1044,7 @@ def backfill_growth_potential_for_location(
     import pandas as pd
 
     task_id = self.request.id
+    request_id = self.request.headers.get("request_id")
     try:
         with SessionLocal() as session:
             # TaskStatus: started
@@ -922,6 +1055,7 @@ def backfill_growth_potential_for_location(
                 location_id,
                 TaskStatusEnum.started,
                 started=True,
+                request_id=request_id,
             )
             # Parse dates
             start = pd.to_datetime(start_date).date()
@@ -936,10 +1070,12 @@ def backfill_growth_potential_for_location(
                 location_id,
                 TaskStatusEnum.success,
                 finished=True,
+                request_id=request_id,
             )
     except Exception as e:
         logger.error(
-            f"Backfill growth potential task failed for location {location_id}: {e}"
+            f"Backfill growth potential task failed for location {location_id}: {e}",
+            extra={"request_id": request_id},
         )
         try:
             with SessionLocal() as session:
@@ -951,6 +1087,7 @@ def backfill_growth_potential_for_location(
                     TaskStatusEnum.failure,
                     error=str(e),
                     finished=True,
+                    request_id=request_id,
                 )
         except Exception:
             pass

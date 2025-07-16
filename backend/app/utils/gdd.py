@@ -3,7 +3,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 from app.models.gdd import GDDModel, GDDValue, GDDReset, ResetType, GDDModelParameters
 from app.models.daily_weather import DailyWeather, WeatherType
-from app.models.lawn import Lawn
+from app.core.logging_config import log_performance_metric
+import time
 
 
 def calculate_and_store_gdd_values_sync(
@@ -13,6 +14,8 @@ def calculate_and_store_gdd_values_sync(
     Calculate and store daily/cumulative GDD values for a GDD model, using the correct run.
     Handles threshold-based reset if enabled.
     """
+    start_time = time.time()
+
     # Fetch the GDD model
     gdd_model = session.get(GDDModel, gdd_model_id)
     if not gdd_model:
@@ -29,6 +32,15 @@ def calculate_and_store_gdd_values_sync(
     )
     weather_rows = session.execute(weather_q).scalars().all()
     if not weather_rows:
+        duration_ms = (time.time() - start_time) * 1000
+        log_performance_metric(
+            "gdd_calculation",
+            duration_ms,
+            success=True,
+            gdd_model_id=gdd_model_id,
+            location_id=location_id,
+            records_processed=0,
+        )
         return 0  # No data to process
 
     # Remove existing GDD values for this model (for full recalculation)
@@ -84,6 +96,17 @@ def calculate_and_store_gdd_values_sync(
     # Bulk insert
     session.bulk_save_objects(values_to_insert)
     session.commit()
+
+    duration_ms = (time.time() - start_time) * 1000
+    log_performance_metric(
+        "gdd_calculation",
+        duration_ms,
+        success=True,
+        gdd_model_id=gdd_model_id,
+        location_id=location_id,
+        records_processed=len(values_to_insert),
+    )
+
     return len(values_to_insert)
 
 
@@ -155,6 +178,8 @@ def calculate_and_store_gdd_values_sync_segmented(
     Calculate and store daily/cumulative GDD values for a GDD model, segmented by runs using the gdd_resets table.
     Handles both manual and threshold resets robustly. Uses parameter history for date-specific calculations.
     """
+    start_time = time.time()
+
     # Only clear on the outermost call
     if clear_threshold_resets:
         session.query(GDDReset).filter(
@@ -181,6 +206,7 @@ def calculate_and_store_gdd_values_sync_segmented(
     session.query(GDDValue).filter(GDDValue.gdd_model_id == gdd_model_id).delete()
     session.commit()
 
+    total_records = 0
     # Process each segment between resets
     for i in range(len(resets)):
         start_date = resets[i].reset_date
@@ -251,31 +277,34 @@ def calculate_and_store_gdd_values_sync_segmented(
                     run=run_number,
                 )
             )
+        # Bulk insert for this segment
+        session.bulk_save_objects(values_to_insert)
+        total_records += len(values_to_insert)
 
-        # Bulk insert values for this segment
-        if values_to_insert:
-            session.bulk_save_objects(values_to_insert)
-            session.commit()
-
-        # If we found a threshold reset point, create it and recalculate
-        if threshold_reset_needed:
-            # Add a new threshold reset
+        # Handle threshold reset if needed
+        if threshold_reset_needed and threshold_reset_date:
+            # Create new reset record
             new_reset = GDDReset(
                 gdd_model_id=gdd_model_id,
-                reset_date=threshold_reset_date,  # This is now the day after crossing
+                reset_date=threshold_reset_date,
                 run_number=run_number + 1,
                 reset_type=ResetType.threshold,
             )
             session.add(new_reset)
             session.commit()
 
-            # Recalculate from this point with the new reset, but do not clear resets again
-            calculate_and_store_gdd_values_sync_segmented(
-                session, gdd_model_id, location_id, clear_threshold_resets=False
-            )
-            return
+    session.commit()
 
-    return True
+    duration_ms = (time.time() - start_time) * 1000
+    log_performance_metric(
+        "gdd_calculation",
+        duration_ms,
+        success=True,
+        gdd_model_id=gdd_model_id,
+        location_id=location_id,
+        records_processed=total_records,
+        calculation_type="segmented",
+    )
 
 
 def get_effective_parameters(

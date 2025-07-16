@@ -10,13 +10,16 @@ from app.models.task_status import TaskStatus, TaskStatusEnum
 from app.tasks.weather import fetch_and_store_weather
 
 
-async def trigger_weather_fetch_if_needed(db: AsyncSession, lawn: Lawn):
+async def trigger_weather_fetch_if_needed(
+    db: AsyncSession, lawn: Lawn, request_id: str = None
+):
     """
     Checks if a weather fetch is needed for a lawn's location and triggers it.
 
     A fetch is needed if weather is enabled for the lawn and no weather data
     currently exists for its location. If not needed, it creates a success
     task status record for visibility in the UI.
+    If request_id is provided, it is passed to the Celery task for correlation.
     """
     if not lawn.weather_enabled:
         return
@@ -35,9 +38,19 @@ async def trigger_weather_fetch_if_needed(db: AsyncSession, lawn: Lawn):
         logger.info(
             f"No weather data found for location_id={lawn.location_id}. Triggering fetch_and_store_weather."
         )
-        fetch_and_store_weather.delay(
-            lawn.location_id, lawn.location.latitude, lawn.location.longitude
-        )
+        if request_id:
+            fetch_and_store_weather.apply_async(
+                args=[
+                    lawn.location_id,
+                    lawn.location.latitude,
+                    lawn.location.longitude,
+                ],
+                headers={"request_id": request_id},
+            )
+        else:
+            fetch_and_store_weather.delay(
+                lawn.location_id, lawn.location.latitude, lawn.location.longitude
+            )
     else:
         logger.info(
             f"Weather data already exists for location_id={lawn.location_id}. No fetch needed."
