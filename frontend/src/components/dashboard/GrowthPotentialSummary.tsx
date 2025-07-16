@@ -7,14 +7,27 @@ import { format, parseISO } from "date-fns";
 import { fetcher } from "../../lib/fetcher";
 import { Location } from "../../types/location";
 import { Info } from "lucide-react";
+import Select from "react-select";
+import { selectStyles } from "../../lib/selectStyles";
 
-const LINE_COLOR = "#22c55e";
+const LINE_COLORS = ["#22c55e", "#3b82f6", "#f59e0b", "#ef4444"];
+
+// Growth potential types (field, label)
+const GROWTH_POTENTIAL_TYPES = [
+  { field: "growth_potential", label: "Raw" },
+  { field: "gp_3d_avg", label: "3-day Average" },
+  { field: "gp_5d_avg", label: "5-day Average" },
+  { field: "gp_7d_avg", label: "7-day Average" },
+];
 
 type GrowthPotential = {
   id: number;
   date: string;
   location_id: number;
   growth_potential: number | null;
+  gp_3d_avg: number | null;
+  gp_5d_avg: number | null;
+  gp_7d_avg: number | null;
   created_at: string;
   is_forecast: boolean;
 };
@@ -78,6 +91,11 @@ export default function GrowthPotentialSummary({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Growth potential type selection state (default to raw)
+  const [selectedGrowthTypes, setSelectedGrowthTypes] = useState<string[]>([
+    "growth_potential",
+  ]);
+
   // Date range state: default to past 5 days and next 16 days
   const today = new Date();
   const defaultStart = useMemo(() => {
@@ -116,19 +134,22 @@ export default function GrowthPotentialSummary({
       .finally(() => setLoading(false));
   }, [location, startDate, endDate, allTimeMode]);
 
-  const chartData = useMemo(
-    () => [
-      {
-        id: "Growth Potential",
+  const chartData = useMemo(() => {
+    return selectedGrowthTypes.map((type) => {
+      const typeConfig = GROWTH_POTENTIAL_TYPES.find((t) => t.field === type);
+      return {
+        id: typeConfig ? typeConfig.label : type,
         data: growthData.map((d) => ({
           x: d.date,
-          y: d.growth_potential !== null ? d.growth_potential * 100 : null,
+          y:
+            d[type as keyof GrowthPotential] !== null
+              ? (d[type as keyof GrowthPotential] as number) * 100
+              : null,
           isForecast: d.is_forecast,
         })),
-      },
-    ],
-    [growthData]
-  );
+      };
+    });
+  }, [growthData, selectedGrowthTypes]);
 
   // Responsive chart margins and x-axis ticks
   const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
@@ -159,9 +180,11 @@ export default function GrowthPotentialSummary({
   const CustomTooltip = ({ slice }: { slice: any }) => {
     if (!slice.points || slice.points.length === 0) return null;
     const point = slice.points[0];
-    const growthValue =
-      typeof point.data.y === "number" ? point.data.y : Number(point.data.y);
-    const band = getGrowthBand(growthValue);
+    const date =
+      typeof point.data.x === "string"
+        ? format(parseISO(point.data.x), "MM/dd")
+        : String(point.data.x);
+
     return (
       <div
         style={{
@@ -171,22 +194,33 @@ export default function GrowthPotentialSummary({
           borderRadius: 8,
           fontSize: 14,
           boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-          minWidth: 160,
-          maxWidth: 160,
+          minWidth: 200,
+          maxWidth: 200,
           wordBreak: "break-word",
           border: "2px solid #444",
           pointerEvents: "none",
         }}
       >
-        <div style={{ fontWeight: 700, marginBottom: 2 }}>
-          {typeof point.data.x === "string"
-            ? format(parseISO(point.data.x), "MM/dd")
-            : String(point.data.x)}
-        </div>
-        <div style={{ fontWeight: 600, color: band.color }}>
-          Growth: {growthValue.toFixed(1)}%
-        </div>
-        <div style={{ color: "#aaa", marginTop: 2 }}>
+        <div style={{ fontWeight: 700, marginBottom: 4 }}>{date}</div>
+        {slice.points.map((p: any) => {
+          const growthValue =
+            typeof p.data.y === "number" ? p.data.y : Number(p.data.y);
+          const band = getGrowthBand(growthValue);
+          // Get the correct label from our GROWTH_POTENTIAL_TYPES array
+          const typeConfig = GROWTH_POTENTIAL_TYPES.find(
+            (t) => t.label === p.id || p.id.startsWith(t.label)
+          );
+          const displayLabel = typeConfig ? typeConfig.label : p.id;
+          return (
+            <div key={p.id} style={{ marginBottom: 2 }}>
+              <div style={{ fontWeight: 600, color: band.color }}>
+                {displayLabel}: {growthValue.toFixed(1)}%
+              </div>
+              <div style={{ color: "#aaa", fontSize: 12 }}>{band.label}</div>
+            </div>
+          );
+        })}
+        <div style={{ color: "#aaa", marginTop: 4, fontSize: 12 }}>
           {slice.points.some((p: any) => p.data.isForecast)
             ? "Forecast"
             : "Historical"}
@@ -195,16 +229,22 @@ export default function GrowthPotentialSummary({
     );
   };
 
-  // Find today's growth value using local date
+  // Find today's growth values using local date
   const todayStr = format(new Date(), "yyyy-MM-dd");
   const todayData = growthData.find((d) => d.date === todayStr);
   const latestData =
     todayData ||
     (growthData.length > 0 ? growthData[growthData.length - 1] : null);
-  const todayGrowth =
-    latestData && latestData.growth_potential !== null
-      ? latestData.growth_potential * 100
-      : null;
+
+  // Get current values for selected growth types
+  const currentValues = selectedGrowthTypes.map((type) => {
+    if (!latestData) return null;
+    const value = latestData[type as keyof GrowthPotential];
+    return value !== null ? (value as number) * 100 : null;
+  });
+
+  // Use the first selected type for the main display
+  const todayGrowth = currentValues[0];
   const band = todayGrowth !== null ? getGrowthBand(todayGrowth) : null;
 
   return (
@@ -230,7 +270,7 @@ export default function GrowthPotentialSummary({
       <CardContent>
         <div className="mb-4 flex flex-col md:flex-row items-center gap-4">
           <span className="font-medium">Date Range:</span>
-          <div className="w-[260px]">
+          <div className="w-full md:w-[260px]">
             <DateRangePopover
               dateRange={dateRange}
               setDateRange={(range) => {
@@ -242,6 +282,26 @@ export default function GrowthPotentialSummary({
                 setDateRange(null);
               }}
               allTimeMode={allTimeMode}
+            />
+          </div>
+          <span className="font-medium">Growth Types:</span>
+          <div className="w-full md:w-[320px] lg:w-[400px]">
+            <Select
+              isMulti
+              options={GROWTH_POTENTIAL_TYPES.map((type) => ({
+                value: type.field,
+                label: type.label,
+              }))}
+              value={GROWTH_POTENTIAL_TYPES.filter((type) =>
+                selectedGrowthTypes.includes(type.field)
+              ).map((type) => ({ value: type.field, label: type.label }))}
+              onChange={(opts) =>
+                setSelectedGrowthTypes(opts.map((o: any) => o.value))
+              }
+              classNamePrefix="react-select"
+              styles={selectStyles}
+              menuPlacement="auto"
+              placeholder="Select growth types..."
             />
           </div>
         </div>
@@ -305,7 +365,7 @@ export default function GrowthPotentialSummary({
                     line: { stroke: "#444", strokeDasharray: "3 3" },
                   },
                 }}
-                colors={[LINE_COLOR]}
+                colors={LINE_COLORS}
                 layers={[
                   // Background growth bands layer
                   ({ yScale, innerWidth }) => (
@@ -331,8 +391,10 @@ export default function GrowthPotentialSummary({
                   // Custom lines layer for dashed forecast segments
                   ({ series, lineGenerator, xScale, yScale }) => (
                     <g>
-                      {series.map((serie) => {
+                      {series.map((serie, serieIndex) => {
                         const points = serie.data;
+                        const color =
+                          LINE_COLORS[serieIndex % LINE_COLORS.length];
                         return points
                           .map((point, i) => {
                             if (i === 0) return null; // Skip first point
@@ -362,7 +424,7 @@ export default function GrowthPotentialSummary({
                                   ]) || ""
                                 }
                                 fill="none"
-                                stroke={LINE_COLOR}
+                                stroke={color}
                                 strokeWidth={3}
                                 strokeDasharray={isDashed ? "6,6" : ""}
                               />
@@ -390,22 +452,67 @@ export default function GrowthPotentialSummary({
             </div>
             {/* Show today's growth and message below chart */}
             <div className="space-y-1 mt-2">
-              <div className="text-2xl font-bold">
-                {todayGrowth !== null ? todayGrowth.toFixed(1) + "%" : "—"}
-              </div>
-              {band && (
-                <div className="mt-1 text-xs font-semibold text-black dark:text-yellow-300">
-                  {band.label}
-                </div>
-              )}
-              {band && (
-                <div className="mt-1 text-xs text-yellow-700 dark:text-yellow-300">
-                  {band.recommendation}
-                </div>
-              )}
-              {band && (
-                <div className="mt-1 text-xs text-muted-foreground whitespace-pre-line">
-                  {band.detailedRecommendation}
+              {selectedGrowthTypes.length === 1 ? (
+                // Single type display
+                <>
+                  <div className="text-2xl font-bold">
+                    {todayGrowth !== null ? todayGrowth.toFixed(1) + "%" : "—"}
+                  </div>
+                  {band && (
+                    <div className="mt-1 text-xs font-semibold text-black dark:text-yellow-300">
+                      {band.label}
+                    </div>
+                  )}
+                  {band && (
+                    <div className="mt-1 text-xs text-yellow-700 dark:text-yellow-300">
+                      {band.recommendation}
+                    </div>
+                  )}
+                  {band && (
+                    <div className="mt-1 text-xs text-muted-foreground whitespace-pre-line">
+                      {band.detailedRecommendation}
+                    </div>
+                  )}
+                </>
+              ) : (
+                // Multiple types display
+                <div className="space-y-2">
+                  <div className="text-lg font-bold">Current Values:</div>
+                  {selectedGrowthTypes.map((type, index) => {
+                    const value = currentValues[index];
+                    const typeConfig = GROWTH_POTENTIAL_TYPES.find(
+                      (t) => t.field === type
+                    );
+                    const valueBand =
+                      value !== null ? getGrowthBand(value) : null;
+
+                    return (
+                      <div key={type} className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{
+                            backgroundColor: valueBand
+                              ? valueBand.color
+                              : "#666",
+                          }}
+                        />
+                        <span className="font-medium">
+                          {typeConfig?.label}:{" "}
+                          {value !== null ? value.toFixed(1) + "%" : "—"}
+                        </span>
+                        {valueBand && (
+                          <span className="text-xs text-muted-foreground">
+                            ({valueBand.label})
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {band && (
+                    <div className="mt-2 text-xs text-muted-foreground whitespace-pre-line">
+                      {band.detailedRecommendation}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

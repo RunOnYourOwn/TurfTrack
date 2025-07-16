@@ -9,9 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Updated Growth Potential graph to be able to select the raw, 3, 5, or 7 day average values
+
 ### Fixed
 
 ### Changed
+
 ## [0.0.17] - 2025-07-15
 
 ### Added
