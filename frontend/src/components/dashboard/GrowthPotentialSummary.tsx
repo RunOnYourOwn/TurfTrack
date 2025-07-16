@@ -135,7 +135,7 @@ export default function GrowthPotentialSummary({
   }, [location, startDate, endDate, allTimeMode]);
 
   const chartData = useMemo(() => {
-    return selectedGrowthTypes.map((type, index) => {
+    return selectedGrowthTypes.map((type) => {
       const typeConfig = GROWTH_POTENTIAL_TYPES.find((t) => t.field === type);
       return {
         id: typeConfig ? typeConfig.label : type,
@@ -202,7 +202,7 @@ export default function GrowthPotentialSummary({
         }}
       >
         <div style={{ fontWeight: 700, marginBottom: 4 }}>{date}</div>
-        {slice.points.map((p: any, index: number) => {
+        {slice.points.map((p: any) => {
           const growthValue =
             typeof p.data.y === "number" ? p.data.y : Number(p.data.y);
           const band = getGrowthBand(growthValue);
@@ -244,7 +244,6 @@ export default function GrowthPotentialSummary({
   });
 
   // Use the first selected type for the main display
-  const primaryType = selectedGrowthTypes[0];
   const todayGrowth = currentValues[0];
   const band = todayGrowth !== null ? getGrowthBand(todayGrowth) : null;
 
