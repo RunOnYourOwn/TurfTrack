@@ -137,8 +137,13 @@ export default function GrowthPotentialSummary({
   const chartData = useMemo(() => {
     return selectedGrowthTypes.map((type) => {
       const typeConfig = GROWTH_POTENTIAL_TYPES.find((t) => t.field === type);
+      // Find the fixed color index for this growth type
+      const colorIndex = GROWTH_POTENTIAL_TYPES.findIndex(
+        (t) => t.field === type
+      );
       return {
         id: typeConfig ? typeConfig.label : type,
+        color: LINE_COLORS[colorIndex % LINE_COLORS.length],
         data: growthData.map((d) => ({
           x: d.date,
           y:
@@ -365,7 +370,7 @@ export default function GrowthPotentialSummary({
                     line: { stroke: "#444", strokeDasharray: "3 3" },
                   },
                 }}
-                colors={LINE_COLORS}
+                colors={(d) => d.color}
                 layers={[
                   // Background growth bands layer
                   ({ yScale, innerWidth }) => (
@@ -391,10 +396,9 @@ export default function GrowthPotentialSummary({
                   // Custom lines layer for dashed forecast segments
                   ({ series, lineGenerator, xScale, yScale }) => (
                     <g>
-                      {series.map((serie, serieIndex) => {
+                      {series.map((serie) => {
                         const points = serie.data;
-                        const color =
-                          LINE_COLORS[serieIndex % LINE_COLORS.length];
+                        const color = serie.color;
                         return points
                           .map((point, i) => {
                             if (i === 0) return null; // Skip first point
