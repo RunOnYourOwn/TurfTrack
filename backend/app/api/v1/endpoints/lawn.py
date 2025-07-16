@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -8,6 +8,7 @@ from app.schemas.lawn import LawnCreate, LawnRead, LawnUpdate
 from typing import List
 from app.utils.location import get_or_create_location, cleanup_orphaned_location
 from app.utils.weather import trigger_weather_fetch_if_needed
+from app.core.logging_config import log_business_event
 
 router = APIRouter(prefix="/lawns", tags=["lawns"])
 
@@ -20,7 +21,11 @@ async def list_lawns(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/", response_model=LawnRead, status_code=status.HTTP_201_CREATED)
-async def create_lawn(lawn: LawnCreate, db: AsyncSession = Depends(get_db)):
+async def create_lawn(
+    lawn: LawnCreate, db: AsyncSession = Depends(get_db), request: Request = None
+):
+    request_id = getattr(request.state, "request_id", None) if request else None
+
     db_lawn = Lawn(
         name=lawn.name,
         area=lawn.area,
@@ -35,14 +40,24 @@ async def create_lawn(lawn: LawnCreate, db: AsyncSession = Depends(get_db)):
     await db.commit()
     await db.refresh(db_lawn)
 
+    # Log business event
+    log_business_event(
+        "lawn_created",
+        f"Lawn '{lawn.name}' created",
+        lawn_id=db_lawn.id,
+        lawn_name=lawn.name,
+        location_id=lawn.location_id,
+        request_id=request_id,
+    )
+
     # Eagerly load the location relationship
     result = await db.execute(
         select(Lawn).options(selectinload(Lawn.location)).where(Lawn.id == db_lawn.id)
     )
     db_lawn = result.scalars().first()
 
-    # Trigger weather fetch if needed
-    await trigger_weather_fetch_if_needed(db, db_lawn)
+    # Trigger weather fetch if needed, passing request_id if available
+    await trigger_weather_fetch_if_needed(db, db_lawn, request_id=request_id)
 
     # The location relationship needs to be loaded before returning
     await db.refresh(db_lawn, attribute_names=["location"])
@@ -62,11 +77,26 @@ async def get_lawn(lawn_id: int, db: AsyncSession = Depends(get_db)):
 
 @router.put("/{lawn_id}", response_model=LawnRead)
 async def update_lawn(
-    lawn_id: int, lawn: LawnUpdate, db: AsyncSession = Depends(get_db)
+    lawn_id: int,
+    lawn: LawnUpdate,
+    db: AsyncSession = Depends(get_db),
+    request: Request = None,
 ):
+    request_id = getattr(request.state, "request_id", None) if request else None
+
     db_lawn = await db.get(Lawn, lawn_id)
     if not db_lawn:
         raise HTTPException(status_code=404, detail="Lawn not found")
+
+    # Log business event before update
+    log_business_event(
+        "lawn_updated",
+        f"Lawn '{db_lawn.name}' updated",
+        lawn_id=lawn_id,
+        lawn_name=db_lawn.name,
+        location_id=db_lawn.location_id,
+        request_id=request_id,
+    )
 
     # Store the old location_id for cleanup check
     old_location_id = db_lawn.location_id
@@ -113,8 +143,8 @@ async def update_lawn(
     )
     db_lawn = result.scalars().first()
 
-    # Trigger weather fetch if needed
-    await trigger_weather_fetch_if_needed(db, db_lawn)
+    # Trigger weather fetch if needed, passing request_id if available
+    await trigger_weather_fetch_if_needed(db, db_lawn, request_id=request_id)
 
     # Clean up old location if it was changed and is now orphaned
     if location_changed:
@@ -126,14 +156,24 @@ async def update_lawn(
 
 
 @router.delete("/{lawn_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_lawn(lawn_id: int, db: AsyncSession = Depends(get_db)):
-    # Get the lawn with its location
-    result = await db.execute(
-        select(Lawn).options(selectinload(Lawn.location)).where(Lawn.id == lawn_id)
-    )
-    db_lawn = result.scalars().first()
+async def delete_lawn(
+    lawn_id: int, db: AsyncSession = Depends(get_db), request: Request = None
+):
+    request_id = getattr(request.state, "request_id", None) if request else None
+
+    db_lawn = await db.get(Lawn, lawn_id)
     if not db_lawn:
         raise HTTPException(status_code=404, detail="Lawn not found")
+
+    # Log business event before deletion
+    log_business_event(
+        "lawn_deleted",
+        f"Lawn '{db_lawn.name}' deleted",
+        lawn_id=lawn_id,
+        lawn_name=db_lawn.name,
+        location_id=db_lawn.location_id,
+        request_id=request_id,
+    )
 
     # Store location_id for later use
     location_id = db_lawn.location_id

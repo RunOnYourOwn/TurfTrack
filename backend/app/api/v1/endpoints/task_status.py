@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.core.database import get_db
@@ -70,10 +70,15 @@ def create_initial_task_status(task_id: str, task_name: str, location_id: int = 
 
 
 @router.post("/trigger-weather-update", tags=["tasks"])
-def trigger_weather_update():
-    task = update_weather_for_all_lawns.delay()
-
-    # Create initial task status record
-    create_initial_task_status(task.id, "update_weather_for_all_lawns")
-
+async def trigger_weather_update(request: Request):
+    request_id = getattr(request.state, "request_id", None)
+    if request_id:
+        task = update_weather_for_all_lawns.apply_async(
+            headers={"request_id": request_id}
+        )
+    else:
+        task = update_weather_for_all_lawns.delay()
+    create_initial_task_status(
+        task.id, "update_weather_for_all_lawns", request_id=request_id
+    )
     return JSONResponse({"task_id": task.id, "status": "started"})

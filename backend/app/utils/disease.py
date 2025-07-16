@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 from app.models.daily_weather import DailyWeather, WeatherType
 from app.models.disease_pressure import DiseasePressure
+from app.core.logging_config import log_performance_metric
+import time
 
 # Smith-Kerns Dollar Spot Model reference: https://tdl.wisc.edu/dollar-spot-model/
 SMITH_KERNS_COEFFICIENTS = {
@@ -24,6 +26,8 @@ def calculate_smith_kerns_for_location(
     Uses historical data when available, fills with forecast data as needed.
     Stores results in disease_pressure table.
     """
+    start_time = time.time()
+
     # Get all relevant weather data for the window
     weather_rows = (
         session.execute(
@@ -59,6 +63,7 @@ def calculate_smith_kerns_for_location(
         "relative_humidity_mean",
     ]
 
+    records_processed = 0
     for target_date in all_dates:
         # Only process if we have a weather record for the target date
         if target_date not in weather_by_date:
@@ -165,4 +170,18 @@ def calculate_smith_kerns_for_location(
                 risk_score=risk_score,
             )
             session.add(dp)
+        records_processed += 1
+
     session.commit()
+
+    duration_ms = (time.time() - start_time) * 1000
+    log_performance_metric(
+        "disease_pressure_calc",
+        duration_ms,
+        success=True,
+        location_id=location_id,
+        start_date=start_date.isoformat(),
+        end_date=end_date.isoformat(),
+        records_processed=records_processed,
+        disease_type="dollar_spot",
+    )

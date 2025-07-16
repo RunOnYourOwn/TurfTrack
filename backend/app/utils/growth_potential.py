@@ -4,6 +4,10 @@ from app.models.daily_weather import DailyWeather
 from app.models.growth_potential import GrowthPotential
 from sqlalchemy import and_, select
 import logging
+from app.core.logging_config import log_performance_metric
+import time
+
+logger = logging.getLogger(__name__)
 
 
 def calculate_growth_potential(temp_c: float, grass_type: str) -> float:
@@ -38,6 +42,8 @@ def calculate_growth_potential_for_location(
         start_date (date): Start date (inclusive)
         end_date (date): End date (inclusive)
     """
+    start_time = time.time()
+
     logger = logging.getLogger(__name__)
     # Get first lawn for this location
     lawn = (
@@ -47,6 +53,14 @@ def calculate_growth_potential_for_location(
     )
     if not lawn:
         logger.warning(f"No lawn found for location {location_id}, skipping GP calc.")
+        duration_ms = (time.time() - start_time) * 1000
+        log_performance_metric(
+            "growth_potential_calc",
+            duration_ms,
+            success=False,
+            location_id=location_id,
+            error="No lawn found for location",
+        )
         return
     grass_type = lawn.grass_type.value
     # Get all weather records for this location/date range
@@ -64,7 +78,16 @@ def calculate_growth_potential_for_location(
         logger.warning(
             f"No weather data for location {location_id} in range {start_date} to {end_date}"
         )
+        duration_ms = (time.time() - start_time) * 1000
+        log_performance_metric(
+            "growth_potential_calc",
+            duration_ms,
+            success=False,
+            location_id=location_id,
+            error="No weather data found",
+        )
         return
+    records_processed = 0
     for weather in weather_records:
         # Use average daily temp (C)
         if (
@@ -104,6 +127,7 @@ def calculate_growth_potential_for_location(
                     growth_potential=gp,
                 )
             )
+        records_processed += 1
     session.commit()
     logger.info(
         f"Growth potential calculated for location {location_id} from {start_date} to {end_date}."
@@ -147,4 +171,16 @@ def calculate_growth_potential_for_location(
     session.commit()
     logger.info(
         f"Rolling averages updated for location {location_id} from {start_date} to {end_date}."
+    )
+
+    duration_ms = (time.time() - start_time) * 1000
+    log_performance_metric(
+        "growth_potential_calc",
+        duration_ms,
+        success=True,
+        location_id=location_id,
+        start_date=start_date.isoformat(),
+        end_date=end_date.isoformat(),
+        records_processed=records_processed,
+        grass_type=grass_type,
     )

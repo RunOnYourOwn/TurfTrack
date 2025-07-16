@@ -1,7 +1,6 @@
 import logging
 import logging.config
 import sys
-from typing import Dict, Any
 from pythonjsonlogger import jsonlogger
 from app.core.config import settings
 
@@ -84,7 +83,7 @@ def setup_logging() -> None:
     # Log the configuration
     logger = logging.getLogger("app.core.logging_config")
     logger.info(
-        f"Logging configured",
+        "Logging configured",
         extra={
             "log_level": log_level,
             "environment": settings.ENVIRONMENT,
@@ -150,6 +149,39 @@ def log_exception(request_id: str, exc: Exception, **kwargs) -> None:
             "request_id": request_id,
             "exception_type": type(exc).__name__,
             "event_type": "exception",
+            **kwargs,
+        },
+    )
+
+
+def log_performance_metric(
+    operation: str, duration_ms: float, success: bool = True, **kwargs
+) -> None:
+    """Log performance metrics for monitoring and alerting."""
+    logger = logging.getLogger("app.metrics.performance")
+    log_level = logging.ERROR if not success else logging.INFO
+
+    logger.log(
+        log_level,
+        f"Performance metric: {operation}",
+        extra={
+            "operation": operation,
+            "duration_ms": round(duration_ms, 2),
+            "success": success,
+            "event_type": "performance_metric",
+            **kwargs,
+        },
+    )
+
+
+def log_business_event(event_type: str, message: str, **kwargs) -> None:
+    """Log business events for auditing and analytics."""
+    logger = logging.getLogger("app.business.events")
+    logger.info(
+        message,
+        extra={
+            "event_type": event_type,
+            "business_event": True,
             **kwargs,
         },
     )

@@ -12,6 +12,11 @@ services:
       - ./backend:/app
       - ./backend/.env:/app/.env
       - ./VERSION:/app/VERSION
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       - ALEMBIC_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
@@ -23,6 +28,8 @@ services:
       - REDBEAT_LOCK_TIMEOUT=${REDBEAT_LOCK_TIMEOUT}
       - TZ=${TZ}
       - ENVIRONMENT=development
+      - UVICORN_LOG_LEVEL=info
+      - UVICORN_ACCESS_LOG=false
     depends_on:
       db:
         condition: service_healthy
@@ -41,6 +48,11 @@ services:
     volumes:
       - ./frontend:/app
       - frontend_node_modules:/app/node_modules
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       - NODE_ENV=development
       - VITE_API_URL=
@@ -58,6 +70,11 @@ services:
       - ./backend:/app
       - ./backend/.env:/app/.env
       - ./VERSION:/app/VERSION
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       - CELERY_LOG_LEVEL=debug
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
@@ -85,6 +102,11 @@ services:
       - ./backend:/app
       - ./backend/.env:/app/.env
       - ./VERSION:/app/VERSION
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       - CELERY_LOG_LEVEL=debug
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}

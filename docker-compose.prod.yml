@@ -4,7 +4,15 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile.prod
+    env_file:
+      - .env
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
+      - ENVIRONMENT=production
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       - ALEMBIC_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       - REDIS_URL=redis://${REDIS_HOST}:${REDIS_PORT}/0
@@ -14,6 +22,8 @@ services:
       - REDBEAT_LOCK_KEY=${REDBEAT_LOCK_KEY}
       - REDBEAT_LOCK_TIMEOUT=${REDBEAT_LOCK_TIMEOUT}
       - TZ=${TZ}
+      - UVICORN_LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - UVICORN_ACCESS_LOG=false
     depends_on:
       db:
         condition: service_healthy
@@ -27,8 +37,15 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile.prod
+    env_file:
+      - .env
     ports:
       - "3000:3000" # Expose on port 3000 for Nginx Proxy Manager
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       - NODE_ENV=${NODE_ENV}
       - VITE_API_URL=${VITE_API_URL}
@@ -44,7 +61,15 @@ services:
       context: ./backend
       dockerfile: Dockerfile.celery
     command: worker
+    env_file:
+      - .env
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
+      - ENVIRONMENT=production
       - CELERY_LOG_LEVEL=${CELERY_LOG_LEVEL}
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       - ALEMBIC_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
@@ -67,7 +92,15 @@ services:
       context: ./backend
       dockerfile: Dockerfile.celery
     command: beat
+    env_file:
+      - .env
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
+      - ENVIRONMENT=production
       - CELERY_LOG_LEVEL=${CELERY_LOG_LEVEL}
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       - ALEMBIC_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}

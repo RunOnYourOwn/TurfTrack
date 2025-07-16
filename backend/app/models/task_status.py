@@ -30,3 +30,4 @@ class TaskStatus(Base):
     finished_at = Column(DateTime(timezone=True), nullable=True)
     result = Column(Text, nullable=True)
     error = Column(Text, nullable=True)
+    request_id = Column(String, nullable=True)  # For correlation ID

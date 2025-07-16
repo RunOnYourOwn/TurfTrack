@@ -52,3 +52,6 @@ docs/tasks.md
 remotes.md
 docs/versioning.md
 RELEASE_WORKFLOW.md
+backend/app/core/__pycache__/config.cpython-312.pyc
+backend/app/core/__pycache__/database.cpython-312.pyc
+

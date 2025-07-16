@@ -1,0 +1,74 @@
+# Logging infrastructure for TurfTrack
+# This can be used with any of the main compose files:
+# docker-compose -f docker-compose.dev.yml -f docker-compose.logging.yml up -d
+# docker-compose -f docker-compose.prod.yml -f docker-compose.logging.yml up -d
+
+services:
+  loki:
+    image: grafana/loki:3.5.2
+    container_name: turftrack-loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./logging/loki-config.yaml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+    networks:
+      - turftrack_network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  promtail:
+    image: grafana/promtail:3.5.2
+    container_name: turftrack-promtail
+    restart: unless-stopped
+    # To use a different config for dev/prod, change the volume mapping below:
+    # For development:
+    #   - ./logging/promtail-config.yaml:/etc/promtail/config.yml
+    # For production:
+    #   - ./logging/promtail-config.prod.yaml:/etc/promtail/config.yml
+    volumes:
+      - /var/log:/var/log
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./logging/promtail-config.prod.yaml:/etc/promtail/config.yml
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - turftrack_network
+    depends_on:
+      loki:
+        condition: service_healthy
+
+  grafana:
+    image: grafana/grafana:12.0.2
+    container_name: turftrack-grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./logging/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+    networks:
+      - turftrack_network
+    depends_on:
+      loki:
+        condition: service_healthy
+
+volumes:
+  loki_data:
+  grafana_data:
+
+networks:
+  turftrack_network:
+    external: true

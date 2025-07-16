@@ -2,10 +2,14 @@ from fastapi import FastAPI
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
+from app.core.logging_config import setup_logging
 from app.api.v1.router import api_router
 
 # Import Celery app to ensure tasks are registered
 from app.celery_app import app as celery_app
+
+# Configure logging BEFORE creating the FastAPI app
+setup_logging()
 
 app = FastAPI(
     title=settings.APP_NAME,
