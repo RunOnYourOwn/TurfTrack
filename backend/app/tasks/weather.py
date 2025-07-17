@@ -582,6 +582,7 @@ def _update_recent_weather_for_location_sync(
 
 @app.task(name="update_weather_for_all_lawns", bind=True)
 def update_weather_for_all_lawns(self):
+    print("update_weather_for_all_lawns started")
     """
     Refresh historical weather data and 16-day forecast for every Location that has at least
     one lawn with weather updates enabled.

@@ -16,8 +16,9 @@ def setup_logging() -> None:
 
     # Create formatter
     if use_json:
+        # Use correct field names for python-json-logger
         formatter = jsonlogger.JsonFormatter(
-            fmt="%(timestamp)s %(level)s %(name)s %(message)s",
+            fmt="%(asctime)s %(levelname)s %(name)s %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
         )
     else:
@@ -82,14 +83,19 @@ def setup_logging() -> None:
 
     # Log the configuration
     logger = logging.getLogger("app.core.logging_config")
-    logger.info(
-        "Logging configured",
-        extra={
-            "log_level": log_level,
-            "environment": settings.ENVIRONMENT,
-            "format": "json" if use_json else "pretty",
-        },
-    )
+    try:
+        logger.info(
+            "Logging configured",
+            extra={
+                "log_level": log_level,
+                "environment": settings.ENVIRONMENT,
+                "format": "json" if use_json else "pretty",
+            },
+        )
+    except Exception as e:
+        # Fallback to basic logging if JSON logger fails
+        logging.basicConfig(level=log_level)
+        logging.error(f"Logging configuration failed: {e}")
 
 
 def get_logger(name: str) -> logging.Logger:
