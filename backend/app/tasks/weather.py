@@ -114,11 +114,23 @@ async def create_or_update_task_status(
 
 @app.task(name="fetch_and_store_weather", bind=True)
 def fetch_and_store_weather(self, location_id: int, latitude: float, longitude: float):
+    print(f"[DEBUG] fetch_and_store_weather task started for location {location_id}")
+    logger.info(
+        f"[fetch_and_store_weather] Task {self.request.id} started for location {location_id}"
+    )
     task_id = self.request.id
-    request_id = self.request.headers.get("request_id")
+    request_id = (
+        self.request.headers.get("request_id")
+        if hasattr(self.request, "headers") and self.request.headers
+        else None
+    )
+    print(f"[DEBUG] Task ID: {task_id}, Request ID: {request_id}")
+
     try:
         with SessionLocal() as session:
+            print(f"[DEBUG] Database session created for location {location_id}")
             try:
+                print(f"[DEBUG] Creating task status record for location {location_id}")
                 create_or_update_task_status_sync(
                     session,
                     task_id,
@@ -128,7 +140,17 @@ def fetch_and_store_weather(self, location_id: int, latitude: float, longitude: 
                     started=True,
                     request_id=request_id,
                 )
+                print(
+                    f"[DEBUG] Task status updated to started for location {location_id}"
+                )
+
+                print(f"[DEBUG] Starting weather fetch for location {location_id}")
                 _fetch_and_store_weather_sync(location_id, latitude, longitude, session)
+                print(f"[DEBUG] Weather fetch completed for location {location_id}")
+
+                print(
+                    f"[DEBUG] Updating task status to success for location {location_id}"
+                )
                 create_or_update_task_status_sync(
                     session,
                     task_id,
@@ -138,7 +160,15 @@ def fetch_and_store_weather(self, location_id: int, latitude: float, longitude: 
                     finished=True,
                     request_id=request_id,
                 )
+                print(
+                    f"[DEBUG] Task status updated to success for location {location_id}"
+                )
+                logger.info(
+                    f"[fetch_and_store_weather] Task {task_id} completed successfully for location {location_id}"
+                )
+
             except (requests.exceptions.RequestException, SQLAlchemyError) as e:
+                print(f"[DEBUG] Error in weather task for location {location_id}: {e}")
                 logger.error(
                     f"Weather task failed for loc {location_id}: {e}",
                     extra={"request_id": request_id},
@@ -155,6 +185,9 @@ def fetch_and_store_weather(self, location_id: int, latitude: float, longitude: 
                 )
                 raise
             except Exception as e:
+                print(
+                    f"[DEBUG] Unexpected error in weather task for location {location_id}: {e}"
+                )
                 logger.error(
                     f"An unexpected error occurred in weather task for loc {location_id}: {e}",
                     extra={"request_id": request_id},
@@ -171,6 +204,7 @@ def fetch_and_store_weather(self, location_id: int, latitude: float, longitude: 
                 )
                 raise
     except SQLAlchemyError as e:
+        print(f"[DEBUG] Database connection failed for weather task: {e}")
         logger.critical(
             f"Database connection failed for weather task: {e}",
             extra={"request_id": request_id},
@@ -333,6 +367,12 @@ def _fetch_and_store_weather_sync(
             location_id=location_id,
             api_endpoint="openmeteo_forecast",
         )
+
+        # Debug logging
+        dates = _get_dates(daily)
+        print(f"[DEBUG] API returned {len(dates)} dates")
+        print(f"DEBUG] Date range: {dates[0].date()} to {dates[-1].date()}")
+
     except Exception as e:
         duration_ms = (time.time() - start_time) * 1000
         log_performance_metric(
@@ -629,17 +669,29 @@ def update_weather_for_all_lawns(self):
                 )
                 return "No locations with weather enabled"
 
+            print(
+                f"[DEBUG] Starting to process {len(locations_with_weather)} locations"
+            )
             # Process each location
             for location in locations_with_weather:
-                print(f"Processing location: {location.name} (ID: {location.id})")
+                print(f"[DEBUG] Processing location {location.id})")
+                print(f"Processing location:{location.name} (ID: {location.id})")
                 try:
-                    fetch_and_store_weather.delay(
+                    print(
+                        f"[DEBUG] About to queue weather fetch for location {location.id}"
+                    )
+                    result = fetch_and_store_weather.delay(
                         location.id, location.latitude, location.longitude
                     )
-                    print(f"Queued weather fetch for location {location.id}")
+                    print(
+                        f"[DEBUG] Successfully queued weather fetch for location {location.id}, task ID: {result.id}"
+                    )
+                    logger.info(
+                        f"[update_weather_for_all_lawns] Queued fetch_and_store_weather task {result.id} for location {location.id}"
+                    )
                 except Exception as e:
                     print(
-                        f"Error queuing weather fetch for location {location.id}: {e}"
+                        f"[DEBUG] Error queuing weather fetch for location {location.id}: {e}"
                     )
                     logger.error(
                         f"Error queuing weather fetch for location {location.id}: {e}"

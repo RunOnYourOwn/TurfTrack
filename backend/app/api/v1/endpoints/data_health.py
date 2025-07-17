@@ -8,7 +8,7 @@ from app.models.daily_weather import DailyWeather
 from app.models.gdd import GDDValue
 from app.models.disease_pressure import DiseasePressure
 from app.models.growth_potential import GrowthPotential
-from datetime import timedelta
+from datetime import timedelta, date
 
 router = APIRouter(tags=["data_health"])
 
@@ -37,8 +37,14 @@ def find_missing_ranges(present_dates, expected_dates):
 async def get_data_health(db: AsyncSession = Depends(get_db)):
     locations = (await db.execute(select(Location))).scalars().all()
     results = []
+
+    # Use a reasonable expected date range: 60 days ago to 16 days in the future (inclusive)
+    today = date.today()
+    expected_start = today - timedelta(days=60)
+    expected_end = today + timedelta(days=16)
+
     for loc in locations:
-        # Define the expected date range (e.g., from first to last weather date)
+        # Get all weather dates for this location
         weather_dates = (
             (
                 await db.execute(
@@ -48,11 +54,11 @@ async def get_data_health(db: AsyncSession = Depends(get_db)):
             .scalars()
             .all()
         )
-        if not weather_dates:
-            continue
-        min_date, max_date = min(weather_dates), max(weather_dates)
+
+        # Create expected dates from our reasonable range (end-exclusive)
         expected_dates = [
-            min_date + timedelta(days=i) for i in range((max_date - min_date).days + 1)
+            expected_start + timedelta(days=i)
+            for i in range((expected_end - expected_start).days)
         ]
 
         async def get_present_dates(
@@ -92,6 +98,20 @@ async def get_data_health(db: AsyncSession = Depends(get_db)):
                 .all()
             )
 
+        async def get_any_weather_dates(location_id):
+            """Check for any weather records (to detect complete gaps)"""
+            return set(
+                (
+                    await db.execute(
+                        select(DailyWeather.date).where(
+                            DailyWeather.location_id == location_id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+
         missing = {}
         value_fields = {
             "weather": "temperature_max_c",  # or another key field for weather
@@ -99,6 +119,7 @@ async def get_data_health(db: AsyncSession = Depends(get_db)):
             "disease_pressure": "risk_score",  # adjust to your actual field name
             "growth_potential": "growth_potential",
         }
+
         for name, model in [
             ("weather", DailyWeather),
             ("gdd", GDDValue),
@@ -134,11 +155,12 @@ async def get_data_health(db: AsyncSession = Depends(get_db)):
                     ).scalar()
                     if not first_reset_date:
                         continue  # skip if no reset for this model
-                    # Use latest weather date as end
+                    # Use expected date range, but start from reset date
+                    model_start = max(first_reset_date, expected_start)
                     model_expected_dates = [
-                        first_reset_date + timedelta(days=i)
-                        for i in range((max_date - first_reset_date).days + 1)
-                        if first_reset_date + timedelta(days=i) <= max_date
+                        model_start + timedelta(days=i)
+                        for i in range((expected_end - model_start).days + 1)
+                        if model_start + timedelta(days=i) <= expected_end
                     ]
                     model_present_dates = await get_present_dates(
                         GDDValue,
@@ -164,9 +186,17 @@ async def get_data_health(db: AsyncSession = Depends(get_db)):
                 )
                 missing[name] = find_missing_ranges(present_dates, expected_dates[4:])
             elif name == "weather":
-                # Use comprehensive weather check that includes all required fields
-                present_dates = await get_complete_weather_dates(loc.id)
-                missing[name] = find_missing_ranges(present_dates, expected_dates)
+                # First check if there are any weather records at all
+                any_weather_dates = await get_any_weather_dates(loc.id)
+                if not any_weather_dates:
+                    # No weather data at all - mark entire range as missing
+                    missing[name] = [
+                        {"start": str(expected_start), "end": str(expected_end)}
+                    ]
+                else:
+                    # Check for complete weather records with required fields
+                    present_dates = await get_complete_weather_dates(loc.id)
+                    missing[name] = find_missing_ranges(present_dates, expected_dates)
             elif name == "growth_potential":
                 # Check for weather data with required fields for growth potential calculation
                 # (uses same function as weather since it requires temperature fields)
