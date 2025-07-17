@@ -633,7 +633,9 @@ def update_weather_for_all_lawns(self):
             for location in locations_with_weather:
                 print(f"Processing location: {location.name} (ID: {location.id})")
                 try:
-                    fetch_and_store_weather.delay(location.id)
+                    fetch_and_store_weather.delay(
+                        location.id, location.latitude, location.longitude
+                    )
                     print(f"Queued weather fetch for location {location.id}")
                 except Exception as e:
                     print(
