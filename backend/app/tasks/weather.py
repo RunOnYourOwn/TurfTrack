@@ -582,118 +582,113 @@ def _update_recent_weather_for_location_sync(
 
 @app.task(name="update_weather_for_all_lawns", bind=True)
 def update_weather_for_all_lawns(self):
-    print("update_weather_for_all_lawns started")
-    """
-    Refresh historical weather data and 16-day forecast for every Location that has at least
-    one lawn with weather updates enabled.
-
-    Historical data fetching strategy:
-    - Finds the earliest forecast date in the database for each location
-    - Fetches historical data from that date to today to fill any gaps
-    - If no forecast data exists, fetches from 7 days ago to today
-    - This ensures weather data continuity even if the app has been offline
-    """
-    task_id = self.request.id
-    request_id = self.request.headers.get("request_id")
+    logger.info(f"[update_weather_for_all_lawns] Task {self.request.id} started")
     try:
         with SessionLocal() as session:
-            # Create task status record for start
+            print("Database session created successfully")
+            # Update task status to started (upsert)
             create_or_update_task_status_sync(
                 session,
-                task_id,
+                self.request.id,
                 "update_weather_for_all_lawns",
-                None,  # No specific location_id for this task
+                None,  # No specific location for this task
                 TaskStatusEnum.started,
                 started=True,
-                request_id=request_id,
+                request_id=self.request.headers.get("request_id")
+                if hasattr(self.request, "headers") and self.request.headers
+                else None,
             )
+            print("Task status record updated to started")
 
-            # One row per unique Location that has an enabled Lawn
-            stmt = (
-                select(
-                    Location.id.label("location_id"),
-                    Location.latitude,
-                    Location.longitude,
-                )
-                .join(
-                    Lawn,
-                    and_(
-                        Lawn.location_id == Location.id, Lawn.weather_enabled.is_(True)
-                    ),
-                )
-                .group_by(Location.id, Location.latitude, Location.longitude)
+            # Get all locations that have at least one lawn with weather enabled
+            locations_with_weather = (
+                session.query(Location)
+                .join(Lawn)
+                .filter(Lawn.weather_enabled)
+                .distinct()
+                .all()
             )
+            print(f"Found {len(locations_with_weather)} locations with weather enabled")
 
-            for loc in session.execute(stmt):
+            if not locations_with_weather:
+                print("No locations with weather enabled found")
+                task_status = (
+                    session.query(TaskStatus)
+                    .filter(TaskStatus.task_id == self.request.id)
+                    .first()
+                )
+                if task_status:
+                    task_status.status = TaskStatusEnum.success
+                    task_status.result = "No locations with weather enabled"
+                    task_status.finished_at = datetime.datetime.now(
+                        datetime.timezone.utc
+                    )
+                    session.commit()
+                logger.info(
+                    f"[update_weather_for_all_lawns] Task {self.request.id} completed: No locations with weather enabled"
+                )
+                return "No locations with weather enabled"
+
+            # Process each location
+            for location in locations_with_weather:
+                print(f"Processing location: {location.name} (ID: {location.id})")
                 try:
-                    _update_recent_weather_for_location_sync(
-                        loc.location_id, loc.latitude, loc.longitude
-                    )
-                except (requests.exceptions.RequestException, SQLAlchemyError) as e:
-                    logger.error(
-                        f"[{task_id}] Weather update failed for location "
-                        f"{loc.location_id}: {e}",
-                        extra={"request_id": request_id},
-                    )
+                    fetch_and_store_weather.delay(location.id)
+                    print(f"Queued weather fetch for location {location.id}")
                 except Exception as e:
+                    print(
+                        f"Error queuing weather fetch for location {location.id}: {e}"
+                    )
                     logger.error(
-                        f"[{task_id}] Unexpected error updating location "
-                        f"{loc.location_id}: {e}",
-                        extra={"request_id": request_id},
+                        f"Error queuing weather fetch for location {location.id}: {e}"
                     )
 
-            # Create task status record for success
-            create_or_update_task_status_sync(
-                session,
-                task_id,
-                "update_weather_for_all_lawns",
-                None,  # No specific location_id for this task
-                TaskStatusEnum.success,
-                finished=True,
-                request_id=request_id,
+            # Update task status
+            task_status = (
+                session.query(TaskStatus)
+                .filter(TaskStatus.task_id == self.request.id)
+                .first()
             )
-
-    except (requests.exceptions.RequestException, SQLAlchemyError) as e:
-        logger.error(
-            f"All-lawn weather update task failed: {e}",
-            extra={"request_id": request_id},
-        )
-        try:
-            with SessionLocal() as session:
-                create_or_update_task_status_sync(
-                    session,
-                    task_id,
-                    "update_weather_for_all_lawns",
-                    None,  # No specific location_id for this task
-                    TaskStatusEnum.failure,
-                    error=str(e),
-                    finished=True,
-                    request_id=request_id,
+            if task_status:
+                task_status.status = TaskStatusEnum.success
+                task_status.result = (
+                    f"Processed {len(locations_with_weather)} locations"
                 )
-        except SQLAlchemyError:
-            # Cannot update task status if DB is down, Celery will retry
-            pass
-        raise
+                task_status.finished_at = datetime.datetime.now(datetime.timezone.utc)
+                session.commit()
+            logger.info(
+                f"[update_weather_for_all_lawns] Task {self.request.id} completed successfully: Processed {len(locations_with_weather)} locations"
+            )
+            print("Task completed successfully")
+            return f"Processed {len(locations_with_weather)} locations"
     except Exception as e:
+        import traceback
+
         logger.error(
-            f"An unexpected error occurred in all-lawn weather update task: {e}",
-            extra={"request_id": request_id},
+            f"[update_weather_for_all_lawns] Task {self.request.id} failed: {e}\n{traceback.format_exc()}"
         )
+        print(f"Error in update_weather_for_all_lawns: {e}")
+        print(f"Traceback: {traceback.format_exc()}")
+        # Update task status with error
         try:
             with SessionLocal() as session:
-                create_or_update_task_status_sync(
-                    session,
-                    task_id,
-                    "update_weather_for_all_lawns",
-                    None,  # No specific location_id for this task
-                    TaskStatusEnum.failure,
-                    error="An unexpected error occurred.",
-                    finished=True,
-                    request_id=request_id,
+                task_status = (
+                    session.query(TaskStatus)
+                    .filter(TaskStatus.task_id == self.request.id)
+                    .first()
                 )
-        except SQLAlchemyError:
-            # Cannot update task status if DB is down, Celery will retry
-            pass
+                if task_status:
+                    task_status.status = TaskStatusEnum.failure
+                    task_status.error = str(e)
+                    task_status.finished_at = datetime.datetime.now(
+                        datetime.timezone.utc
+                    )
+                    session.commit()
+        except Exception as update_error:
+            logger.error(
+                f"[update_weather_for_all_lawns] Error updating task status after failure: {update_error}"
+            )
+            print(f"Error updating task status: {update_error}")
         raise
 
 

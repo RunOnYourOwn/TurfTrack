@@ -44,7 +44,9 @@ async def get_task(task_id: str, db: AsyncSession = Depends(get_db)):
     return task
 
 
-def create_initial_task_status(task_id: str, task_name: str, location_id: int = None):
+def create_initial_task_status(
+    task_id: str, task_name: str, location_id: int = None, request_id: str = None
+):
     """Create initial task status record when task is queued"""
     with SessionLocal() as session:
         now = datetime.now(timezone.utc)
@@ -54,12 +56,14 @@ def create_initial_task_status(task_id: str, task_name: str, location_id: int = 
             related_location_id=location_id,
             status=TaskStatusEnum.pending,
             created_at=now,
+            request_id=request_id,
         )
         update_dict = {
             "status": TaskStatusEnum.pending,
             "task_name": task_name,
             "related_location_id": location_id,
             "created_at": now,
+            "request_id": request_id,
         }
         upsert_stmt = insert_stmt.on_conflict_do_update(
             index_elements=["task_id"],
