@@ -27,8 +27,21 @@ interface LocationDataHealth {
   };
 }
 
+interface DuplicateWeatherEntry {
+  id: number;
+  type: string;
+  temperature_max_c: number;
+  temperature_min_c: number;
+}
+
+interface DuplicateWeatherDate {
+  date: string;
+  entries: DuplicateWeatherEntry[];
+}
+
 interface DataHealthResponse {
   locations: LocationDataHealth[];
+  duplicate_weather: Record<string, DuplicateWeatherDate[]>;
 }
 
 // API helpers
@@ -70,6 +83,14 @@ async function backfillGrowthPotential(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     data: { location_id, start_date: start, end_date: end },
+  });
+}
+
+async function cleanupDuplicateWeather(location_id: number) {
+  return fetcher("/api/v1/backfill/cleanup_duplicate_weather/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    data: { location_id },
   });
 }
 
@@ -261,6 +282,23 @@ export function AdminBackfillPanel() {
     },
   });
 
+  const duplicateCleanupMutation = useMutation({
+    mutationFn: (location_id: number) => cleanupDuplicateWeather(location_id),
+    onMutate: (location_id) => setActiveLocation(location_id),
+    onSettled: () => setActiveLocation(null),
+    onSuccess: (data) => {
+      setPollingTaskId(data.task_id);
+      toast.success(
+        "Duplicate weather cleanup started. Waiting for completion..."
+      );
+    },
+    onError: (err: any) => {
+      toast.error(
+        "Duplicate weather cleanup failed: " + (err?.message || "Unknown error")
+      );
+    },
+  });
+
   if (isLoading) return <div>Loading data health...</div>;
   if (error) return <div>Error loading data health</div>;
 
@@ -277,7 +315,8 @@ export function AdminBackfillPanel() {
               activeLocation === loc.id &&
               (weatherMutation.isPending ||
                 diseaseMutation.isPending ||
-                growthMutation.isPending);
+                growthMutation.isPending ||
+                duplicateCleanupMutation.isPending);
             return (
               <Card
                 key={loc.id}
@@ -443,6 +482,48 @@ export function AdminBackfillPanel() {
                       </Button>
                     </div>
                   )}
+                  {/* Duplicate Weather */}
+                  {data.duplicate_weather[loc.id.toString()] &&
+                    data.duplicate_weather[loc.id.toString()].length > 0 && (
+                      <div className="flex items-center justify-between bg-background dark:bg-gray-900 rounded-md p-3 border border-border mb-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">Duplicate Weather</span>
+                          {data.duplicate_weather[loc.id.toString()].map(
+                            (duplicate, i) => (
+                              <Badge
+                                key={i}
+                                variant="destructive"
+                                className="ml-1"
+                              >
+                                {duplicate.date} ({duplicate.entries.length}{" "}
+                                entries)
+                              </Badge>
+                            )
+                          )}
+                        </div>
+                        <Button
+                          size="sm"
+                          className="ml-2"
+                          variant="destructive"
+                          disabled={
+                            isLocPending || duplicateCleanupMutation.isPending
+                          }
+                          onClick={() => {
+                            duplicateCleanupMutation.mutate(loc.id);
+                          }}
+                        >
+                          {duplicateCleanupMutation.isPending &&
+                          activeLocation === loc.id ? (
+                            <span className="flex items-center gap-1">
+                              <span className="animate-spin">⏳</span>{" "}
+                              Cleaning...
+                            </span>
+                          ) : (
+                            "Clean Up"
+                          )}
+                        </Button>
+                      </div>
+                    )}
                 </div>
               </Card>
             );

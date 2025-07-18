@@ -9,9 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added duplicate weather check cleanup
+
 ### Fixed
 
 ### Changed
+
 ## [0.0.18] - 2025-07-16
 
 ### Added

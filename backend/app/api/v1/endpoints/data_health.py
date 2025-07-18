@@ -33,6 +33,59 @@ def find_missing_ranges(present_dates, expected_dates):
     return missing
 
 
+async def find_duplicate_weather_entries(db: AsyncSession, location_id: int):
+    """
+    Find duplicate weather entries for a location (same date, different types).
+    Returns dates that have both historical and forecast entries.
+    """
+    from app.models.daily_weather import WeatherType
+
+    # Find dates that have multiple entries
+    duplicate_dates_query = (
+        select(DailyWeather.date)
+        .where(DailyWeather.location_id == location_id)
+        .group_by(DailyWeather.date)
+        .having(func.count(DailyWeather.date) > 1)
+    )
+
+    duplicate_dates = (await db.execute(duplicate_dates_query)).scalars().all()
+
+    duplicates = []
+    for weather_date in duplicate_dates:
+        # Get all entries for this date
+        entries_query = (
+            select(DailyWeather)
+            .where(
+                DailyWeather.location_id == location_id,
+                DailyWeather.date == weather_date,
+            )
+            .order_by(DailyWeather.type.asc())  # historical comes before forecast
+        )
+
+        entries = (await db.execute(entries_query)).scalars().all()
+
+        if len(entries) > 1:
+            # Check if we have both historical and forecast
+            types = [entry.type for entry in entries]
+            if WeatherType.historical in types and WeatherType.forecast in types:
+                duplicates.append(
+                    {
+                        "date": str(weather_date),
+                        "entries": [
+                            {
+                                "id": entry.id,
+                                "type": entry.type.value,
+                                "temperature_max_c": entry.temperature_max_c,
+                                "temperature_min_c": entry.temperature_min_c,
+                            }
+                            for entry in entries
+                        ],
+                    }
+                )
+
+    return duplicates
+
+
 @router.get("/data_health/")
 async def get_data_health(db: AsyncSession = Depends(get_db)):
     locations = (await db.execute(select(Location))).scalars().all()
@@ -210,4 +263,12 @@ async def get_data_health(db: AsyncSession = Depends(get_db)):
                 missing[name] = find_missing_ranges(present_dates, expected_dates)
 
         results.append({"id": loc.id, "name": loc.name, "missing": missing})
-    return {"locations": results}
+
+    # Check for duplicate weather entries
+    duplicate_weather = {}
+    for loc in locations:
+        duplicates = await find_duplicate_weather_entries(db, loc.id)
+        if duplicates:
+            duplicate_weather[loc.id] = duplicates
+
+    return {"locations": results, "duplicate_weather": duplicate_weather}

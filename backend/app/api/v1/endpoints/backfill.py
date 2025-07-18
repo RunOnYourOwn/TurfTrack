@@ -6,6 +6,7 @@ from app.tasks.weather import (
     backfill_gdd_for_model,
     backfill_disease_pressure_for_location,
     backfill_growth_potential_for_location,
+    cleanup_duplicate_weather_for_location,
 )
 from app.core.database import SessionLocal
 from app.models.task_status import TaskStatus, TaskStatusEnum
@@ -39,6 +40,10 @@ class GrowthPotentialBackfillRequest(BaseModel):
     location_id: int
     start_date: date
     end_date: date
+
+
+class DuplicateWeatherCleanupRequest(BaseModel):
+    location_id: int
 
 
 def create_initial_task_status(
@@ -179,4 +184,32 @@ async def growth_potential_backfill(
         return {"task_id": celery_result.id, "status": "started"}
     except Exception as e:
         logger.error(f"Failed to queue growth potential backfill task: {e}")
+        raise
+
+
+@router.post("/cleanup_duplicate_weather/")
+async def cleanup_duplicate_weather(
+    request: Request, body: DuplicateWeatherCleanupRequest
+):
+    try:
+        request_id = request.state.request_id
+        logger.info(
+            f"Queuing duplicate weather cleanup task for location {body.location_id}"
+        )
+        celery_result = cleanup_duplicate_weather_for_location.apply_async(
+            args=[body.location_id],
+            headers={"request_id": request_id},
+        )
+        logger.info(
+            f"Duplicate weather cleanup task queued with ID: {celery_result.id}"
+        )
+        create_initial_task_status(
+            celery_result.id,
+            "cleanup_duplicate_weather_for_location",
+            body.location_id,
+            request_id,
+        )
+        return {"task_id": celery_result.id, "status": "started"}
+    except Exception as e:
+        logger.error(f"Failed to queue duplicate weather cleanup task: {e}")
         raise
