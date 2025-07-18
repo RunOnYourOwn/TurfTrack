@@ -206,92 +206,107 @@ def calculate_and_store_gdd_values_sync_segmented(
     session.query(GDDValue).filter(GDDValue.gdd_model_id == gdd_model_id).delete()
     session.commit()
 
-    total_records = 0
-    # Process each segment between resets
-    for i in range(len(resets)):
-        start_date = resets[i].reset_date
-        end_date = resets[i + 1].reset_date if i + 1 < len(resets) else None
-        run_number = resets[i].run_number
-
-        # Get weather data for this segment
-        weather_q = session.query(DailyWeather).filter(
+    # Get all weather data from the start date
+    start_date = resets[0].reset_date
+    weather_q = (
+        session.query(DailyWeather)
+        .filter(
             DailyWeather.location_id == location_id,
             DailyWeather.date >= start_date,
         )
-        if end_date:
-            weather_q = weather_q.filter(DailyWeather.date < end_date)
-        weather_q = weather_q.order_by(DailyWeather.date.asc())
-        weather_rows = weather_q.all()
+        .order_by(DailyWeather.date.asc())
+    )
+    weather_rows = weather_q.all()
 
-        cumulative = 0.0
-        values_to_insert = []
-        threshold_reset_needed = False
-        threshold_reset_date = None
+    if not weather_rows:
+        return 0
 
-        for w in weather_rows:
-            # Get parameters effective for this date
-            date_params = get_effective_parameters(session, gdd_model_id, w.date)
-            if not date_params:
-                continue
+    # Process all data sequentially, handling resets as we go
+    current_run = 1
+    cumulative = 0.0
+    values_to_insert = []
+    threshold_resets_created = []
+    is_new_run = True  # Track if this is the first day of a new run
 
-            # Calculate daily GDD
-            if gdd_model.unit.value == "C":
-                tmax = w.temperature_max_c
-                tmin = w.temperature_min_c
-            else:
-                tmax = w.temperature_max_f
-                tmin = w.temperature_min_f
+    for w in weather_rows:
+        # Check if we need to start a new run due to a manual reset
+        for reset in resets:
+            if reset.reset_date == w.date and reset.reset_type == ResetType.manual:
+                current_run = reset.run_number
+                cumulative = 0.0
+                is_new_run = True
+                break
 
-            if tmax is None or tmin is None:
-                daily_gdd = None
-                cumulative_gdd = None
-            else:
-                daily_gdd = max(0.0, ((tmax + tmin) / 2) - date_params["base_temp"])
+        # Check if we need to start a new run due to a threshold reset
+        for reset in threshold_resets_created:
+            if reset.reset_date == w.date:
+                current_run = reset.run_number
+                cumulative = 0.0
+                is_new_run = True
+                break
 
-                # Always start a new run with cumulative at 0
-                if w.date == start_date:
-                    cumulative = 0
-                else:
-                    # Add daily_gdd to cumulative
-                    cumulative += daily_gdd
+        # Get parameters effective for this date
+        date_params = get_effective_parameters(session, gdd_model_id, w.date)
+        if not date_params:
+            continue
 
-                    # Check for threshold reset
-                    # Only check on the last/current run and if we haven't already found a reset point
-                    if (
-                        date_params["reset_on_threshold"]
-                        and cumulative >= date_params["threshold"]
-                        and i == len(resets) - 1
-                        and not threshold_reset_needed
-                    ):
-                        threshold_reset_needed = True
-                        # Set reset date to the next day
-                        threshold_reset_date = w.date + datetime.timedelta(days=1)
+        # Calculate daily GDD
+        if gdd_model.unit.value == "C":
+            tmax = w.temperature_max_c
+            tmin = w.temperature_min_c
+        else:
+            tmax = w.temperature_max_f
+            tmin = w.temperature_min_f
 
-            values_to_insert.append(
-                GDDValue(
+        if tmax is None or tmin is None:
+            daily_gdd = None
+        else:
+            daily_gdd = max(0.0, ((tmax + tmin) / 2) - date_params["base_temp"])
+
+            # Check for threshold reset BEFORE adding to cumulative
+            if (
+                date_params["reset_on_threshold"]
+                and cumulative + daily_gdd >= date_params["threshold"]
+                and w.date not in [r.reset_date for r in threshold_resets_created]
+            ):
+                # Create threshold reset for the NEXT day (day after threshold is crossed)
+                threshold_reset_date = w.date + datetime.timedelta(days=1)
+                new_reset = GDDReset(
                     gdd_model_id=gdd_model_id,
-                    date=w.date,
-                    daily_gdd=daily_gdd,
-                    cumulative_gdd=cumulative if daily_gdd is not None else None,
-                    is_forecast=(w.type == WeatherType.forecast),
-                    run=run_number,
+                    reset_date=threshold_reset_date,
+                    run_number=current_run + 1,
+                    reset_type=ResetType.threshold,
                 )
-            )
-        # Bulk insert for this segment
-        session.bulk_save_objects(values_to_insert)
-        total_records += len(values_to_insert)
+                threshold_resets_created.append(new_reset)
 
-        # Handle threshold reset if needed
-        if threshold_reset_needed and threshold_reset_date:
-            # Create new reset record
-            new_reset = GDDReset(
+            # For the first day of a new run, store cumulative_gdd = 0
+            if is_new_run and daily_gdd is not None:
+                cumulative_gdd_to_store = 0.0
+                # Add daily_gdd to cumulative for next day
+                cumulative += daily_gdd
+                is_new_run = False
+            else:
+                # Add daily_gdd to cumulative
+                cumulative += daily_gdd
+                cumulative_gdd_to_store = cumulative if daily_gdd is not None else None
+
+        values_to_insert.append(
+            GDDValue(
                 gdd_model_id=gdd_model_id,
-                reset_date=threshold_reset_date,
-                run_number=run_number + 1,
-                reset_type=ResetType.threshold,
+                date=w.date,
+                daily_gdd=daily_gdd,
+                cumulative_gdd=cumulative_gdd_to_store,
+                is_forecast=(w.type == WeatherType.forecast),
+                run=current_run,
             )
-            session.add(new_reset)
-            session.commit()
+        )
+
+    # Bulk insert all values
+    session.bulk_save_objects(values_to_insert)
+
+    # Add threshold resets to database
+    for reset in threshold_resets_created:
+        session.add(reset)
 
     session.commit()
 
@@ -302,9 +317,11 @@ def calculate_and_store_gdd_values_sync_segmented(
         success=True,
         gdd_model_id=gdd_model_id,
         location_id=location_id,
-        records_processed=total_records,
+        records_processed=len(values_to_insert),
         calculation_type="segmented",
     )
+
+    return len(values_to_insert)
 
 
 def get_effective_parameters(

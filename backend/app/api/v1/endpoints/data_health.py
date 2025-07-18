@@ -159,8 +159,8 @@ async def get_data_health(db: AsyncSession = Depends(get_db)):
                     model_start = max(first_reset_date, expected_start)
                     model_expected_dates = [
                         model_start + timedelta(days=i)
-                        for i in range((expected_end - model_start).days + 1)
-                        if model_start + timedelta(days=i) <= expected_end
+                        for i in range((expected_end - model_start).days)
+                        if model_start + timedelta(days=i) < expected_end
                     ]
                     model_present_dates = await get_present_dates(
                         GDDValue,

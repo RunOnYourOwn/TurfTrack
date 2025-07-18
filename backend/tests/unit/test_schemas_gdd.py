@@ -146,6 +146,7 @@ def test_gdd_value_read_serialization():
         daily_gdd=2.5,
         cumulative_gdd=10.0,
         is_forecast=False,
+        run=1,
         effective_params={"base_temp": 5},
     )
     obj = GDDValueRead(**data)
@@ -173,6 +174,7 @@ def test_gdd_model_with_values_and_history():
             daily_gdd=2.5,
             cumulative_gdd=10.0,
             is_forecast=False,
+            run=1,
             effective_params=None,
         )
     ]

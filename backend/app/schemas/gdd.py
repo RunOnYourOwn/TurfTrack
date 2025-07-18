@@ -109,6 +109,7 @@ class GDDValueRead(BaseModel):
     daily_gdd: float
     cumulative_gdd: float
     is_forecast: bool
+    run: int
     effective_params: Optional[dict] = None
 
     class Config:
