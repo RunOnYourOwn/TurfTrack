@@ -198,9 +198,10 @@ async def get_data_health(db: AsyncSession = Depends(get_db)):
                     present_dates = await get_complete_weather_dates(loc.id)
                     missing[name] = find_missing_ranges(present_dates, expected_dates)
             elif name == "growth_potential":
-                # Check for weather data with required fields for growth potential calculation
-                # (uses same function as weather since it requires temperature fields)
-                present_dates = await get_complete_weather_dates(loc.id)
+                # Check for actual growth potential records
+                present_dates = await get_present_dates(
+                    model, value_fields[name], loc.id
+                )
                 missing[name] = find_missing_ranges(present_dates, expected_dates)
             else:
                 present_dates = await get_present_dates(
