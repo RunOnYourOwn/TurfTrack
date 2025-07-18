@@ -9,6 +9,8 @@ from app.tasks.weather import (
 )
 from app.core.database import SessionLocal
 from app.models.task_status import TaskStatus, TaskStatusEnum
+from app.models.gdd import GDDModel
+from sqlalchemy import select
 import logging
 from sqlalchemy.dialects.postgresql import insert
 
@@ -95,6 +97,18 @@ async def gdd_backfill(request: Request, body: GDDBackfillRequest):
     try:
         request_id = request.state.request_id
         logger.info(f"Queuing GDD backfill task for model {body.gdd_model_id}")
+
+        # Look up the location_id from the GDD model
+        with SessionLocal() as session:
+            gdd_model = session.execute(
+                select(GDDModel).where(GDDModel.id == body.gdd_model_id)
+            ).scalar_one_or_none()
+
+            if not gdd_model:
+                raise ValueError(f"GDD model {body.gdd_model_id} not found")
+
+            location_id = gdd_model.location_id
+
         celery_result = backfill_gdd_for_model.apply_async(
             args=[body.gdd_model_id],
             headers={"request_id": request_id},
@@ -103,7 +117,7 @@ async def gdd_backfill(request: Request, body: GDDBackfillRequest):
         create_initial_task_status(
             celery_result.id,
             "backfill_gdd_for_model",
-            body.gdd_model_id,  # Use gdd_model_id as location_id for tracking
+            location_id,  # Use the actual location_id, not gdd_model_id
             request_id,
         )
         return {"task_id": celery_result.id, "status": "started"}

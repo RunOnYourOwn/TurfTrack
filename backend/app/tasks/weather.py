@@ -969,31 +969,34 @@ def backfill_gdd_for_model(self, gdd_model_id: int):
     request_id = self.request.headers.get("request_id")
     try:
         with SessionLocal() as session:
+            # Look up GDD model and location first
+            gdd_model = session.get(GDDModel, gdd_model_id)
+            if not gdd_model:
+                raise ValueError(f"GDD model {gdd_model_id} not found")
+            location_id = gdd_model.location_id
+
             # TaskStatus: started
             create_or_update_task_status_sync(
                 session,
                 task_id,
                 "backfill_gdd_for_model",
-                gdd_model_id,  # Use gdd_model_id as related_location_id for tracking
+                location_id,  # Use the actual location_id, not gdd_model_id
                 TaskStatusEnum.started,
                 started=True,
                 request_id=request_id,
             )
-            # Look up GDD model and location
-            gdd_model = session.get(GDDModel, gdd_model_id)
-            if not gdd_model:
-                raise ValueError(f"GDD model {gdd_model_id} not found")
-            location_id = gdd_model.location_id
+
             # Recalculate all GDD values
             calculate_and_store_gdd_values_sync_segmented(
                 session, gdd_model_id, location_id
             )
+
             # TaskStatus: success
             create_or_update_task_status_sync(
                 session,
                 task_id,
                 "backfill_gdd_for_model",
-                gdd_model_id,
+                location_id,  # Use the actual location_id, not gdd_model_id
                 TaskStatusEnum.success,
                 finished=True,
                 request_id=request_id,
@@ -1005,11 +1008,15 @@ def backfill_gdd_for_model(self, gdd_model_id: int):
         )
         try:
             with SessionLocal() as session:
+                # Try to get location_id for error reporting
+                gdd_model = session.get(GDDModel, gdd_model_id)
+                location_id = gdd_model.location_id if gdd_model else None
+
                 create_or_update_task_status_sync(
                     session,
                     task_id,
                     "backfill_gdd_for_model",
-                    gdd_model_id,
+                    location_id,  # Use the actual location_id, not gdd_model_id
                     TaskStatusEnum.failure,
                     error=str(e),
                     finished=True,
