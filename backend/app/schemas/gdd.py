@@ -148,6 +148,7 @@ class GDDModelDashboardRead(BaseModel):
     current_gdd: Optional[float] = None
     last_reset: Optional[date] = None
     run_number: Optional[int] = None
+    next_threshold_date: Optional[date] = None
 
     class Config:
         from_attributes = True

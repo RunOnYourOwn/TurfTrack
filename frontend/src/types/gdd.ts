@@ -71,6 +71,7 @@ export interface GDDModelDashboard {
   current_gdd?: number;
   last_reset?: string;
   run_number?: number;
+  next_threshold_date?: string;
 }
 
 // Import Location type from location.ts
