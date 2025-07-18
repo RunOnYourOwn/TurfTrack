@@ -63,6 +63,7 @@ export default function DashboardGDDModels({ location }: Props) {
               <div>Target: {model.threshold} GDD</div>
               <div>Current: {model.current_gdd?.toFixed(1) ?? "0"} GDD</div>
               <div>Last Reset: {model.last_reset ?? "N/A"}</div>
+              <div>Next Threshold: {model.next_threshold_date ?? "N/A"}</div>
               {/* Progress Bar */}
               <div className="mt-4">
                 <div className="w-full h-2 rounded bg-muted dark:bg-muted-foreground/20 overflow-hidden">

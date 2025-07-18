@@ -418,6 +418,18 @@ async def list_gdd_models_dashboard_by_location(
         latest_gdd = gdd_result.scalars().first()
         current_gdd = latest_gdd.cumulative_gdd if latest_gdd else 0.0
 
+        # Get the last date in the current run (next threshold crossing date)
+        last_date_result = await db.execute(
+            select(GDDValue.date)
+            .where(
+                GDDValue.gdd_model_id == model.id,
+                GDDValue.run == run_number,
+            )
+            .order_by(GDDValue.date.desc())
+            .limit(1)
+        )
+        next_threshold_date = last_date_result.scalar()
+
         dashboard_models.append(
             GDDModelDashboardRead(
                 id=model.id,
@@ -431,6 +443,7 @@ async def list_gdd_models_dashboard_by_location(
                 current_gdd=current_gdd,
                 last_reset=last_reset,
                 run_number=run_number,
+                next_threshold_date=next_threshold_date,
             )
         )
     return dashboard_models
