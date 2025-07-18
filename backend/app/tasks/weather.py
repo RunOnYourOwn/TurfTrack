@@ -20,6 +20,7 @@ from app.utils.growth_potential import calculate_growth_potential_for_location
 from sqlalchemy.dialects.postgresql import insert
 from app.core.logging_config import log_performance_metric
 import time
+from app.models.daily_weather import DailyWeather
 
 logger = logging.getLogger(__name__)
 
@@ -1140,6 +1141,114 @@ def backfill_growth_potential_for_location(
                     session,
                     task_id,
                     "backfill_growth_potential_for_location",
+                    location_id,
+                    TaskStatusEnum.failure,
+                    error=str(e),
+                    finished=True,
+                    request_id=request_id,
+                )
+        except Exception:
+            pass
+        raise
+
+
+@app.task(name="cleanup_duplicate_weather_for_location", bind=True)
+def cleanup_duplicate_weather_for_location(self, location_id: int):
+    """
+    Clean up duplicate weather entries for a location.
+    When both historical and forecast data exist for the same date,
+    keeps the historical data and removes the forecast data.
+    Tracks progress in TaskStatus.
+    """
+    from app.models.task_status import TaskStatusEnum
+    from app.models.daily_weather import WeatherType
+    from sqlalchemy import func
+
+    task_id = self.request.id
+    request_id = self.request.headers.get("request_id")
+    try:
+        with SessionLocal() as session:
+            # TaskStatus: started
+            create_or_update_task_status_sync(
+                session,
+                task_id,
+                "cleanup_duplicate_weather_for_location",
+                location_id,
+                TaskStatusEnum.started,
+                started=True,
+                request_id=request_id,
+            )
+
+            # Find dates that have multiple entries
+            duplicate_dates_query = (
+                session.query(DailyWeather.date)
+                .filter(DailyWeather.location_id == location_id)
+                .group_by(DailyWeather.date)
+                .having(func.count(DailyWeather.date) > 1)
+            )
+            duplicate_dates = duplicate_dates_query.all()
+
+            cleaned_count = 0
+            for (weather_date,) in duplicate_dates:
+                # Get all entries for this date
+                entries = (
+                    session.query(DailyWeather)
+                    .filter(
+                        DailyWeather.location_id == location_id,
+                        DailyWeather.date == weather_date,
+                    )
+                    .order_by(
+                        DailyWeather.type.asc()
+                    )  # historical comes before forecast
+                    .all()
+                )
+
+                if len(entries) > 1:
+                    # Check if we have both historical and forecast
+                    types = [entry.type for entry in entries]
+                    if (
+                        WeatherType.historical in types
+                        and WeatherType.forecast in types
+                    ):
+                        # Keep historical, remove forecast
+                        forecast_entries = [
+                            entry
+                            for entry in entries
+                            if entry.type == WeatherType.forecast
+                        ]
+                        for entry in forecast_entries:
+                            session.delete(entry)
+                            cleaned_count += 1
+
+            session.commit()
+
+            # TaskStatus: success
+            create_or_update_task_status_sync(
+                session,
+                task_id,
+                "cleanup_duplicate_weather_for_location",
+                location_id,
+                TaskStatusEnum.success,
+                finished=True,
+                request_id=request_id,
+            )
+
+            logger.info(
+                f"Cleaned up {cleaned_count} duplicate weather entries for location {location_id}",
+                extra={"request_id": request_id},
+            )
+
+    except Exception as e:
+        logger.error(
+            f"Cleanup duplicate weather task failed for location {location_id}: {e}",
+            extra={"request_id": request_id},
+        )
+        try:
+            with SessionLocal() as session:
+                create_or_update_task_status_sync(
+                    session,
+                    task_id,
+                    "cleanup_duplicate_weather_for_location",
                     location_id,
                     TaskStatusEnum.failure,
                     error=str(e),
