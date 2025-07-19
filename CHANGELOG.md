@@ -10,10 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added duplicate weather check cleanup
+- Added next reset date to GDD model card on dashboard
+- Added bespoke weed pressure calculation and chart
 
 ### Fixed
 
+- Fix backfill tasks
+- Fix GDD calculations
+
 ### Changed
+
+- Hard coded the log level for the production docker compose
 
 ## [0.0.18] - 2025-07-16
 

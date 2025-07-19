@@ -12,13 +12,13 @@ import {
   SelectContent,
   SelectItem,
 } from "../components/ui/select";
+import { WeedPressureChart } from "../components/dashboard/WeedPressureChart";
 
 export default function Dashboard() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(
     null
   );
-
   useEffect(() => {
     fetcher("/api/v1/locations/")
       .then((data) => {
@@ -60,6 +60,9 @@ export default function Dashboard() {
           </div>
           <div className="mt-6">
             <GrowthPotentialSummary location={selectedLocation} />
+          </div>
+          <div className="mt-6">
+            <WeedPressureChart locationId={selectedLocation.id} />
           </div>
           <div className="mt-8">
             <DashboardGDDModels location={selectedLocation} />

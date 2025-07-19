@@ -7,10 +7,11 @@
 - React with TypeScript
 - Vite for build tooling
 - shadcn/ui for component library
-- React Query for data fetching
+- React Query for data fetching and caching
 - Axios for all API requests (replacing fetch)
 - React Router for navigation
-- Chart.js for analytics visualization
+- Nivo for analytics visualization
+- date-fns for date handling
 
 ### Backend
 
@@ -19,6 +20,8 @@
 - Celery with Redis for task processing
 - Alembic for database migrations
 - OpenMeteo API for weather data
+- SQLAlchemy for ORM
+- Pydantic for data validation
 
 ## Database Schema
 
@@ -73,6 +76,7 @@
 - id: UUID (primary key)
 - latitude: Float
 - longitude: Float
+- name: String (optional)
 
 ### Applications
 
@@ -83,6 +87,8 @@
 - amount: Float
 - notes: Text
 - weather_conditions: JSONB
+- status: Enum (planned, applied, cancelled)
+- unit: Enum (lbs, oz, gal, etc.)
 - created_at: DateTime
 - updated_at: DateTime
 
@@ -92,19 +98,29 @@
 - location_id: ForeignKey to Location
 - date: DateTime
 - type: Enum (historical, forecast)
-- temperature_max_c/f, temperature_min_c/f: Float
+- temperature_max_c/f: Float
+- temperature_min_c/f: Float
 - precipitation_mm/in: Float
-- humidity: Float
-- wind_speed: Float
+- relative_humidity_mean: Float
+- wind_speed_10m_max: Float
+- wind_gusts_10m_max: Float
+- wind_direction_10m_dominant: Float
+- et0_fao_evapotranspiration: Float
+- relative_humidity_2m_max: Float
+- relative_humidity_2m_min: Float
+- dew_point_2m_max: Float
+- dew_point_2m_min: Float
+- dew_point_2m_mean: Float
+- sunshine_duration: Float
 - created_at: DateTime
 - Unique constraint on (date, location_id, type)
 
-### GDD Models (MVP Complete)
+### GDD Models
 
 - id: UUID (primary key)
-- lawn_id: UUID (foreign key)
+- location_id: UUID (foreign key)
 - name: String (user-defined)
-- base_temp: Float
+- base_temp_c: Float
 - unit: Enum (C/F)
 - start_date: DateTime
 - threshold: Float
@@ -122,165 +138,363 @@
 - is_forecast: Boolean
 - run: Integer (tracks different GDD accumulation periods)
 
-#### GDD Calculation Logic
+### GDD Resets
 
-- On model create/update, backend calculates and stores all GDD values (historical + forecast) for the model using location weather data.
-- Daily GDD = ((Tmax + Tmin) / 2) - base_temp, where base_temp is user-defined
-- Cumulative GDD is tracked per run, resetting to 0 at the start of each new run
-- Runs can be created by:
-  - Initial model creation (Run 1)
-  - Manual reset (creates new run starting on specified date)
-  - Threshold reset (if enabled, creates new run when threshold is crossed)
-- Reset handling:
-  - Manual resets: New run starts on the specified date with cumulative = 0
-  - Threshold resets: New run starts the day after threshold is crossed
-  - All resets maintain the daily_gdd values while resetting cumulative tracking
-- Supports recalculation on any parameter change
-- GDD data is deleted when a lawn is deleted and it's the last lawn for a location.
+- id: UUID (primary key)
+- gdd_model_id: UUID (foreign key)
+- reset_date: DateTime
+- reset_type: Enum (manual, threshold)
+- reset_value: Float
+- notes: Text
+- created_at: DateTime
 
-#### API Endpoints
+### Weed Species
 
-- CRUD for GDD models
-- Manual reset endpoint
-- Fetch GDD values by run
-- Fetch reset history
-- Parameter update endpoint with recalculation option
-- (Planned) GDD models API will return 'lawn_name' and 'next_threshold_date' for each model
+- id: UUID (primary key)
+- name: String
+- scientific_name: String
+- gdd_base_temp_c: Float
+- gdd_threshold_emergence: Float
+- optimal_soil_temp_min_c: Float
+- optimal_soil_temp_max_c: Float
+- season: Enum (spring, summer, fall, year_round)
+- moisture_preference: Enum (low, medium, high)
+- is_active: Boolean
+- created_at: DateTime
+- updated_at: DateTime
 
-#### Frontend/UX
+### Weed Pressure
 
-- UI for GDD model management (create, edit, delete, per lawn)
-- Manual reset controls with date selection
-- Run-based visualization with run selection
-- Graph shows:
-  - Cumulative GDD line (resets properly with runs)
-  - Daily GDD bars
-  - Threshold line
-  - Forecast data in different color
-- Professional, modern look matching current palette
-- Export functionality (CSV, PDF, etc.) is a future enhancement
+- id: UUID (primary key)
+- location_id: UUID (foreign key)
+- weed_species_id: UUID (foreign key)
+- date: DateTime
+- weed_pressure_score: Float (0-10)
+- gdd_risk_score: Float (0-3)
+- soil_temp_risk_score: Float (0-2)
+- moisture_risk_score: Float (0-2)
+- turf_stress_score: Float (0-2)
+- seasonal_timing_score: Float (0-1)
+- gdd_accumulated: Float
+- soil_temp_estimate_c: Float
+- precipitation_3day_mm: Float
+- humidity_avg: Float
+- et0_mm: Float
+- is_forecast: Boolean
+- created_at: DateTime
+- updated_at: DateTime
 
-## MVP Status
+### Disease Pressure
 
-- GDD models, analytics, weather sync, and task monitoring are complete and robust
-- System is production-ready; future enhancements are documented in tasks and technical docs
+- id: UUID (primary key)
+- location_id: UUID (foreign key)
+- date: DateTime
+- disease: String (e.g., "dollar_spot")
+- risk_score: Float (0-1)
+- avg_temp_5d: Float
+- avg_humidity_5d: Float
+- is_forecast: Boolean
+- created_at: DateTime
+- updated_at: DateTime
 
-## API Endpoints
+### Growth Potential
 
-### Products
+- id: UUID (primary key)
+- location_id: UUID (foreign key)
+- date: DateTime
+- growth_potential: Float (0-1)
+- gp_3d_avg: Float
+- gp_5d_avg: Float
+- gp_7d_avg: Float
+- created_at: DateTime
+- updated_at: DateTime
 
-- GET /api/products - List all products
-- POST /api/products - Create new product
-- GET /api/products/{id} - Get product details
-- PUT /api/products/{id} - Update product
-- DELETE /api/products/{id} - Delete product
+### Task Status
 
-### Lawns
+- id: UUID (primary key)
+- task_id: String (Celery task ID)
+- task_name: String
+- related_location_id: Integer (optional)
+- status: Enum (pending, started, success, failure)
+- started_at: DateTime
+- finished_at: DateTime
+- error: Text
+- result: Text
+- request_id: String (for request correlation)
+- created_at: DateTime
 
-- GET /api/lawns - List all lawns
-- POST /api/lawns - Create new lawn (triggers weather fetch only if no data exists for location)
-- GET /api/lawns/{id} - Get lawn details
-- PUT /api/lawns/{id} - Update lawn
-- DELETE /api/lawns/{id} - Delete lawn
+## Calculation Methodologies
 
-### Applications
+### GDD (Growing Degree Days)
 
-- GET /api/applications - List all applications
-- POST /api/applications - Create new application
-- GET /api/applications/{id} - Get application details
-- PUT /api/applications/{id} - Update application
-- DELETE /api/applications/{id} - Delete application
-
-### GDD
-
-- GET /api/gdd/{lawn_id} - Get current GDD for lawn
-- GET /api/gdd/{lawn_id}/history - Get GDD history
-- GET /api/gdd/{lawn_id}/predictions - Get GDD predictions
-
-### Weather
-
-- Weather data is fetched and upserted per unique location
-- No duplicate fetches for same location
-- Scheduled Celery Beat task updates all locations daily at 3am Central (09:00 UTC)
-- Atomic upsert operations prevent race conditions
-- Proper error handling and task status tracking
-
-## GDD Calculation Methodology
-
-### Base Temperature
-
-- Cold Season Grass: 0°C (32°F)
-- Warm Season Grass: 10°C (50°F)
-
-### Calculation Formula
+#### Daily Calculation
 
 ```
-GDD = ((Tmax + Tmin) / 2) - Tbase
+GDD = ((Tmax + Tmin) / 2) - Base Temperature
 ```
 
 Where:
 
 - Tmax = Maximum daily temperature
 - Tmin = Minimum daily temperature
-- Tbase = Base temperature for grass type
+- Base Temperature = User-defined base temperature (typically 0°C for cool season, 10°C for warm season)
 
-### Weather Data Integration
+#### Cumulative Tracking
 
-- Daily weather data from OpenMeteo API
-- Historical data storage for analysis
-- Predictive modeling for future GDD calculations
-- Atomic upsert operations for data consistency
-- Race condition prevention in concurrent updates
+- Accumulated from January 1st of each year
+- Reset handling for manual and threshold-based resets
+- Run-based tracking for multiple accumulation periods
 
-## Task Processing
+#### Reset Logic
+
+- **Manual Resets**: User-specified date, new run starts with cumulative = 0
+- **Threshold Resets**: Automatic when threshold is crossed, new run starts next day
+- **Run Management**: Each reset creates a new run number for tracking
+
+### Weed Pressure
+
+#### Multi-Factor Model
+
+Final score (0-10) calculated as weighted sum of 5 factors:
+
+```
+Final Score = (GDD Risk × 1.36) + (Soil Temp Risk × 0.91) + (Moisture Risk × 0.91) + (Turf Stress × 0.91) + (Seasonal Timing × 0.45)
+```
+
+#### GDD Risk (0-3 points)
+
+- **< 70% of emergence threshold**: 0 points (too early)
+- **70-100% of threshold**: 1 point (approaching)
+- **100-130% of threshold**: 2 points (peak emergence window)
+- **> 130% of threshold**: 3 points (past peak, but still risk)
+
+#### Soil Temperature Risk (0-2 points)
+
+- **Estimation**: `Soil Temp = Air Temp × Seasonal Factor`
+  - Spring: 0.8 (soil cooler than air)
+  - Summer: 0.9 (soil closer to air temp)
+  - Fall/Winter: 0.85 (intermediate)
+- **Scoring**:
+  - `< optimal min`: 0 points (too cold)
+  - `optimal range`: 2 points (perfect conditions)
+  - `optimal + 5°C`: 1 point (still acceptable)
+  - `> optimal + 5°C`: 0 points (too hot)
+
+#### Moisture Risk (0-2 points)
+
+- **Precipitation (0-1 point)**: 3-day total
+  - `> 25mm (1 inch)`: 1 point
+  - `12-25mm (0.5-1 inch)`: 0.5 points
+  - `< 12mm`: 0 points
+- **Humidity (0-1 point)**: 7-day average
+  - `> 80%`: 1 point
+  - `70-80%`: 0.5 points
+  - `< 70%`: 0 points
+
+#### Turf Stress (0-2 points)
+
+- **Drought Stress**: `ET0 - precipitation`
+  - `> 5mm/day`: 1 point (high stress)
+- **Growth Potential**: Simplified temperature-based estimate
+  - `< 30%`: 1 point (low growth = stressed turf)
+
+#### Seasonal Timing (0-1 point)
+
+- **Spring weeds (Mar-May)**: 1 point in spring, 0 otherwise
+- **Summer weeds (Jun-Aug)**: 1 point in summer, 0 otherwise
+- **Fall weeds (Sep-Nov)**: 1 point in fall, 0 otherwise
+- **Year-round weeds**: Always 1 point
+
+### Disease Pressure (Smith-Kerns Model)
+
+#### Model Formula
+
+```
+logit = b0 + b1*avg_temp + b2*avg_rh
+risk_score = exp(logit) / (1 + exp(logit))
+```
+
+#### Coefficients
+
+- b0 = -11.4041
+- b1 = 0.1932 (temperature coefficient)
+- b2 = 0.0894 (humidity coefficient)
+
+#### Calculation Process
+
+1. **5-Day Moving Averages**: Calculate average temperature and humidity over 5 days
+2. **Temperature Validation**: Only calculate if avg_temp is between 10-35°C
+3. **Risk Scoring**: Probability-based risk assessment (0-1 scale)
+
+### Growth Potential
+
+#### Temperature-Based Model
+
+```
+GP = exp(-0.5 * ((temp - t_opt) / sigma)²)
+```
+
+#### Grass Type Parameters
+
+- **Cold Season**: t_opt = 20°C, sigma = 5.5
+- **Warm Season**: t_opt = 31°C, sigma = 7.0
+
+#### Rolling Averages
+
+- **3-day average**: Smoothing for short-term trends
+- **5-day average**: Medium-term trend analysis
+- **7-day average**: Long-term trend analysis
+
+## API Endpoints
+
+### Products
+
+- GET /api/v1/products - List all products
+- POST /api/v1/products - Create new product
+- GET /api/v1/products/{id} - Get product details
+- PUT /api/v1/products/{id} - Update product
+- DELETE /api/v1/products/{id} - Delete product
+
+### Lawns
+
+- GET /api/v1/lawns - List all lawns
+- POST /api/v1/lawns - Create new lawn (triggers weather fetch and weed pressure calculation)
+- GET /api/v1/lawns/{id} - Get lawn details
+- PUT /api/v1/lawns/{id} - Update lawn
+- DELETE /api/v1/lawns/{id} - Delete lawn
+
+### Applications
+
+- GET /api/v1/applications - List all applications
+- POST /api/v1/applications - Create new application
+- GET /api/v1/applications/{id} - Get application details
+- PUT /api/v1/applications/{id} - Update application
+- DELETE /api/v1/applications/{id} - Delete application
+
+### GDD
+
+- GET /api/v1/gdd_models - List GDD models
+- POST /api/v1/gdd_models - Create GDD model
+- GET /api/v1/gdd_models/{id} - Get GDD model details
+- PUT /api/v1/gdd_models/{id} - Update GDD model
+- DELETE /api/v1/gdd_models/{id} - Delete GDD model
+- GET /api/v1/gdd_models/{id}/values - Get GDD values for model
+- POST /api/v1/gdd_models/{id}/reset - Manual reset
+- GET /api/v1/gdd_models/location/{location_id} - Get models by location
+
+### Weed Pressure
+
+- GET /api/v1/weed_pressure - Get weed pressure data
+- GET /api/v1/weed_pressure/location/{location_id} - Get by location
+- GET /api/v1/weed_species - List weed species
+- POST /api/v1/weed_species - Create weed species
+- PUT /api/v1/weed_species/{id} - Update weed species
+
+### Disease Pressure
+
+- GET /api/v1/disease_pressure - Get disease pressure data
+- GET /api/v1/disease_pressure/location/{location_id} - Get by location
+
+### Growth Potential
+
+- GET /api/v1/growth_potential - Get growth potential data
+- GET /api/v1/growth_potential/location/{location_id} - Get by location
+
+### Weather
+
+- GET /api/v1/weather - Get weather data
+- GET /api/v1/weather/location/{location_id} - Get by location
+
+### Task Status
+
+- GET /api/v1/task_status - List task statuses
+- GET /api/v1/task_status/{task_id} - Get specific task status
+
+### Data Health
+
+- GET /api/v1/data_health - System health check
+- GET /api/v1/data_health/location/{location_id} - Location-specific health
+
+## Background Tasks
 
 ### Scheduled Tasks
 
-- Daily weather data collection
-- GDD calculations
-- Application reminders
-- Report generation
+- **Daily Weather Updates**: 3am Central time, updates all locations
+- **GDD Recalculation**: Triggered after weather updates
+- **Weed Pressure Calculation**: Triggered after weather updates
+- **Disease Pressure Calculation**: Triggered after weather updates
+- **Growth Potential Calculation**: Triggered after weather updates
 
-### Background Tasks
+### On-Demand Tasks
 
-- Weather data processing
-- GDD model updates
-- Analytics calculations
-- Task status tracking and monitoring
-
-## Security Considerations
-
-- Input validation for all API endpoints
-- Rate limiting for external API calls
-- Data validation for weather data
-- Secure storage of application records
+- **Weather Backfill**: Historical data retrieval for date ranges
+- **GDD Backfill**: Recalculate GDD for specific models
+- **Weed Pressure Backfill**: Recalculate weed pressure for date ranges
+- **Disease Pressure Backfill**: Recalculate disease pressure for date ranges
+- **Growth Potential Backfill**: Recalculate growth potential for date ranges
 
 ## Performance Considerations
 
-- Caching of weather data
-- Optimized GDD calculations
-- Efficient database queries
-- Background processing for heavy computations
-- Atomic database operations for data consistency
+### Database Optimization
 
-## Data Fetching and API Integration
+- **Indexes**: Comprehensive indexing on date fields and foreign keys
+- **Query Optimization**: N+1 query prevention with proper joins
+- **Atomic Operations**: Race condition prevention in concurrent updates
+- **Connection Pooling**: Efficient database connection management
 
-- All frontend API requests are now handled via Axios, using a generic fetcher utility in `src/lib/fetcher.ts`
-- React Query is used for caching, background updates, and UI state management
-- Lawns CRUD UI is fully integrated with the backend, supporting create, read, update, and delete operations via Axios and React Query
+### Caching Strategy
 
-## Weather Data Deduplication & Scheduling
+- **Frontend**: React Query for API response caching
+- **Backend**: Redis for session storage and task broker
+- **Weather Data**: Location-based deduplication prevents duplicate API calls
 
-- When a lawn is created, backend checks if weather data exists for the location before fetching
-- Weather data is stored per location, not per lawn
-- Celery Beat runs a daily job to update the latest historical and forecast data for all locations
-- Logging is in place to track deduplication and fetch logic
-- Atomic upsert operations prevent race conditions
-- Task status tracking provides visibility into update operations
+### Calculation Performance
 
-## Frontend Integration
+- **Batch Processing**: Date range calculations for efficiency
+- **Incremental Updates**: Only recalculate when weather data changes
+- **Background Processing**: Heavy calculations moved to Celery workers
+- **Performance Monitoring**: Comprehensive logging and metrics
 
-- React Query and Axios handle all CRUD and weather data fetching
-- UI is built with shadcn/ui components
-- Weather data is displayed per lawn, but deduplicated at the backend
-- Task status tracking is ready for frontend integration
+## Security Considerations
+
+### Container Security
+
+- **Non-Root Users**: All containers run as non-root users (UID 1001-1004)
+- **File Permissions**: Proper directory ownership and permissions
+- **Network Security**: Container isolation and secure communication
+
+### API Security
+
+- **Input Validation**: Comprehensive Pydantic schema validation
+- **Rate Limiting**: API rate limiting for external services
+- **Data Sanitization**: Input sanitization and SQL injection prevention
+- **Error Handling**: Secure error messages without information leakage
+
+### Data Security
+
+- **Database Security**: Connection encryption and access controls
+- **Backup Procedures**: Regular automated backups
+- **Audit Trail**: Comprehensive logging of all operations
+
+## Observability
+
+### Logging
+
+- **Centralized Logging**: Loki, Promtail, Grafana stack
+- **Request Tracing**: End-to-end request ID correlation
+- **Structured Logging**: JSON-formatted logs with metadata
+- **Performance Metrics**: API response times and calculation durations
+
+### Monitoring
+
+- **Task Monitoring**: Real-time Celery task status tracking
+- **Health Checks**: Comprehensive system health monitoring
+- **Error Tracking**: Error aggregation and alerting
+- **Performance Dashboards**: Real-time system performance metrics
+
+### Debugging
+
+- **Full-Stack Tracing**: Request ID propagation from API to Celery
+- **Log Search**: Grafana-based log search and filtering
+- **Task Correlation**: Link API requests to background tasks
+- **Error Context**: Comprehensive error context and stack traces

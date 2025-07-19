@@ -22,7 +22,8 @@ services:
       - REDBEAT_LOCK_KEY=${REDBEAT_LOCK_KEY}
       - REDBEAT_LOCK_TIMEOUT=${REDBEAT_LOCK_TIMEOUT}
       - TZ=${TZ}
-      - UVICORN_LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - UVICORN_LOG_LEVEL=INFO
+      - LOG_LEVEL=INFO
       - UVICORN_ACCESS_LOG=false
     depends_on:
       db:
@@ -70,7 +71,8 @@ services:
         max-file: "3"
     environment:
       - ENVIRONMENT=production
-      - CELERY_LOG_LEVEL=${CELERY_LOG_LEVEL}
+      - CELERY_LOG_LEVEL=INFO
+      - LOG_LEVEL=INFO
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       - ALEMBIC_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       - REDIS_URL=redis://${REDIS_HOST}:${REDIS_PORT}/0
@@ -101,7 +103,8 @@ services:
         max-file: "3"
     environment:
       - ENVIRONMENT=production
-      - CELERY_LOG_LEVEL=${CELERY_LOG_LEVEL}
+      - CELERY_LOG_LEVEL=INFO
+      - LOG_LEVEL=INFO
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       - ALEMBIC_DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       - REDIS_URL=redis://${REDIS_HOST}:${REDIS_PORT}/0
