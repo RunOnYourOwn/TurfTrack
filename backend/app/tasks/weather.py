@@ -764,7 +764,9 @@ def recalculate_gdd_for_location(self, location_id: int):
     Triggered after weather data is updated.
     """
     task_id = self.request.id
-    request_id = self.request.headers.get("request_id")
+    request_id = (
+        self.request.headers.get("request_id") if self.request.headers else None
+    )
     try:
         with SessionLocal() as session:
             # Create task status record for start
@@ -865,7 +867,9 @@ def backfill_weather_for_location(
     from app.models.task_status import TaskStatusEnum
 
     task_id = self.request.id
-    request_id = self.request.headers.get("request_id")
+    request_id = (
+        self.request.headers.get("request_id") if self.request.headers else None
+    )
     try:
         with SessionLocal() as session:
             # TaskStatus: started
@@ -980,7 +984,9 @@ def backfill_gdd_for_model(self, gdd_model_id: int):
     from app.utils.gdd import store_parameter_history
 
     task_id = self.request.id
-    request_id = self.request.headers.get("request_id")
+    request_id = (
+        self.request.headers.get("request_id") if self.request.headers else None
+    )
     try:
         with SessionLocal() as session:
             # Look up GDD model and location first
@@ -1092,7 +1098,9 @@ def backfill_disease_pressure_for_location(
     import pandas as pd
 
     task_id = self.request.id
-    request_id = self.request.headers.get("request_id")
+    request_id = (
+        self.request.headers.get("request_id") if self.request.headers else None
+    )
     try:
         with SessionLocal() as session:
             # TaskStatus: started
@@ -1154,7 +1162,9 @@ def backfill_growth_potential_for_location(
     import pandas as pd
 
     task_id = self.request.id
-    request_id = self.request.headers.get("request_id")
+    request_id = (
+        self.request.headers.get("request_id") if self.request.headers else None
+    )
     try:
         with SessionLocal() as session:
             # TaskStatus: started
@@ -1217,7 +1227,9 @@ def cleanup_duplicate_weather_for_location(self, location_id: int):
     from sqlalchemy import func
 
     task_id = self.request.id
-    request_id = self.request.headers.get("request_id")
+    request_id = (
+        self.request.headers.get("request_id") if self.request.headers else None
+    )
     try:
         with SessionLocal() as session:
             # TaskStatus: started

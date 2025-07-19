@@ -58,14 +58,24 @@ async def create_lawn(
     db_lawn = result.scalars().first()
 
     # Trigger weather fetch if needed, passing request_id if available
-    await trigger_weather_fetch_if_needed(db, db_lawn, request_id=request_id)
+    weather_task = await trigger_weather_fetch_if_needed(
+        db, db_lawn, request_id=request_id
+    )
 
     # Trigger weed pressure calculation for this location
     from app.tasks.weed_pressure import calculate_weed_pressure_for_location_task
 
     # Calculate for today's date
     today = date.today().isoformat()
-    calculate_weed_pressure_for_location_task.delay(db_lawn.location_id, today)
+
+    # If weather task was triggered, chain weed pressure to run after it
+    if weather_task:
+        weather_task.then(
+            calculate_weed_pressure_for_location_task.s(db_lawn.location_id, today)
+        )
+    else:
+        # If no weather task was needed (data already exists), run weed pressure immediately
+        calculate_weed_pressure_for_location_task.delay(db_lawn.location_id, today)
 
     # The location relationship needs to be loaded before returning
     await db.refresh(db_lawn, attribute_names=["location"])
@@ -152,7 +162,9 @@ async def update_lawn(
     db_lawn = result.scalars().first()
 
     # Trigger weather fetch if needed, passing request_id if available
-    await trigger_weather_fetch_if_needed(db, db_lawn, request_id=request_id)
+    weather_task = await trigger_weather_fetch_if_needed(
+        db, db_lawn, request_id=request_id
+    )
 
     # Clean up old location if it was changed and is now orphaned
     if location_changed:

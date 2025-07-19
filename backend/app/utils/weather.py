@@ -39,7 +39,7 @@ async def trigger_weather_fetch_if_needed(
             f"No weather data found for location_id={lawn.location_id}. Triggering fetch_and_store_weather."
         )
         if request_id:
-            fetch_and_store_weather.apply_async(
+            task = fetch_and_store_weather.apply_async(
                 args=[
                     lawn.location_id,
                     lawn.location.latitude,
@@ -48,9 +48,10 @@ async def trigger_weather_fetch_if_needed(
                 headers={"request_id": request_id},
             )
         else:
-            fetch_and_store_weather.delay(
+            task = fetch_and_store_weather.delay(
                 lawn.location_id, lawn.location.latitude, lawn.location.longitude
             )
+        return task
     else:
         logger.info(
             f"Weather data already exists for location_id={lawn.location_id}. No fetch needed."
