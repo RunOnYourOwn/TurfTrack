@@ -16,6 +16,12 @@ interface GDDMissing {
   missing: MissingRange[];
 }
 
+interface WeedPressureMissing {
+  species_id: number;
+  species_name: string;
+  missing: MissingRange[];
+}
+
 interface LocationDataHealth {
   id: number;
   name: string;
@@ -24,6 +30,7 @@ interface LocationDataHealth {
     gdd: GDDMissing[];
     disease_pressure: MissingRange[];
     growth_potential: MissingRange[];
+    weed_pressure: WeedPressureMissing[];
   };
 }
 
@@ -80,6 +87,17 @@ async function backfillGrowthPotential(
   end: string
 ) {
   return fetcher("/api/v1/backfill/growth_potential/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    data: { location_id, start_date: start, end_date: end },
+  });
+}
+async function backfillWeedPressure(
+  location_id: number,
+  start: string,
+  end: string
+) {
+  return fetcher("/api/v1/backfill/weed_pressure/", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     data: { location_id, start_date: start, end_date: end },
@@ -282,6 +300,31 @@ export function AdminBackfillPanel() {
     },
   });
 
+  const weedPressureMutation = useMutation({
+    mutationFn: ({
+      location_id,
+      start,
+      end,
+    }: {
+      location_id: number;
+      start: string;
+      end: string;
+    }) => backfillWeedPressure(location_id, start, end),
+    onMutate: (vars) => setActiveLocation(vars.location_id),
+    onSettled: () => setActiveLocation(null),
+    onSuccess: (data) => {
+      setPollingTaskId(data.task_id);
+      toast.success(
+        "Weed pressure backfill started. Waiting for completion..."
+      );
+    },
+    onError: (err: any) => {
+      toast.error(
+        "Weed pressure backfill failed: " + (err?.message || "Unknown error")
+      );
+    },
+  });
+
   const duplicateCleanupMutation = useMutation({
     mutationFn: (location_id: number) => cleanupDuplicateWeather(location_id),
     onMutate: (location_id) => setActiveLocation(location_id),
@@ -316,7 +359,14 @@ export function AdminBackfillPanel() {
               (weatherMutation.isPending ||
                 diseaseMutation.isPending ||
                 growthMutation.isPending ||
+                weedPressureMutation.isPending ||
                 duplicateCleanupMutation.isPending);
+
+            // Gather all missing weed pressure ranges for this location
+            const allWeedRanges = (loc.missing.weed_pressure || []).flatMap(
+              (wp) => wp.missing
+            );
+
             return (
               <Card
                 key={loc.id}
@@ -471,6 +521,49 @@ export function AdminBackfillPanel() {
                         }}
                       >
                         {growthMutation.isPending &&
+                        activeLocation === loc.id ? (
+                          <span className="flex items-center gap-1">
+                            <span className="animate-spin">⏳</span>{" "}
+                            Backfilling...
+                          </span>
+                        ) : (
+                          "Backfill"
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                  {/* Weed Pressure */}
+                  {allWeedRanges.length > 0 && (
+                    <div className="flex items-center justify-between bg-background dark:bg-gray-900 rounded-md p-3 border border-border mb-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Weed Pressure</span>
+                        {allWeedRanges.map((range, i) => (
+                          <Badge key={i} variant="secondary" className="ml-1">
+                            {range.start} to {range.end}
+                          </Badge>
+                        ))}
+                      </div>
+                      <Button
+                        size="sm"
+                        className="ml-2"
+                        disabled={
+                          isLocPending || weedPressureMutation.isPending
+                        }
+                        onClick={() => {
+                          const min = allWeedRanges.reduce((a, b) =>
+                            a.start < b.start ? a : b
+                          ).start;
+                          const max = allWeedRanges.reduce((a, b) =>
+                            a.end > b.end ? a : b
+                          ).end;
+                          weedPressureMutation.mutate({
+                            location_id: loc.id,
+                            start: min,
+                            end: max,
+                          });
+                        }}
+                      >
+                        {weedPressureMutation.isPending &&
                         activeLocation === loc.id ? (
                           <span className="flex items-center gap-1">
                             <span className="animate-spin">⏳</span>{" "}
