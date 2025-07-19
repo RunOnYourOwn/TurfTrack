@@ -70,7 +70,9 @@ def calculate_weed_pressure_for_location_task(
     Tracks progress in TaskStatus.
     """
     task_id = self.request.id
-    request_id = self.request.headers.get("request_id")
+    request_id = (
+        self.request.headers.get("request_id") if self.request.headers else None
+    )
 
     try:
         with SessionLocal() as session:
@@ -151,7 +153,9 @@ def calculate_weed_pressure_for_all_locations_task(self):
     Calculate weed pressure for all locations.
     Useful for daily scheduled updates.
     """
-    request_id = self.request.headers.get("request_id")
+    request_id = (
+        self.request.headers.get("request_id") if self.request.headers else None
+    )
 
     try:
         with SessionLocal() as session:
@@ -207,7 +211,9 @@ def backfill_weed_pressure_for_location_task(
     Useful for historical data or when adding new weed species.
     """
     task_id = self.request.id
-    request_id = self.request.headers.get("request_id")
+    request_id = (
+        self.request.headers.get("request_id") if self.request.headers else None
+    )
 
     try:
         with SessionLocal() as session:
