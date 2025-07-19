@@ -21,5 +21,8 @@ class Location(Base):
     disease_pressures = relationship(
         "DiseasePressure", back_populates="location", cascade="all, delete-orphan"
     )
+    weed_pressure_entries = relationship(
+        "WeedPressure", back_populates="location", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (UniqueConstraint("latitude", "longitude", name="uix_lat_lon"),)

@@ -19,6 +19,15 @@ except ImportError as e:
     logger.error(f"Failed to import weather tasks: {e}")
     raise
 
+# Explicitly import weed pressure tasks to ensure registration
+try:
+    from app.tasks import weed_pressure
+
+    logger.info("Weed pressure tasks imported successfully")
+except ImportError as e:
+    logger.error(f"Failed to import weed pressure tasks: {e}")
+    raise
+
 # Import the scheduler configuration to ensure its loaded
 try:
     from app.celery_app import scheduler

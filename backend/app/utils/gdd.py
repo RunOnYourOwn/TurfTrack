@@ -279,15 +279,17 @@ def calculate_and_store_gdd_values_sync_segmented(
                 )
                 threshold_resets_created.append(new_reset)
 
+            # Add daily_gdd to cumulative BEFORE storing the value
+            # But only if it's not the first day of a new run
+            if daily_gdd is not None and not is_new_run:
+                cumulative += daily_gdd
+
             # For the first day of a new run, store cumulative_gdd = 0
             if is_new_run and daily_gdd is not None:
                 cumulative_gdd_to_store = 0.0
-                # Add daily_gdd to cumulative for next day
-                cumulative += daily_gdd
                 is_new_run = False
             else:
-                # Add daily_gdd to cumulative
-                cumulative += daily_gdd
+                # Use current cumulative value (after adding today's daily_gdd)
                 cumulative_gdd_to_store = cumulative if daily_gdd is not None else None
 
         values_to_insert.append(

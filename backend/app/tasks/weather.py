@@ -394,20 +394,21 @@ def _fetch_and_store_weather_sync(
         )
         upsert_daily_weather_sync(session, location_id, date, weather_type, data)
 
-    # Calculate disease pressure for this location (Smith-Kerns)
-    forecast_end = today + datetime.timedelta(days=16)
-    calculate_smith_kerns_for_location(
-        session, location_id, today - datetime.timedelta(days=60), forecast_end
-    )
-    # Calculate growth potential for this location (same date range)
-    calculate_growth_potential_for_location(
-        session, location_id, today - datetime.timedelta(days=60), forecast_end
-    )
+        # Calculate disease pressure for this location (Smith-Kerns)
+        forecast_end = today + datetime.timedelta(days=16)
+        calculate_smith_kerns_for_location(
+            session, location_id, today - datetime.timedelta(days=60), forecast_end
+        )
+        # Calculate weed pressure for this location (same date range)
+        from app.utils.weed_pressure import calculate_weed_pressure_for_location_range
 
-    # Add comprehensive logging for debugging
-    print(
-        f"[WeatherIngest] Fetching forecast for location {location_id} (lat: {latitude}, lon: {longitude})"
-    )
+        calculate_weed_pressure_for_location_range(
+            session, location_id, today - datetime.timedelta(days=60), forecast_end
+        )
+        # Calculate growth potential for this location (same date range)
+        calculate_growth_potential_for_location(
+            session, location_id, today - datetime.timedelta(days=60), forecast_end
+        )
 
 
 def _get_historical_start_date(session, location_id: int) -> datetime.date:
@@ -611,13 +612,21 @@ def _update_recent_weather_for_location_sync(
         recalculate_gdd_for_location.delay(location_id)
 
         # Calculate disease pressure for this location (Smith-Kerns)
+        # Only recalculate yesterday (when forecast becomes historical) and new forecast days
+        yesterday = today - datetime.timedelta(days=1)
         forecast_end = today + datetime.timedelta(days=16)
-        # Use historical_start_date for both calculations
         calculate_smith_kerns_for_location(
-            session, location_id, historical_start_date, forecast_end
+            session, location_id, yesterday, forecast_end
         )
+        # Calculate weed pressure for this location (same optimized date range)
+        from app.utils.weed_pressure import calculate_weed_pressure_for_location_range
+
+        calculate_weed_pressure_for_location_range(
+            session, location_id, yesterday, forecast_end
+        )
+        # Calculate growth potential for this location (same optimized date range)
         calculate_growth_potential_for_location(
-            session, location_id, historical_start_date, forecast_end
+            session, location_id, yesterday, forecast_end
         )
 
 
@@ -681,14 +690,15 @@ def update_weather_for_all_lawns(self):
                     print(
                         f"[DEBUG] About to queue weather fetch for location {location.id}"
                     )
-                    result = fetch_and_store_weather.delay(
+                    # Use optimized function for daily updates
+                    _update_recent_weather_for_location_sync(
                         location.id, location.latitude, location.longitude
                     )
                     print(
-                        f"[DEBUG] Successfully queued weather fetch for location {location.id}, task ID: {result.id}"
+                        f"[DEBUG] Successfully updated weather for location {location.id}"
                     )
                     logger.info(
-                        f"[update_weather_for_all_lawns] Queued fetch_and_store_weather task {result.id} for location {location.id}"
+                        f"[update_weather_for_all_lawns] Updated weather for location {location.id}"
                     )
                 except Exception as e:
                     print(
@@ -963,8 +973,11 @@ def backfill_gdd_for_model(self, gdd_model_id: int):
     """
     Recalculate all GDD values for a given GDD model (full history backfill).
     Tracks progress in TaskStatus.
+    Ensures model has proper parameter history and reset records before calculation.
     """
     from app.models.task_status import TaskStatusEnum
+    from app.models.gdd import GDDReset, ResetType, GDDModelParameters
+    from app.utils.gdd import store_parameter_history
 
     task_id = self.request.id
     request_id = self.request.headers.get("request_id")
@@ -986,6 +999,45 @@ def backfill_gdd_for_model(self, gdd_model_id: int):
                 started=True,
                 request_id=request_id,
             )
+
+            # Ensure parameter history exists (like model creation does)
+            existing_params = (
+                session.query(GDDModelParameters)
+                .filter(GDDModelParameters.gdd_model_id == gdd_model_id)
+                .first()
+            )
+
+            if not existing_params:
+                # Store initial parameters in history (same as model creation)
+                store_parameter_history(
+                    session,
+                    gdd_model_id,
+                    gdd_model.base_temp,
+                    gdd_model.threshold,
+                    gdd_model.reset_on_threshold,
+                    gdd_model.start_date,
+                )
+
+            # Ensure initial reset exists (like model creation does)
+            existing_reset = (
+                session.query(GDDReset)
+                .filter(
+                    GDDReset.gdd_model_id == gdd_model_id,
+                    GDDReset.reset_type == ResetType.initial,
+                )
+                .first()
+            )
+
+            if not existing_reset:
+                # Create initial reset (same as model creation)
+                initial_reset = GDDReset(
+                    gdd_model_id=gdd_model_id,
+                    reset_date=gdd_model.start_date,
+                    run_number=1,
+                    reset_type=ResetType.initial,
+                )
+                session.add(initial_reset)
+                session.commit()
 
             # Recalculate all GDD values
             calculate_and_store_gdd_values_sync_segmented(
