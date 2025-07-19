@@ -6,6 +6,7 @@ from app.core.database import get_db
 from app.models.lawn import Lawn, GrassType, WeatherFetchFrequency
 from app.schemas.lawn import LawnCreate, LawnRead, LawnUpdate
 from typing import List
+from datetime import date
 from app.utils.location import get_or_create_location, cleanup_orphaned_location
 from app.utils.weather import trigger_weather_fetch_if_needed
 from app.core.logging_config import log_business_event
@@ -58,6 +59,13 @@ async def create_lawn(
 
     # Trigger weather fetch if needed, passing request_id if available
     await trigger_weather_fetch_if_needed(db, db_lawn, request_id=request_id)
+
+    # Trigger weed pressure calculation for this location
+    from app.tasks.weed_pressure import calculate_weed_pressure_for_location_task
+
+    # Calculate for today's date
+    today = date.today().isoformat()
+    calculate_weed_pressure_for_location_task.delay(db_lawn.location_id, today)
 
     # The location relationship needs to be loaded before returning
     await db.refresh(db_lawn, attribute_names=["location"])

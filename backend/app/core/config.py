@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     # Logging
     LOG_LEVEL: str = "INFO"  # Can be overridden by environment variable
 
+    # Timezone
+    TZ: str = "UTC"
+
     # Database
     POSTGRES_SERVER: str = "db"
     POSTGRES_PORT: int = 5432

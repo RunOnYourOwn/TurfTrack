@@ -8,6 +8,7 @@ from app.models.daily_weather import DailyWeather
 from app.models.gdd import GDDValue
 from app.models.disease_pressure import DiseasePressure
 from app.models.growth_potential import GrowthPotential
+from app.models.weed_pressure import WeedPressure, WeedSpecies
 from datetime import timedelta, date
 
 router = APIRouter(tags=["data_health"])
@@ -86,6 +87,40 @@ async def find_duplicate_weather_entries(db: AsyncSession, location_id: int):
     return duplicates
 
 
+async def find_duplicate_disease_pressure_entries(db: AsyncSession, location_id: int):
+    """
+    Find duplicate disease pressure entries for a location (same date, same disease).
+    Returns dates/diseases that have more than one entry.
+    """
+    from app.models.disease_pressure import DiseasePressure
+
+    # Find (date, disease) pairs that have multiple entries
+    duplicate_query = (
+        select(DiseasePressure.date, DiseasePressure.disease)
+        .where(DiseasePressure.location_id == location_id)
+        .group_by(DiseasePressure.date, DiseasePressure.disease)
+        .having(func.count(DiseasePressure.id) > 1)
+    )
+    duplicates = (await db.execute(duplicate_query)).all()
+    result = []
+    for date_val, disease in duplicates:
+        # Get all entries for this date/disease
+        entries_query = select(DiseasePressure).where(
+            DiseasePressure.location_id == location_id,
+            DiseasePressure.date == date_val,
+            DiseasePressure.disease == disease,
+        )
+        entries = (await db.execute(entries_query)).scalars().all()
+        result.append(
+            {
+                "date": str(date_val),
+                "disease": disease,
+                "entries": [{"id": e.id, "risk_score": e.risk_score} for e in entries],
+            }
+        )
+    return result
+
+
 @router.get("/data_health/")
 async def get_data_health(db: AsyncSession = Depends(get_db)):
     locations = (await db.execute(select(Location))).scalars().all()
@@ -97,17 +132,6 @@ async def get_data_health(db: AsyncSession = Depends(get_db)):
     expected_end = today + timedelta(days=16)
 
     for loc in locations:
-        # Get all weather dates for this location
-        weather_dates = (
-            (
-                await db.execute(
-                    select(DailyWeather.date).where(DailyWeather.location_id == loc.id)
-                )
-            )
-            .scalars()
-            .all()
-        )
-
         # Create expected dates from our reasonable range (end-exclusive)
         expected_dates = [
             expected_start + timedelta(days=i)
@@ -171,6 +195,7 @@ async def get_data_health(db: AsyncSession = Depends(get_db)):
             "gdd": "daily_gdd",  # use daily_gdd for GDDValue
             "disease_pressure": "risk_score",  # adjust to your actual field name
             "growth_potential": "growth_potential",
+            "weed_pressure": "weed_pressure_score",
         }
 
         for name, model in [
@@ -178,6 +203,7 @@ async def get_data_health(db: AsyncSession = Depends(get_db)):
             ("gdd", GDDValue),
             ("disease_pressure", DiseasePressure),
             ("growth_potential", GrowthPotential),
+            ("weed_pressure", WeedPressure),
         ]:
             if name == "gdd":
                 from app.models.gdd import GDDModel
@@ -229,6 +255,42 @@ async def get_data_health(db: AsyncSession = Depends(get_db)):
                     )
                 missing[name] = gdd_missing
                 continue
+            elif name == "weed_pressure":
+                # For each active weed species, check for missing entries
+                species_list = (
+                    (await db.execute(select(WeedSpecies).where(WeedSpecies.is_active)))
+                    .scalars()
+                    .all()
+                )
+                weed_missing = []
+                for species in species_list:
+                    # Check for weed pressure data for this specific species and location
+                    present_dates = set(
+                        (
+                            await db.execute(
+                                select(WeedPressure.date).where(
+                                    and_(
+                                        WeedPressure.location_id == loc.id,
+                                        WeedPressure.weed_species_id == species.id,
+                                        WeedPressure.weed_pressure_score.isnot(None),
+                                    )
+                                )
+                            )
+                        )
+                        .scalars()
+                        .all()
+                    )
+                    # Only count dates where this species is missing
+                    missing_ranges = find_missing_ranges(present_dates, expected_dates)
+                    weed_missing.append(
+                        {
+                            "species_id": species.id,
+                            "species_name": species.name,
+                            "missing": missing_ranges,
+                        }
+                    )
+                missing[name] = weed_missing
+                continue
             elif name == "disease_pressure":
                 # Only check for missing values starting from the 5th date (index 4)
                 if len(expected_dates) < 5:
@@ -271,4 +333,5 @@ async def get_data_health(db: AsyncSession = Depends(get_db)):
         if duplicates:
             duplicate_weather[loc.id] = duplicates
 
+    # Remove duplicate_disease_pressure logic
     return {"locations": results, "duplicate_weather": duplicate_weather}
