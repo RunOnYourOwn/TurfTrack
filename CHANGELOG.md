@@ -9,9 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Water management chart with precipitation, evapotranspiration, and water balance
+
 ### Fixed
 
 ### Changed
+
 ## [0.0.19] - 2025-07-18
 
 ### Added

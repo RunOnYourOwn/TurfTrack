@@ -13,6 +13,7 @@ import {
   SelectItem,
 } from "../components/ui/select";
 import { WeedPressureChart } from "../components/dashboard/WeedPressureChart";
+import WaterManagementSummary from "../components/dashboard/WaterManagementSummary";
 
 export default function Dashboard() {
   const [locations, setLocations] = useState<Location[]>([]);
@@ -60,6 +61,9 @@ export default function Dashboard() {
           </div>
           <div className="mt-6">
             <GrowthPotentialSummary location={selectedLocation} />
+          </div>
+          <div className="mt-6">
+            <WaterManagementSummary location={selectedLocation} />
           </div>
           <div className="mt-6">
             <WeedPressureChart locationId={selectedLocation.id} />
