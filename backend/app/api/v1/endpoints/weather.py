@@ -73,6 +73,17 @@ async def get_weather_for_lawn(
             ),
             "et0_evapotranspiration_mm": safe_float(entry.et0_evapotranspiration_mm),
             "et0_evapotranspiration_in": safe_float(entry.et0_evapotranspiration_in),
+            "relative_humidity_mean": safe_float(entry.relative_humidity_mean),
+            "relative_humidity_max": safe_float(entry.relative_humidity_max),
+            "relative_humidity_min": safe_float(entry.relative_humidity_min),
+            "dew_point_max_c": safe_float(entry.dew_point_max_c),
+            "dew_point_max_f": safe_float(entry.dew_point_max_f),
+            "dew_point_min_c": safe_float(entry.dew_point_min_c),
+            "dew_point_min_f": safe_float(entry.dew_point_min_f),
+            "dew_point_mean_c": safe_float(entry.dew_point_mean_c),
+            "dew_point_mean_f": safe_float(entry.dew_point_mean_f),
+            "sunshine_duration_s": safe_float(entry.sunshine_duration_s),
+            "sunshine_duration_h": safe_float(entry.sunshine_duration_h),
         }
 
     return [serialize(e) for e in weather_entries]
@@ -142,6 +153,17 @@ async def get_weather_for_location(
             ),
             "et0_evapotranspiration_mm": safe_float(entry.et0_evapotranspiration_mm),
             "et0_evapotranspiration_in": safe_float(entry.et0_evapotranspiration_in),
+            "relative_humidity_mean": safe_float(entry.relative_humidity_mean),
+            "relative_humidity_max": safe_float(entry.relative_humidity_max),
+            "relative_humidity_min": safe_float(entry.relative_humidity_min),
+            "dew_point_max_c": safe_float(entry.dew_point_max_c),
+            "dew_point_max_f": safe_float(entry.dew_point_max_f),
+            "dew_point_min_c": safe_float(entry.dew_point_min_c),
+            "dew_point_min_f": safe_float(entry.dew_point_min_f),
+            "dew_point_mean_c": safe_float(entry.dew_point_mean_c),
+            "dew_point_mean_f": safe_float(entry.dew_point_mean_f),
+            "sunshine_duration_s": safe_float(entry.sunshine_duration_s),
+            "sunshine_duration_h": safe_float(entry.sunshine_duration_h),
         }
 
     return [serialize(e) for e in weather_entries]
