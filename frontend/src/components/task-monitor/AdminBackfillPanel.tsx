@@ -2,9 +2,29 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { toast } from "sonner";
 import React from "react";
 import { fetcher } from "@/lib/fetcher";
+import {
+  MapPin,
+  Cloud,
+  Thermometer,
+  Bug,
+  Sprout,
+  Flower2,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  ChevronDown,
+  RefreshCw,
+  Database,
+  Activity,
+} from "lucide-react";
 
 interface MissingRange {
   start: string;
@@ -342,17 +362,109 @@ export function AdminBackfillPanel() {
     },
   });
 
-  if (isLoading) return <div>Loading data health...</div>;
-  if (error) return <div>Error loading data health</div>;
+  if (isLoading)
+    return (
+      <Card className="mb-6 bg-white dark:bg-gray-900 text-black dark:text-white w-full max-w-none shadow-lg flex flex-col">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Database className="w-5 h-5" />
+            Data Health & Backfill
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center py-8">
+            <div className="flex items-center gap-2">
+              <RefreshCw className="w-4 h-4 animate-spin" />
+              <span>Loading data health information...</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+
+  if (error)
+    return (
+      <Card className="mb-6 bg-white dark:bg-gray-900 text-black dark:text-white w-full max-w-none shadow-lg flex flex-col">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Database className="w-5 h-5" />
+            Data Health & Backfill
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center py-8">
+            <div className="flex items-center gap-2 text-red-500">
+              <XCircle className="w-4 h-4" />
+              <span>Error loading data health information</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+
+  // Calculate overall health metrics
+  const totalLocations = data?.locations.length || 0;
+  const totalMissingDataPoints =
+    data?.locations.reduce((total, loc) => {
+      return (
+        total +
+        loc.missing.weather.length +
+        loc.missing.gdd.reduce((sum, gdd) => sum + gdd.missing.length, 0) +
+        loc.missing.disease_pressure.length +
+        loc.missing.growth_potential.length +
+        loc.missing.weed_pressure.reduce(
+          (sum, wp) => sum + wp.missing.length,
+          0
+        )
+      );
+    }, 0) || 0;
 
   return (
     <Card className="mb-6 bg-white dark:bg-gray-900 text-black dark:text-white w-full max-w-none shadow-lg flex flex-col">
       <CardHeader>
-        <CardTitle>Data Health & Backfill</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <Database className="w-5 h-5" />
+          Data Health & Backfill
+        </CardTitle>
+        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <MapPin className="w-4 h-4" />
+            <span>{totalLocations} locations</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Activity className="w-4 h-4" />
+            <span>{totalMissingDataPoints} missing data points</span>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col gap-6">
           {data?.locations.map((loc) => {
+            // Calculate location health metrics
+            const locationMissingData =
+              loc.missing.weather.length +
+              loc.missing.gdd.reduce(
+                (sum, gdd) => sum + gdd.missing.length,
+                0
+              ) +
+              loc.missing.disease_pressure.length +
+              loc.missing.growth_potential.length +
+              loc.missing.weed_pressure.reduce(
+                (sum, wp) => sum + wp.missing.length,
+                0
+              );
+
+            const healthPercentage =
+              locationMissingData === 0
+                ? 100
+                : Math.max(0, 100 - locationMissingData * 10);
+            const healthStatus =
+              healthPercentage >= 90
+                ? "good"
+                : healthPercentage >= 70
+                ? "warning"
+                : "critical";
+
             // Determine if any mutation is running for this location
             const isLocPending =
               activeLocation === loc.id &&
@@ -368,257 +480,366 @@ export function AdminBackfillPanel() {
             );
 
             return (
-              <Card
-                key={loc.id}
-                className="bg-muted dark:bg-gray-800 border border-border p-4"
-              >
-                <div className="font-semibold text-lg mb-2">{loc.name}</div>
-                <div className="flex flex-col gap-3">
-                  {/* Weather */}
-                  {loc.missing.weather.length > 0 && (
-                    <div className="flex items-center justify-between bg-background dark:bg-gray-900 rounded-md p-3 border border-border mb-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">Weather</span>
-                        {loc.missing.weather.map((range, i) => (
-                          <Badge key={i} variant="secondary" className="ml-1">
-                            {range.start} to {range.end}
-                          </Badge>
-                        ))}
-                      </div>
-                      <Button
-                        size="sm"
-                        className="ml-2"
-                        disabled={isLocPending || weatherMutation.isPending}
-                        onClick={() => {
-                          const min = loc.missing.weather.reduce((a, b) =>
-                            a.start < b.start ? a : b
-                          ).start;
-                          const max = loc.missing.weather.reduce((a, b) =>
-                            a.end > b.end ? a : b
-                          ).end;
-                          weatherMutation.mutate({
-                            location_id: loc.id,
-                            start: min,
-                            end: max,
-                          });
-                        }}
-                      >
-                        {weatherMutation.isPending &&
-                        activeLocation === loc.id ? (
-                          <span className="flex items-center gap-1">
-                            <span className="animate-spin">⏳</span>{" "}
-                            Backfilling...
-                          </span>
-                        ) : (
-                          "Backfill"
-                        )}
-                      </Button>
-                    </div>
-                  )}
-                  {/* GDD */}
-                  {loc.missing.gdd.map((gdd) =>
-                    gdd.missing.length > 0 ? (
-                      <div
-                        key={`gdd-${gdd.gdd_model_id}`}
-                        className="flex items-center justify-between bg-background dark:bg-gray-900 rounded-md p-3 border border-border mb-1"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">
-                            GDD Model {gdd.gdd_model_id}
-                          </span>
-                          {gdd.missing.map((range, i) => (
-                            <Badge key={i} variant="secondary" className="ml-1">
-                              {range.start} to {range.end}
-                            </Badge>
-                          ))}
-                        </div>
-                        <Button
-                          size="sm"
-                          className="ml-2"
-                          disabled={gddMutation.isPending}
-                          onClick={() => gddMutation.mutate(gdd.gdd_model_id)}
-                        >
-                          {gddMutation.isPending ? (
-                            <span className="flex items-center gap-1">
-                              <span className="animate-spin">⏳</span>{" "}
-                              Backfilling...
+              <Collapsible key={loc.id}>
+                <Card className="bg-muted dark:bg-gray-800 border border-border overflow-hidden">
+                  <CollapsibleTrigger asChild>
+                    <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <MapPin className="w-5 h-5 text-muted-foreground" />
+                        <div>
+                          <div className="font-semibold text-lg">
+                            {loc.name}
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <span>
+                              {locationMissingData} missing data points
                             </span>
-                          ) : (
-                            "Backfill"
-                          )}
-                        </Button>
-                      </div>
-                    ) : null
-                  )}
-                  {/* Disease Pressure */}
-                  {loc.missing.disease_pressure.length > 0 && (
-                    <div className="flex items-center justify-between bg-background dark:bg-gray-900 rounded-md p-3 border border-border mb-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">Disease Pressure</span>
-                        {loc.missing.disease_pressure.map((range, i) => (
-                          <Badge key={i} variant="secondary" className="ml-1">
-                            {range.start} to {range.end}
-                          </Badge>
-                        ))}
-                      </div>
-                      <Button
-                        size="sm"
-                        className="ml-2"
-                        disabled={isLocPending || diseaseMutation.isPending}
-                        onClick={() => {
-                          const min = loc.missing.disease_pressure.reduce(
-                            (a, b) => (a.start < b.start ? a : b)
-                          ).start;
-                          const max = loc.missing.disease_pressure.reduce(
-                            (a, b) => (a.end > b.end ? a : b)
-                          ).end;
-                          diseaseMutation.mutate({
-                            location_id: loc.id,
-                            start: min,
-                            end: max,
-                          });
-                        }}
-                      >
-                        {diseaseMutation.isPending &&
-                        activeLocation === loc.id ? (
-                          <span className="flex items-center gap-1">
-                            <span className="animate-spin">⏳</span>{" "}
-                            Backfilling...
-                          </span>
-                        ) : (
-                          "Backfill"
-                        )}
-                      </Button>
-                    </div>
-                  )}
-                  {/* Growth Potential */}
-                  {loc.missing.growth_potential.length > 0 && (
-                    <div className="flex items-center justify-between bg-background dark:bg-gray-900 rounded-md p-3 border border-border mb-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">Growth Potential</span>
-                        {loc.missing.growth_potential.map((range, i) => (
-                          <Badge key={i} variant="secondary" className="ml-1">
-                            {range.start} to {range.end}
-                          </Badge>
-                        ))}
-                      </div>
-                      <Button
-                        size="sm"
-                        className="ml-2"
-                        disabled={isLocPending || growthMutation.isPending}
-                        onClick={() => {
-                          const min = loc.missing.growth_potential.reduce(
-                            (a, b) => (a.start < b.start ? a : b)
-                          ).start;
-                          const max = loc.missing.growth_potential.reduce(
-                            (a, b) => (a.end > b.end ? a : b)
-                          ).end;
-                          growthMutation.mutate({
-                            location_id: loc.id,
-                            start: min,
-                            end: max,
-                          });
-                        }}
-                      >
-                        {growthMutation.isPending &&
-                        activeLocation === loc.id ? (
-                          <span className="flex items-center gap-1">
-                            <span className="animate-spin">⏳</span>{" "}
-                            Backfilling...
-                          </span>
-                        ) : (
-                          "Backfill"
-                        )}
-                      </Button>
-                    </div>
-                  )}
-                  {/* Weed Pressure */}
-                  {allWeedRanges.length > 0 && (
-                    <div className="flex items-center justify-between bg-background dark:bg-gray-900 rounded-md p-3 border border-border mb-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">Weed Pressure</span>
-                        {allWeedRanges.map((range, i) => (
-                          <Badge key={i} variant="secondary" className="ml-1">
-                            {range.start} to {range.end}
-                          </Badge>
-                        ))}
-                      </div>
-                      <Button
-                        size="sm"
-                        className="ml-2"
-                        disabled={
-                          isLocPending || weedPressureMutation.isPending
-                        }
-                        onClick={() => {
-                          const min = allWeedRanges.reduce((a, b) =>
-                            a.start < b.start ? a : b
-                          ).start;
-                          const max = allWeedRanges.reduce((a, b) =>
-                            a.end > b.end ? a : b
-                          ).end;
-                          weedPressureMutation.mutate({
-                            location_id: loc.id,
-                            start: min,
-                            end: max,
-                          });
-                        }}
-                      >
-                        {weedPressureMutation.isPending &&
-                        activeLocation === loc.id ? (
-                          <span className="flex items-center gap-1">
-                            <span className="animate-spin">⏳</span>{" "}
-                            Backfilling...
-                          </span>
-                        ) : (
-                          "Backfill"
-                        )}
-                      </Button>
-                    </div>
-                  )}
-                  {/* Duplicate Weather */}
-                  {data.duplicate_weather[loc.id.toString()] &&
-                    data.duplicate_weather[loc.id.toString()].length > 0 && (
-                      <div className="flex items-center justify-between bg-background dark:bg-gray-900 rounded-md p-3 border border-border mb-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">Duplicate Weather</span>
-                          {data.duplicate_weather[loc.id.toString()].map(
-                            (duplicate, i) => (
-                              <Badge
-                                key={i}
-                                variant="destructive"
-                                className="ml-1"
-                              >
-                                {duplicate.date} ({duplicate.entries.length}{" "}
-                                entries)
-                              </Badge>
-                            )
-                          )}
-                        </div>
-                        <Button
-                          size="sm"
-                          className="ml-2"
-                          variant="destructive"
-                          disabled={
-                            isLocPending || duplicateCleanupMutation.isPending
-                          }
-                          onClick={() => {
-                            duplicateCleanupMutation.mutate(loc.id);
-                          }}
-                        >
-                          {duplicateCleanupMutation.isPending &&
-                          activeLocation === loc.id ? (
-                            <span className="flex items-center gap-1">
-                              <span className="animate-spin">⏳</span>{" "}
-                              Cleaning...
+                            <span>•</span>
+                            <span
+                              className={`flex items-center gap-1 ${
+                                healthStatus === "good"
+                                  ? "text-green-500"
+                                  : healthStatus === "warning"
+                                  ? "text-yellow-500"
+                                  : "text-red-500"
+                              }`}
+                            >
+                              {healthStatus === "good" ? (
+                                <CheckCircle className="w-3 h-3" />
+                              ) : healthStatus === "warning" ? (
+                                <AlertTriangle className="w-3 h-3" />
+                              ) : (
+                                <XCircle className="w-3 h-3" />
+                              )}
+                              {healthPercentage}% healthy
                             </span>
-                          ) : (
-                            "Clean Up"
-                          )}
-                        </Button>
+                          </div>
+                        </div>
                       </div>
-                    )}
-                </div>
-              </Card>
+                      <div className="flex items-center gap-2">
+                        <div className="w-16 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full transition-all duration-300 ${
+                              healthStatus === "good"
+                                ? "bg-green-500"
+                                : healthStatus === "warning"
+                                ? "bg-yellow-500"
+                                : "bg-red-500"
+                            }`}
+                            style={{ width: `${healthPercentage}%` }}
+                          />
+                        </div>
+                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                      </div>
+                    </div>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="px-4 pb-4 space-y-3">
+                      {/* Weather */}
+                      {loc.missing.weather.length > 0 && (
+                        <div className="flex items-center justify-between bg-background dark:bg-gray-900 rounded-md p-3 border border-border">
+                          <div className="flex items-center gap-3">
+                            <Cloud className="w-4 h-4 text-blue-500" />
+                            <div>
+                              <div className="font-medium">Weather Data</div>
+                              <div className="flex items-center gap-1 mt-1">
+                                {loc.missing.weather.map((range, i) => (
+                                  <Badge
+                                    key={i}
+                                    variant="secondary"
+                                    className="text-xs"
+                                  >
+                                    {range.start} to {range.end}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            disabled={isLocPending || weatherMutation.isPending}
+                            onClick={() => {
+                              const min = loc.missing.weather.reduce((a, b) =>
+                                a.start < b.start ? a : b
+                              ).start;
+                              const max = loc.missing.weather.reduce((a, b) =>
+                                a.end > b.end ? a : b
+                              ).end;
+                              weatherMutation.mutate({
+                                location_id: loc.id,
+                                start: min,
+                                end: max,
+                              });
+                            }}
+                          >
+                            {weatherMutation.isPending &&
+                            activeLocation === loc.id ? (
+                              <span className="flex items-center gap-1">
+                                <RefreshCw className="w-3 h-3 animate-spin" />
+                                Backfilling...
+                              </span>
+                            ) : (
+                              "Backfill"
+                            )}
+                          </Button>
+                        </div>
+                      )}
+                      {/* GDD */}
+                      {loc.missing.gdd.map((gdd) =>
+                        gdd.missing.length > 0 ? (
+                          <div
+                            key={`gdd-${gdd.gdd_model_id}`}
+                            className="flex items-center justify-between bg-background dark:bg-gray-900 rounded-md p-3 border border-border"
+                          >
+                            <div className="flex items-center gap-3">
+                              <Thermometer className="w-4 h-4 text-orange-500" />
+                              <div>
+                                <div className="font-medium">
+                                  GDD Model {gdd.gdd_model_id}
+                                </div>
+                                <div className="flex items-center gap-1 mt-1">
+                                  {gdd.missing.map((range, i) => (
+                                    <Badge
+                                      key={i}
+                                      variant="secondary"
+                                      className="text-xs"
+                                    >
+                                      {range.start} to {range.end}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                            <Button
+                              size="sm"
+                              disabled={gddMutation.isPending}
+                              onClick={() =>
+                                gddMutation.mutate(gdd.gdd_model_id)
+                              }
+                            >
+                              {gddMutation.isPending ? (
+                                <span className="flex items-center gap-1">
+                                  <RefreshCw className="w-3 h-3 animate-spin" />
+                                  Backfilling...
+                                </span>
+                              ) : (
+                                "Backfill"
+                              )}
+                            </Button>
+                          </div>
+                        ) : null
+                      )}
+                      {/* Disease Pressure */}
+                      {loc.missing.disease_pressure.length > 0 && (
+                        <div className="flex items-center justify-between bg-background dark:bg-gray-900 rounded-md p-3 border border-border">
+                          <div className="flex items-center gap-3">
+                            <Bug className="w-4 h-4 text-red-500" />
+                            <div>
+                              <div className="font-medium">
+                                Disease Pressure
+                              </div>
+                              <div className="flex items-center gap-1 mt-1">
+                                {loc.missing.disease_pressure.map(
+                                  (range, i) => (
+                                    <Badge
+                                      key={i}
+                                      variant="secondary"
+                                      className="text-xs"
+                                    >
+                                      {range.start} to {range.end}
+                                    </Badge>
+                                  )
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            disabled={isLocPending || diseaseMutation.isPending}
+                            onClick={() => {
+                              const min = loc.missing.disease_pressure.reduce(
+                                (a, b) => (a.start < b.start ? a : b)
+                              ).start;
+                              const max = loc.missing.disease_pressure.reduce(
+                                (a, b) => (a.end > b.end ? a : b)
+                              ).end;
+                              diseaseMutation.mutate({
+                                location_id: loc.id,
+                                start: min,
+                                end: max,
+                              });
+                            }}
+                          >
+                            {diseaseMutation.isPending &&
+                            activeLocation === loc.id ? (
+                              <span className="flex items-center gap-1">
+                                <RefreshCw className="w-3 h-3 animate-spin" />
+                                Backfilling...
+                              </span>
+                            ) : (
+                              "Backfill"
+                            )}
+                          </Button>
+                        </div>
+                      )}
+                      {/* Growth Potential */}
+                      {loc.missing.growth_potential.length > 0 && (
+                        <div className="flex items-center justify-between bg-background dark:bg-gray-900 rounded-md p-3 border border-border">
+                          <div className="flex items-center gap-3">
+                            <Sprout className="w-4 h-4 text-green-500" />
+                            <div>
+                              <div className="font-medium">
+                                Growth Potential
+                              </div>
+                              <div className="flex items-center gap-1 mt-1">
+                                {loc.missing.growth_potential.map(
+                                  (range, i) => (
+                                    <Badge
+                                      key={i}
+                                      variant="secondary"
+                                      className="text-xs"
+                                    >
+                                      {range.start} to {range.end}
+                                    </Badge>
+                                  )
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            disabled={isLocPending || growthMutation.isPending}
+                            onClick={() => {
+                              const min = loc.missing.growth_potential.reduce(
+                                (a, b) => (a.start < b.start ? a : b)
+                              ).start;
+                              const max = loc.missing.growth_potential.reduce(
+                                (a, b) => (a.end > b.end ? a : b)
+                              ).end;
+                              growthMutation.mutate({
+                                location_id: loc.id,
+                                start: min,
+                                end: max,
+                              });
+                            }}
+                          >
+                            {growthMutation.isPending &&
+                            activeLocation === loc.id ? (
+                              <span className="flex items-center gap-1">
+                                <RefreshCw className="w-3 h-3 animate-spin" />
+                                Backfilling...
+                              </span>
+                            ) : (
+                              "Backfill"
+                            )}
+                          </Button>
+                        </div>
+                      )}
+                      {/* Weed Pressure */}
+                      {allWeedRanges.length > 0 && (
+                        <div className="flex items-center justify-between bg-background dark:bg-gray-900 rounded-md p-3 border border-border">
+                          <div className="flex items-center gap-3">
+                            <Flower2 className="w-4 h-4 text-purple-500" />
+                            <div>
+                              <div className="font-medium">Weed Pressure</div>
+                              <div className="flex items-center gap-1 mt-1">
+                                {allWeedRanges.map((range, i) => (
+                                  <Badge
+                                    key={i}
+                                    variant="secondary"
+                                    className="text-xs"
+                                  >
+                                    {range.start} to {range.end}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            disabled={
+                              isLocPending || weedPressureMutation.isPending
+                            }
+                            onClick={() => {
+                              const min = allWeedRanges.reduce((a, b) =>
+                                a.start < b.start ? a : b
+                              ).start;
+                              const max = allWeedRanges.reduce((a, b) =>
+                                a.end > b.end ? a : b
+                              ).end;
+                              weedPressureMutation.mutate({
+                                location_id: loc.id,
+                                start: min,
+                                end: max,
+                              });
+                            }}
+                          >
+                            {weedPressureMutation.isPending &&
+                            activeLocation === loc.id ? (
+                              <span className="flex items-center gap-1">
+                                <RefreshCw className="w-3 h-3 animate-spin" />
+                                Backfilling...
+                              </span>
+                            ) : (
+                              "Backfill"
+                            )}
+                          </Button>
+                        </div>
+                      )}
+                      {/* Duplicate Weather */}
+                      {data.duplicate_weather[loc.id.toString()] &&
+                        data.duplicate_weather[loc.id.toString()].length >
+                          0 && (
+                          <div className="flex items-center justify-between bg-background dark:bg-gray-900 rounded-md p-3 border border-border">
+                            <div className="flex items-center gap-3">
+                              <AlertTriangle className="w-4 h-4 text-red-500" />
+                              <div>
+                                <div className="font-medium">
+                                  Duplicate Weather
+                                </div>
+                                <div className="flex items-center gap-1 mt-1">
+                                  {data.duplicate_weather[
+                                    loc.id.toString()
+                                  ].map((duplicate, i) => (
+                                    <Badge
+                                      key={i}
+                                      variant="destructive"
+                                      className="text-xs"
+                                    >
+                                      {duplicate.date} (
+                                      {duplicate.entries.length} entries)
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              disabled={
+                                isLocPending ||
+                                duplicateCleanupMutation.isPending
+                              }
+                              onClick={() => {
+                                duplicateCleanupMutation.mutate(loc.id);
+                              }}
+                            >
+                              {duplicateCleanupMutation.isPending &&
+                              activeLocation === loc.id ? (
+                                <span className="flex items-center gap-1">
+                                  <RefreshCw className="w-3 h-3 animate-spin" />
+                                  Cleaning...
+                                </span>
+                              ) : (
+                                "Clean Up"
+                              )}
+                            </Button>
+                          </div>
+                        )}
+                    </div>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
             );
           })}
         </div>
