@@ -83,6 +83,13 @@ async function backfillWeather(
     data: { location_id, start_date: start, end_date: end },
   });
 }
+
+async function triggerWeatherUpdate() {
+  return fetcher("/api/v1/tasks/trigger-weather-update", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+}
 async function backfillGDD(gdd_model_id: number) {
   return fetcher("/api/v1/backfill/gdd/", {
     method: "POST",
@@ -362,6 +369,19 @@ export function AdminBackfillPanel() {
     },
   });
 
+  const weatherUpdateMutation = useMutation({
+    mutationFn: triggerWeatherUpdate,
+    onSuccess: (data) => {
+      setPollingTaskId(data.task_id);
+      toast.success("Weather update triggered. Waiting for completion...");
+    },
+    onError: (err: any) => {
+      toast.error(
+        "Weather update failed: " + (err?.message || "Unknown error")
+      );
+    },
+  });
+
   if (isLoading)
     return (
       <Card className="mb-6 bg-white dark:bg-gray-900 text-black dark:text-white w-full max-w-none shadow-lg flex flex-col">
@@ -422,19 +442,40 @@ export function AdminBackfillPanel() {
   return (
     <Card className="mb-6 bg-white dark:bg-gray-900 text-black dark:text-white w-full max-w-none shadow-lg flex flex-col">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Database className="w-5 h-5" />
-          Data Health & Backfill
-        </CardTitle>
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <MapPin className="w-4 h-4" />
-            <span>{totalLocations} locations</span>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Database className="w-5 h-5" />
+              Data Health & Backfill
+            </CardTitle>
+            <div className="flex items-center gap-4 text-sm text-muted-foreground mt-2">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4" />
+                <span>{totalLocations} locations</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Activity className="w-4 h-4" />
+                <span>{totalMissingDataPoints} missing data points</span>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Activity className="w-4 h-4" />
-            <span>{totalMissingDataPoints} missing data points</span>
-          </div>
+          <Button
+            onClick={() => weatherUpdateMutation.mutate()}
+            disabled={weatherUpdateMutation.isPending}
+            className="flex items-center gap-2"
+          >
+            {weatherUpdateMutation.isPending ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                Updating...
+              </>
+            ) : (
+              <>
+                <Cloud className="w-4 h-4" />
+                Update Weather
+              </>
+            )}
+          </Button>
         </div>
       </CardHeader>
       <CardContent>
