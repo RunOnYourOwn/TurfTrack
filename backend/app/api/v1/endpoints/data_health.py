@@ -157,7 +157,7 @@ async def get_data_health(db: AsyncSession = Depends(get_db)):
             )
 
         async def get_complete_weather_dates(location_id):
-            """Check for weather records with all required fields for disease pressure calculation"""
+            """Check for weather records with all required fields for water management and disease pressure calculation"""
             return set(
                 (
                     await db.execute(
@@ -167,6 +167,10 @@ async def get_data_health(db: AsyncSession = Depends(get_db)):
                                 DailyWeather.temperature_max_c.isnot(None),
                                 DailyWeather.temperature_min_c.isnot(None),
                                 DailyWeather.relative_humidity_mean.isnot(None),
+                                DailyWeather.et0_evapotranspiration_mm.isnot(None),
+                                DailyWeather.et0_evapotranspiration_in.isnot(None),
+                                DailyWeather.precipitation_mm.isnot(None),
+                                DailyWeather.precipitation_in.isnot(None),
                             )
                         )
                     )

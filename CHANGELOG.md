@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Water management chart with precipitation, evapotranspiration, and water balance
+- Enhance the Admin Panel - add manual update weather button
 
 ### Fixed
 
