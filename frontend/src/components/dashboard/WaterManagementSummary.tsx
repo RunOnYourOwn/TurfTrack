@@ -369,6 +369,28 @@ export default function WaterManagementSummary({
       ? getWaterBalanceZone(weeklyWaterBalance, unit, true)
       : null;
 
+  // Calculate dynamic y-axis min and max
+  const allYValues = useMemo(
+    () => chartData.flatMap((series) => series.data.map((d) => d.y)),
+    [chartData]
+  );
+  const yMin = allYValues.length ? Math.min(...allYValues) : 0;
+  const yMax = allYValues.length ? Math.max(...allYValues) : 0;
+  const yPadding = (yMax - yMin) * 0.1 || 1; // fallback to 1 if all values are the same
+  const dynamicYMin = Math.floor(yMin - yPadding);
+  const dynamicYMax = Math.ceil(yMax + yPadding);
+
+  // Clamp y-axis to always include threshold bands
+  const conversionFactor = unit === "in" ? 0.03937 : 1;
+  const zoneMin = Math.min(
+    ...WATER_BALANCE_ZONES_MM.map((z) => z.min * conversionFactor)
+  );
+  const zoneMax = Math.max(
+    ...WATER_BALANCE_ZONES_MM.map((z) => z.max * conversionFactor)
+  );
+  const finalYMin = Math.min(dynamicYMin, Math.floor(zoneMin));
+  const finalYMax = Math.max(dynamicYMax, Math.ceil(zoneMax));
+
   return (
     <Card className="bg-white dark:bg-gray-900 text-black dark:text-white">
       <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
@@ -449,8 +471,8 @@ export default function WaterManagementSummary({
                 xScale={{ type: "point" }}
                 yScale={{
                   type: "linear",
-                  min: unit === "mm" ? -20 : -0.8,
-                  max: unit === "mm" ? 20 : 0.8,
+                  min: finalYMin,
+                  max: finalYMax,
                 }}
                 axisBottom={{
                   tickRotation: isMobile ? -60 : -30,
@@ -501,6 +523,12 @@ export default function WaterManagementSummary({
                       min: zone.min * conversionFactor,
                       max: zone.max * conversionFactor,
                     }));
+
+                    // Extend the first and last zone to the y-axis min/max
+                    if (zones.length > 0) {
+                      zones[0].min = finalYMin;
+                      zones[zones.length - 1].max = finalYMax;
+                    }
 
                     return (
                       <g>
