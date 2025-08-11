@@ -9,6 +9,9 @@ from app.tasks.weather import (
     cleanup_duplicate_weather_for_location,
 )
 from app.tasks.weed_pressure import backfill_weed_pressure_for_location_task
+from app.tasks.water_management import (
+    calculate_weekly_water_summaries_for_location_task,
+)
 from app.core.database import SessionLocal
 from app.models.task_status import TaskStatus, TaskStatusEnum
 from app.models.gdd import GDDModel
@@ -48,6 +51,12 @@ class DuplicateWeatherCleanupRequest(BaseModel):
 
 
 class WeedPressureBackfillRequest(BaseModel):
+    location_id: int
+    start_date: date
+    end_date: date
+
+
+class WaterManagementBackfillRequest(BaseModel):
     location_id: int
     start_date: date
     end_date: date
@@ -243,4 +252,32 @@ async def weed_pressure_backfill(request: Request, body: WeedPressureBackfillReq
         return {"task_id": celery_result.id, "status": "started"}
     except Exception as e:
         logger.error(f"Failed to queue weed pressure backfill task: {e}")
+        raise
+
+
+@router.post("/water_management/")
+async def water_management_backfill(
+    request: Request, body: WaterManagementBackfillRequest
+):
+    try:
+        request_id = request.state.request_id
+        logger.info(
+            f"Queuing water management backfill task for location {body.location_id}"
+        )
+        celery_result = calculate_weekly_water_summaries_for_location_task.apply_async(
+            args=[body.location_id, str(body.start_date), str(body.end_date)],
+            headers={"request_id": request_id},
+        )
+        logger.info(
+            f"Water management backfill task queued with ID: {celery_result.id}"
+        )
+        create_initial_task_status(
+            celery_result.id,
+            "calculate_weekly_water_summaries_for_location",
+            body.location_id,
+            request_id,
+        )
+        return {"task_id": celery_result.id, "status": "started"}
+    except Exception as e:
+        logger.error(f"Failed to queue water management backfill task: {e}")
         raise

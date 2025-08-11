@@ -19,6 +19,7 @@ import {
   BarChartIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  DropletsIcon,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useTheme } from "../../ThemeProvider";
@@ -42,6 +43,12 @@ const navigationItems = [
     url: "/gdd",
     icon: LeafIcon,
     description: "Manage your lawns",
+  },
+  {
+    title: "Water Management",
+    url: "/water",
+    icon: DropletsIcon,
+    description: "Track irrigation and water usage",
   },
   {
     title: "Products",

@@ -5,6 +5,7 @@ import DiseasePressureSummary from "../components/dashboard/DiseasePressureSumma
 import GrowthPotentialSummary from "../components/dashboard/GrowthPotentialSummary";
 import { fetcher } from "../lib/fetcher";
 import { Location } from "../types/location";
+import { Lawn } from "../types/lawn";
 import {
   Select,
   SelectTrigger,
@@ -20,11 +21,18 @@ export default function Dashboard() {
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(
     null
   );
+  const [selectedLawn, setSelectedLawn] = useState<Lawn | null>(null);
   useEffect(() => {
     fetcher("/api/v1/locations/")
       .then((data) => {
         setLocations(data);
         if (data.length > 0) setSelectedLocation(data[0]);
+      })
+      .catch(() => {});
+
+    fetcher("/api/v1/lawns/")
+      .then((data) => {
+        if (data.length > 0) setSelectedLawn(data[0]);
       })
       .catch(() => {});
   }, []);
@@ -62,9 +70,11 @@ export default function Dashboard() {
           <div className="mt-6">
             <GrowthPotentialSummary location={selectedLocation} />
           </div>
-          <div className="mt-6">
-            <WaterManagementSummary location={selectedLocation} />
-          </div>
+          {selectedLawn && (
+            <div className="mt-6">
+              <WaterManagementSummary lawn={selectedLawn} />
+            </div>
+          )}
           <div className="mt-6">
             <WeedPressureChart locationId={selectedLocation.id} />
           </div>

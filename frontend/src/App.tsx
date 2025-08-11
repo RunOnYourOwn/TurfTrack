@@ -7,6 +7,7 @@ import Applications from "@/pages/Applications";
 import Reports from "@/pages/Reports";
 import TaskMonitor from "@/pages/TaskMonitor";
 import GDD from "@/pages/GDD";
+import WaterManagement from "@/pages/WaterManagement";
 import { Toaster } from "@/components/ui/sonner";
 
 function App() {
@@ -21,6 +22,7 @@ function App() {
           <Route path="/reports" element={<Reports />} />
           <Route path="/admin" element={<TaskMonitor />} />
           <Route path="/gdd" element={<GDD />} />
+          <Route path="/water" element={<WaterManagement />} />
         </Routes>
       </AppLayout>
       <Toaster richColors position="top-right" />
