@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Fixed
+
+### Changed
+## [0.0.21] - 2025-08-11
+
+### Added
+
 - **Complete Water Management System**:
   - Database models for `IrrigationEntry` and `WeeklyWaterSummary` with `is_forecast` flag
   - Full CRUD API endpoints for irrigation entries (GET, POST, PUT, DELETE)
