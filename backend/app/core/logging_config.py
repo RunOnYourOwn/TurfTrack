@@ -8,8 +8,8 @@ from app.core.config import settings
 def setup_logging() -> None:
     """Configure logging for the application."""
 
-    # Get log level from settings
-    log_level = getattr(settings, "LOG_LEVEL", "INFO")
+    # Get log level from settings and convert to uppercase
+    log_level = getattr(settings, "LOG_LEVEL", "INFO").upper()
 
     # Determine if we should use JSON formatting
     use_json = settings.ENVIRONMENT == "production"

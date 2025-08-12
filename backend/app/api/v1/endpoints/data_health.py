@@ -9,6 +9,8 @@ from app.models.gdd import GDDValue
 from app.models.disease_pressure import DiseasePressure
 from app.models.growth_potential import GrowthPotential
 from app.models.weed_pressure import WeedPressure, WeedSpecies
+from app.models.water_management import WeeklyWaterSummary
+from app.models.lawn import Lawn
 from datetime import timedelta, date
 
 router = APIRouter(tags=["data_health"])
@@ -200,6 +202,7 @@ async def get_data_health(db: AsyncSession = Depends(get_db)):
             "disease_pressure": "risk_score",  # adjust to your actual field name
             "growth_potential": "growth_potential",
             "weed_pressure": "weed_pressure_score",
+            "water_management": "et0_total",  # use et0_total for WeeklyWaterSummary
         }
 
         for name, model in [
@@ -208,6 +211,7 @@ async def get_data_health(db: AsyncSession = Depends(get_db)):
             ("disease_pressure", DiseasePressure),
             ("growth_potential", GrowthPotential),
             ("weed_pressure", WeedPressure),
+            ("water_management", WeeklyWaterSummary),
         ]:
             if name == "gdd":
                 from app.models.gdd import GDDModel
@@ -322,6 +326,56 @@ async def get_data_health(db: AsyncSession = Depends(get_db)):
                     model, value_fields[name], loc.id
                 )
                 missing[name] = find_missing_ranges(present_dates, expected_dates)
+            elif name == "water_management":
+                # For water management, check weekly summaries for all lawns at this location
+                lawns = (
+                    (await db.execute(select(Lawn).where(Lawn.location_id == loc.id)))
+                    .scalars()
+                    .all()
+                )
+                water_missing = []
+                for lawn in lawns:
+                    # Check for weekly water summaries for this lawn
+                    present_week_starts = set(
+                        (
+                            await db.execute(
+                                select(WeeklyWaterSummary.week_start).where(
+                                    and_(
+                                        WeeklyWaterSummary.lawn_id == lawn.id,
+                                        WeeklyWaterSummary.et0_total.isnot(None),
+                                    )
+                                )
+                            )
+                        )
+                        .scalars()
+                        .all()
+                    )
+
+                    # Generate expected week starts (Mondays) within the date range
+                    # Start from the beginning of the week containing expected_start
+                    week_start = expected_start - timedelta(
+                        days=expected_start.weekday()
+                    )
+                    expected_week_starts = []
+                    current_week_start = week_start
+
+                    while current_week_start <= expected_end:
+                        expected_week_starts.append(current_week_start)
+                        current_week_start += timedelta(days=7)
+
+                    # Find missing weekly ranges
+                    missing_week_ranges = find_missing_ranges(
+                        present_week_starts, expected_week_starts
+                    )
+
+                    water_missing.append(
+                        {
+                            "lawn_id": lawn.id,
+                            "lawn_name": lawn.name,
+                            "missing": missing_week_ranges,
+                        }
+                    )
+                missing[name] = water_missing
             else:
                 present_dates = await get_present_dates(
                     model, value_fields[name], loc.id

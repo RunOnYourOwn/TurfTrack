@@ -36,6 +36,12 @@ class Lawn(Base):
         ForeignKey("locations.id", ondelete="CASCADE"), nullable=False
     )
     location = relationship("Location", back_populates="lawns")
+    irrigation_entries = relationship(
+        "IrrigationEntry", back_populates="lawn", cascade="all, delete-orphan"
+    )
+    weekly_water_summaries = relationship(
+        "WeeklyWaterSummary", back_populates="lawn", cascade="all, delete-orphan"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow
     )

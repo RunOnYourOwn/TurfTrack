@@ -390,25 +390,32 @@ def _fetch_and_store_weather_sync(
     for i, date in enumerate(_get_dates(daily)):
         data = _extract_weather_data(daily, i, date)
         weather_type = (
-            WeatherType.historical if date.date() < today else WeatherType.forecast
+            WeatherType.historical if date.date() <= today else WeatherType.forecast
         )
         upsert_daily_weather_sync(session, location_id, date, weather_type, data)
 
-        # Calculate disease pressure for this location (Smith-Kerns)
-        forecast_end = today + datetime.timedelta(days=16)
-        calculate_smith_kerns_for_location(
-            session, location_id, today - datetime.timedelta(days=60), forecast_end
-        )
-        # Calculate weed pressure for this location (same date range)
-        from app.utils.weed_pressure import calculate_weed_pressure_for_location_range
+    # Calculate disease pressure for this location (Smith-Kerns) - moved outside loop
+    forecast_end = today + datetime.timedelta(days=16)
+    calculate_smith_kerns_for_location(
+        session, location_id, today - datetime.timedelta(days=60), forecast_end
+    )
+    # Calculate weed pressure for this location (same date range) - moved outside loop
+    from app.utils.weed_pressure import calculate_weed_pressure_for_location_range
 
-        calculate_weed_pressure_for_location_range(
-            session, location_id, today - datetime.timedelta(days=60), forecast_end
-        )
-        # Calculate growth potential for this location (same date range)
-        calculate_growth_potential_for_location(
-            session, location_id, today - datetime.timedelta(days=60), forecast_end
-        )
+    calculate_weed_pressure_for_location_range(
+        session, location_id, today - datetime.timedelta(days=60), forecast_end
+    )
+    # Calculate growth potential for this location (same date range) - moved outside loop
+    calculate_growth_potential_for_location(
+        session, location_id, today - datetime.timedelta(days=60), forecast_end
+    )
+
+    # Trigger weekly water summary calculation for this location - moved outside loop
+    from app.tasks.water_management import (
+        calculate_weekly_water_summaries_for_location_task,
+    )
+
+    calculate_weekly_water_summaries_for_location_task.delay(location_id)
 
 
 def _get_historical_start_date(session, location_id: int) -> datetime.date:
@@ -627,6 +634,20 @@ def _update_recent_weather_for_location_sync(
         # Calculate growth potential for this location (same optimized date range)
         calculate_growth_potential_for_location(
             session, location_id, yesterday, forecast_end
+        )
+
+        # Trigger weekly water summary calculation for this location (optimized range)
+        from app.tasks.water_management import (
+            calculate_weekly_water_summaries_for_location_task,
+        )
+
+        # Use optimized range: yesterday to 16 days in future (same as disease/weed/growth)
+        yesterday = today - datetime.timedelta(days=1)
+        forecast_end = today + datetime.timedelta(days=16)
+        calculate_weekly_water_summaries_for_location_task.delay(
+            location_id,
+            start_date=yesterday.isoformat(),
+            end_date=forecast_end.isoformat(),
         )
 
 

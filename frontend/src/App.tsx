@@ -1,27 +1,40 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Suspense, lazy } from "react";
 import { AppLayout } from "@/layouts/AppLayout";
-import Dashboard from "@/pages/Dashboard";
-import Lawns from "@/pages/Lawns";
-import Products from "@/pages/Products";
-import Applications from "@/pages/Applications";
-import Reports from "@/pages/Reports";
-import TaskMonitor from "@/pages/TaskMonitor";
-import GDD from "@/pages/GDD";
 import { Toaster } from "@/components/ui/sonner";
+
+// Lazy load page components for code splitting
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const Lawns = lazy(() => import("@/pages/Lawns"));
+const Products = lazy(() => import("@/pages/Products"));
+const Applications = lazy(() => import("@/pages/Applications"));
+const Reports = lazy(() => import("@/pages/Reports"));
+const TaskMonitor = lazy(() => import("@/pages/TaskMonitor"));
+const GDD = lazy(() => import("@/pages/GDD"));
+const WaterManagement = lazy(() => import("@/pages/WaterManagement"));
 
 function App() {
   return (
     <BrowserRouter>
       <AppLayout>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/lawns" element={<Lawns />} />
-          <Route path="/products" element={<Products />} />
-          <Route path="/applications" element={<Applications />} />
-          <Route path="/reports" element={<Reports />} />
-          <Route path="/admin" element={<TaskMonitor />} />
-          <Route path="/gdd" element={<GDD />} />
-        </Routes>
+        <Suspense
+          fallback={
+            <div className="flex items-center justify-center h-64">
+              Loading...
+            </div>
+          }
+        >
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/lawns" element={<Lawns />} />
+            <Route path="/products" element={<Products />} />
+            <Route path="/applications" element={<Applications />} />
+            <Route path="/reports" element={<Reports />} />
+            <Route path="/admin" element={<TaskMonitor />} />
+            <Route path="/gdd" element={<GDD />} />
+            <Route path="/water" element={<WaterManagement />} />
+          </Routes>
+        </Suspense>
       </AppLayout>
       <Toaster richColors position="top-right" />
     </BrowserRouter>

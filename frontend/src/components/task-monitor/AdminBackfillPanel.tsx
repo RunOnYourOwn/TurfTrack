@@ -24,6 +24,7 @@ import {
   RefreshCw,
   Database,
   Activity,
+  Droplets,
 } from "lucide-react";
 
 interface MissingRange {
@@ -42,6 +43,12 @@ interface WeedPressureMissing {
   missing: MissingRange[];
 }
 
+interface WaterManagementMissing {
+  lawn_id: number;
+  lawn_name: string;
+  missing: MissingRange[];
+}
+
 interface LocationDataHealth {
   id: number;
   name: string;
@@ -51,6 +58,7 @@ interface LocationDataHealth {
     disease_pressure: MissingRange[];
     growth_potential: MissingRange[];
     weed_pressure: WeedPressureMissing[];
+    water_management: WaterManagementMissing[];
   };
 }
 
@@ -139,6 +147,18 @@ async function cleanupDuplicateWeather(location_id: number) {
   });
 }
 
+async function backfillWaterManagement(
+  location_id: number,
+  start: string,
+  end: string
+) {
+  return fetcher("/api/v1/backfill/water_management/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    data: { location_id, start_date: start, end_date: end },
+  });
+}
+
 // Polling hook for task status
 function useTaskStatusPolling(
   taskId: string | null,
@@ -148,31 +168,15 @@ function useTaskStatusPolling(
     if (!taskId) return;
     let cancelled = false;
     let interval: NodeJS.Timeout;
-    console.log("[Polling] Started for taskId:", taskId);
     async function checkStatus() {
       try {
         const data = await fetcher(`/api/v1/tasks/${taskId}`);
-        console.log(
-          "[Polling] First check for",
-          taskId,
-          "status:",
-          data.status,
-          "full:",
-          data
-        );
         if (data.status === "success" || data.status === "failed") {
-          console.log(
-            "[Polling] onComplete called for",
-            taskId,
-            "with status:",
-            data.status
-          );
           if (!cancelled) onComplete(data.status);
         } else {
           interval = setTimeout(poll, 300);
         }
       } catch (e) {
-        console.log("[Polling] Exception in checkStatus for", taskId, e);
         interval = setTimeout(poll, 300);
       }
     }
@@ -180,27 +184,12 @@ function useTaskStatusPolling(
       if (cancelled) return;
       try {
         const data = await fetcher(`/api/v1/tasks/${taskId}`);
-        console.log(
-          "[Polling] Poll for",
-          taskId,
-          "status:",
-          data.status,
-          "full:",
-          data
-        );
         if (data.status === "success" || data.status === "failed") {
-          console.log(
-            "[Polling] onComplete called for",
-            taskId,
-            "with status:",
-            data.status
-          );
           if (!cancelled) onComplete(data.status);
         } else {
           interval = setTimeout(poll, 300);
         }
       } catch (e) {
-        console.log("[Polling] Exception in poll for", taskId, e);
         interval = setTimeout(poll, 300);
       }
     }
@@ -208,7 +197,6 @@ function useTaskStatusPolling(
     return () => {
       cancelled = true;
       if (interval) clearTimeout(interval);
-      console.log("[Polling] Stopped for taskId:", taskId);
     };
   }, [taskId, onComplete]);
 }
@@ -352,6 +340,31 @@ export function AdminBackfillPanel() {
     },
   });
 
+  const waterManagementMutation = useMutation({
+    mutationFn: ({
+      location_id,
+      start,
+      end,
+    }: {
+      location_id: number;
+      start: string;
+      end: string;
+    }) => backfillWaterManagement(location_id, start, end),
+    onMutate: (vars) => setActiveLocation(vars.location_id),
+    onSettled: () => setActiveLocation(null),
+    onSuccess: (data) => {
+      setPollingTaskId(data.task_id);
+      toast.success(
+        "Water management backfill started. Waiting for completion..."
+      );
+    },
+    onError: (err: any) => {
+      toast.error(
+        "Water management backfill failed: " + (err?.message || "Unknown error")
+      );
+    },
+  });
+
   const duplicateCleanupMutation = useMutation({
     mutationFn: (location_id: number) => cleanupDuplicateWeather(location_id),
     onMutate: (location_id) => setActiveLocation(location_id),
@@ -435,6 +448,10 @@ export function AdminBackfillPanel() {
         loc.missing.weed_pressure.reduce(
           (sum, wp) => sum + wp.missing.length,
           0
+        ) +
+        loc.missing.water_management.reduce(
+          (sum, wm) => sum + wm.missing.length,
+          0
         )
       );
     }, 0) || 0;
@@ -493,6 +510,10 @@ export function AdminBackfillPanel() {
               loc.missing.weed_pressure.reduce(
                 (sum, wp) => sum + wp.missing.length,
                 0
+              ) +
+              loc.missing.water_management.reduce(
+                (sum, wm) => sum + wm.missing.length,
+                0
               );
 
             const healthPercentage =
@@ -513,6 +534,7 @@ export function AdminBackfillPanel() {
                 diseaseMutation.isPending ||
                 growthMutation.isPending ||
                 weedPressureMutation.isPending ||
+                waterManagementMutation.isPending ||
                 duplicateCleanupMutation.isPending);
 
             // Gather all missing weed pressure ranges for this location
@@ -577,12 +599,12 @@ export function AdminBackfillPanel() {
                   <CollapsibleContent>
                     <div className="px-4 pb-4 space-y-3">
                       {/* Weather */}
-                      {loc.missing.weather.length > 0 && (
-                        <div className="flex items-center justify-between bg-background dark:bg-gray-900 rounded-md p-3 border border-border">
-                          <div className="flex items-center gap-3">
-                            <Cloud className="w-4 h-4 text-blue-500" />
-                            <div>
-                              <div className="font-medium">Weather Data</div>
+                      <div className="flex items-center justify-between bg-background dark:bg-gray-900 rounded-md p-3 border border-border">
+                        <div className="flex items-center gap-3">
+                          <Cloud className="w-4 h-4 text-blue-500" />
+                          <div>
+                            <div className="font-medium">Weather Data</div>
+                            {loc.missing.weather.length > 0 ? (
                               <div className="flex items-center gap-1 mt-1">
                                 {loc.missing.weather.map((range, i) => (
                                   <Badge
@@ -594,40 +616,51 @@ export function AdminBackfillPanel() {
                                   </Badge>
                                 ))}
                               </div>
-                            </div>
-                          </div>
-                          <Button
-                            size="sm"
-                            disabled={isLocPending || weatherMutation.isPending}
-                            onClick={() => {
-                              const min = loc.missing.weather.reduce((a, b) =>
-                                a.start < b.start ? a : b
-                              ).start;
-                              const max = loc.missing.weather.reduce((a, b) =>
-                                a.end > b.end ? a : b
-                              ).end;
-                              weatherMutation.mutate({
-                                location_id: loc.id,
-                                start: min,
-                                end: max,
-                              });
-                            }}
-                          >
-                            {weatherMutation.isPending &&
-                            activeLocation === loc.id ? (
-                              <span className="flex items-center gap-1">
-                                <RefreshCw className="w-3 h-3 animate-spin" />
-                                Backfilling...
-                              </span>
                             ) : (
-                              "Backfill"
+                              <div className="flex items-center gap-1 mt-1">
+                                <CheckCircle className="w-3 h-3 text-green-500" />
+                                <span className="text-sm text-green-600 dark:text-green-400">
+                                  All data present
+                                </span>
+                              </div>
                             )}
-                          </Button>
+                          </div>
                         </div>
-                      )}
+                        <Button
+                          size="sm"
+                          disabled={
+                            isLocPending ||
+                            weatherMutation.isPending ||
+                            loc.missing.weather.length === 0
+                          }
+                          onClick={() => {
+                            const min = loc.missing.weather.reduce((a, b) =>
+                              a.start < b.start ? a : b
+                            ).start;
+                            const max = loc.missing.weather.reduce((a, b) =>
+                              a.end > b.end ? a : b
+                            ).end;
+                            weatherMutation.mutate({
+                              location_id: loc.id,
+                              start: min,
+                              end: max,
+                            });
+                          }}
+                        >
+                          {weatherMutation.isPending &&
+                          activeLocation === loc.id ? (
+                            <span className="flex items-center gap-1">
+                              <RefreshCw className="w-3 h-3 animate-spin" />
+                              Backfilling...
+                            </span>
+                          ) : (
+                            "Backfill"
+                          )}
+                        </Button>
+                      </div>
                       {/* GDD */}
-                      {loc.missing.gdd.map((gdd) =>
-                        gdd.missing.length > 0 ? (
+                      {loc.missing.gdd.length > 0 ? (
+                        loc.missing.gdd.map((gdd) => (
                           <div
                             key={`gdd-${gdd.gdd_model_id}`}
                             className="flex items-center justify-between bg-background dark:bg-gray-900 rounded-md p-3 border border-border"
@@ -638,22 +671,34 @@ export function AdminBackfillPanel() {
                                 <div className="font-medium">
                                   GDD Model {gdd.gdd_model_id}
                                 </div>
-                                <div className="flex items-center gap-1 mt-1">
-                                  {gdd.missing.map((range, i) => (
-                                    <Badge
-                                      key={i}
-                                      variant="secondary"
-                                      className="text-xs"
-                                    >
-                                      {range.start} to {range.end}
-                                    </Badge>
-                                  ))}
-                                </div>
+                                {gdd.missing.length > 0 ? (
+                                  <div className="flex items-center gap-1 mt-1">
+                                    {gdd.missing.map((range, i) => (
+                                      <Badge
+                                        key={i}
+                                        variant="secondary"
+                                        className="text-xs"
+                                      >
+                                        {range.start} to {range.end}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1 mt-1">
+                                    <CheckCircle className="w-3 h-3 text-green-500" />
+                                    <span className="text-sm text-green-600 dark:text-green-400">
+                                      All data present
+                                    </span>
+                                  </div>
+                                )}
                               </div>
                             </div>
                             <Button
                               size="sm"
-                              disabled={gddMutation.isPending}
+                              disabled={
+                                gddMutation.isPending ||
+                                gdd.missing.length === 0
+                              }
                               onClick={() =>
                                 gddMutation.mutate(gdd.gdd_model_id)
                               }
@@ -668,17 +713,33 @@ export function AdminBackfillPanel() {
                               )}
                             </Button>
                           </div>
-                        ) : null
-                      )}
-                      {/* Disease Pressure */}
-                      {loc.missing.disease_pressure.length > 0 && (
+                        ))
+                      ) : (
                         <div className="flex items-center justify-between bg-background dark:bg-gray-900 rounded-md p-3 border border-border">
                           <div className="flex items-center gap-3">
-                            <Bug className="w-4 h-4 text-red-500" />
+                            <Thermometer className="w-4 h-4 text-orange-500" />
                             <div>
-                              <div className="font-medium">
-                                Disease Pressure
+                              <div className="font-medium">GDD Models</div>
+                              <div className="flex items-center gap-1 mt-1">
+                                <CheckCircle className="w-3 h-3 text-green-500" />
+                                <span className="text-sm text-green-600 dark:text-green-400">
+                                  No GDD models configured
+                                </span>
                               </div>
+                            </div>
+                          </div>
+                          <Button size="sm" disabled>
+                            Backfill
+                          </Button>
+                        </div>
+                      )}
+                      {/* Disease Pressure */}
+                      <div className="flex items-center justify-between bg-background dark:bg-gray-900 rounded-md p-3 border border-border">
+                        <div className="flex items-center gap-3">
+                          <Bug className="w-4 h-4 text-red-500" />
+                          <div>
+                            <div className="font-medium">Disease Pressure</div>
+                            {loc.missing.disease_pressure.length > 0 ? (
                               <div className="flex items-center gap-1 mt-1">
                                 {loc.missing.disease_pressure.map(
                                   (range, i) => (
@@ -692,46 +753,55 @@ export function AdminBackfillPanel() {
                                   )
                                 )}
                               </div>
-                            </div>
-                          </div>
-                          <Button
-                            size="sm"
-                            disabled={isLocPending || diseaseMutation.isPending}
-                            onClick={() => {
-                              const min = loc.missing.disease_pressure.reduce(
-                                (a, b) => (a.start < b.start ? a : b)
-                              ).start;
-                              const max = loc.missing.disease_pressure.reduce(
-                                (a, b) => (a.end > b.end ? a : b)
-                              ).end;
-                              diseaseMutation.mutate({
-                                location_id: loc.id,
-                                start: min,
-                                end: max,
-                              });
-                            }}
-                          >
-                            {diseaseMutation.isPending &&
-                            activeLocation === loc.id ? (
-                              <span className="flex items-center gap-1">
-                                <RefreshCw className="w-3 h-3 animate-spin" />
-                                Backfilling...
-                              </span>
                             ) : (
-                              "Backfill"
-                            )}
-                          </Button>
-                        </div>
-                      )}
-                      {/* Growth Potential */}
-                      {loc.missing.growth_potential.length > 0 && (
-                        <div className="flex items-center justify-between bg-background dark:bg-gray-900 rounded-md p-3 border border-border">
-                          <div className="flex items-center gap-3">
-                            <Sprout className="w-4 h-4 text-green-500" />
-                            <div>
-                              <div className="font-medium">
-                                Growth Potential
+                              <div className="flex items-center gap-1 mt-1">
+                                <CheckCircle className="w-3 h-3 text-green-500" />
+                                <span className="text-sm text-green-600 dark:text-green-400">
+                                  All data present
+                                </span>
                               </div>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          disabled={
+                            isLocPending ||
+                            diseaseMutation.isPending ||
+                            loc.missing.disease_pressure.length === 0
+                          }
+                          onClick={() => {
+                            const min = loc.missing.disease_pressure.reduce(
+                              (a, b) => (a.start < b.start ? a : b)
+                            ).start;
+                            const max = loc.missing.disease_pressure.reduce(
+                              (a, b) => (a.end > b.end ? a : b)
+                            ).end;
+                            diseaseMutation.mutate({
+                              location_id: loc.id,
+                              start: min,
+                              end: max,
+                            });
+                          }}
+                        >
+                          {diseaseMutation.isPending &&
+                          activeLocation === loc.id ? (
+                            <span className="flex items-center gap-1">
+                              <RefreshCw className="w-3 h-3 animate-spin" />
+                              Backfilling...
+                            </span>
+                          ) : (
+                            "Backfill"
+                          )}
+                        </Button>
+                      </div>
+                      {/* Growth Potential */}
+                      <div className="flex items-center justify-between bg-background dark:bg-gray-900 rounded-md p-3 border border-border">
+                        <div className="flex items-center gap-3">
+                          <Sprout className="w-4 h-4 text-green-500" />
+                          <div>
+                            <div className="font-medium">Growth Potential</div>
+                            {loc.missing.growth_potential.length > 0 ? (
                               <div className="flex items-center gap-1 mt-1">
                                 {loc.missing.growth_potential.map(
                                   (range, i) => (
@@ -745,44 +815,55 @@ export function AdminBackfillPanel() {
                                   )
                                 )}
                               </div>
-                            </div>
-                          </div>
-                          <Button
-                            size="sm"
-                            disabled={isLocPending || growthMutation.isPending}
-                            onClick={() => {
-                              const min = loc.missing.growth_potential.reduce(
-                                (a, b) => (a.start < b.start ? a : b)
-                              ).start;
-                              const max = loc.missing.growth_potential.reduce(
-                                (a, b) => (a.end > b.end ? a : b)
-                              ).end;
-                              growthMutation.mutate({
-                                location_id: loc.id,
-                                start: min,
-                                end: max,
-                              });
-                            }}
-                          >
-                            {growthMutation.isPending &&
-                            activeLocation === loc.id ? (
-                              <span className="flex items-center gap-1">
-                                <RefreshCw className="w-3 h-3 animate-spin" />
-                                Backfilling...
-                              </span>
                             ) : (
-                              "Backfill"
+                              <div className="flex items-center gap-1 mt-1">
+                                <CheckCircle className="w-3 h-3 text-green-500" />
+                                <span className="text-sm text-green-600 dark:text-green-400">
+                                  All data present
+                                </span>
+                              </div>
                             )}
-                          </Button>
+                          </div>
                         </div>
-                      )}
+                        <Button
+                          size="sm"
+                          disabled={
+                            isLocPending ||
+                            growthMutation.isPending ||
+                            loc.missing.growth_potential.length === 0
+                          }
+                          onClick={() => {
+                            const min = loc.missing.growth_potential.reduce(
+                              (a, b) => (a.start < b.start ? a : b)
+                            ).start;
+                            const max = loc.missing.growth_potential.reduce(
+                              (a, b) => (a.end > b.end ? a : b)
+                            ).end;
+                            growthMutation.mutate({
+                              location_id: loc.id,
+                              start: min,
+                              end: max,
+                            });
+                          }}
+                        >
+                          {growthMutation.isPending &&
+                          activeLocation === loc.id ? (
+                            <span className="flex items-center gap-1">
+                              <RefreshCw className="w-3 h-3 animate-spin" />
+                              Backfilling...
+                            </span>
+                          ) : (
+                            "Backfill"
+                          )}
+                        </Button>
+                      </div>
                       {/* Weed Pressure */}
-                      {allWeedRanges.length > 0 && (
-                        <div className="flex items-center justify-between bg-background dark:bg-gray-900 rounded-md p-3 border border-border">
-                          <div className="flex items-center gap-3">
-                            <Flower2 className="w-4 h-4 text-purple-500" />
-                            <div>
-                              <div className="font-medium">Weed Pressure</div>
+                      <div className="flex items-center justify-between bg-background dark:bg-gray-900 rounded-md p-3 border border-border">
+                        <div className="flex items-center gap-3">
+                          <Flower2 className="w-4 h-4 text-purple-500" />
+                          <div>
+                            <div className="font-medium">Weed Pressure</div>
+                            {allWeedRanges.length > 0 ? (
                               <div className="flex items-center gap-1 mt-1">
                                 {allWeedRanges.map((range, i) => (
                                   <Badge
@@ -794,39 +875,126 @@ export function AdminBackfillPanel() {
                                   </Badge>
                                 ))}
                               </div>
-                            </div>
-                          </div>
-                          <Button
-                            size="sm"
-                            disabled={
-                              isLocPending || weedPressureMutation.isPending
-                            }
-                            onClick={() => {
-                              const min = allWeedRanges.reduce((a, b) =>
-                                a.start < b.start ? a : b
-                              ).start;
-                              const max = allWeedRanges.reduce((a, b) =>
-                                a.end > b.end ? a : b
-                              ).end;
-                              weedPressureMutation.mutate({
-                                location_id: loc.id,
-                                start: min,
-                                end: max,
-                              });
-                            }}
-                          >
-                            {weedPressureMutation.isPending &&
-                            activeLocation === loc.id ? (
-                              <span className="flex items-center gap-1">
-                                <RefreshCw className="w-3 h-3 animate-spin" />
-                                Backfilling...
-                              </span>
                             ) : (
-                              "Backfill"
+                              <div className="flex items-center gap-1 mt-1">
+                                <CheckCircle className="w-3 h-3 text-green-500" />
+                                <span className="text-sm text-green-600 dark:text-green-400">
+                                  All data present
+                                </span>
+                              </div>
                             )}
-                          </Button>
+                          </div>
                         </div>
-                      )}
+                        <Button
+                          size="sm"
+                          disabled={
+                            isLocPending ||
+                            weedPressureMutation.isPending ||
+                            allWeedRanges.length === 0
+                          }
+                          onClick={() => {
+                            const min = allWeedRanges.reduce((a, b) =>
+                              a.start < b.start ? a : b
+                            ).start;
+                            const max = allWeedRanges.reduce((a, b) =>
+                              a.end > b.end ? a : b
+                            ).end;
+                            weedPressureMutation.mutate({
+                              location_id: loc.id,
+                              start: min,
+                              end: max,
+                            });
+                          }}
+                        >
+                          {weedPressureMutation.isPending &&
+                          activeLocation === loc.id ? (
+                            <span className="flex items-center gap-1">
+                              <RefreshCw className="w-3 h-3 animate-spin" />
+                              Backfilling...
+                            </span>
+                          ) : (
+                            "Backfill"
+                          )}
+                        </Button>
+                      </div>
+                      {/* Water Management */}
+                      <div className="flex items-center justify-between bg-background dark:bg-gray-900 rounded-md p-3 border border-border">
+                        <div className="flex items-center gap-3">
+                          <Droplets className="w-4 h-4 text-blue-500" />
+                          <div>
+                            <div className="font-medium">Water Management</div>
+                            {loc.missing.water_management.some(
+                              (lawn) => lawn.missing.length > 0
+                            ) ? (
+                              <div className="flex flex-col gap-2 mt-1">
+                                {loc.missing.water_management.map((lawn, i) => (
+                                  <div key={i} className="flex flex-col gap-1">
+                                    <div className="text-sm text-muted-foreground">
+                                      {lawn.lawn_name}
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      {lawn.missing.map((range, j) => (
+                                        <Badge
+                                          key={j}
+                                          variant="secondary"
+                                          className="text-xs"
+                                        >
+                                          {range.start} to {range.end}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1 mt-1">
+                                <CheckCircle className="w-3 h-3 text-green-500" />
+                                <span className="text-sm text-green-600 dark:text-green-400">
+                                  All data present
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          disabled={
+                            isLocPending ||
+                            waterManagementMutation.isPending ||
+                            !loc.missing.water_management.some(
+                              (lawn) => lawn.missing.length > 0
+                            )
+                          }
+                          onClick={() => {
+                            // Get all missing ranges across all lawns
+                            const allWaterRanges =
+                              loc.missing.water_management.flatMap(
+                                (lawn) => lawn.missing
+                              );
+                            const min = allWaterRanges.reduce((a, b) =>
+                              a.start < b.start ? a : b
+                            ).start;
+                            const max = allWaterRanges.reduce((a, b) =>
+                              a.end > b.end ? a : b
+                            ).end;
+                            waterManagementMutation.mutate({
+                              location_id: loc.id,
+                              start: min,
+                              end: max,
+                            });
+                          }}
+                        >
+                          {waterManagementMutation.isPending &&
+                          activeLocation === loc.id ? (
+                            <span className="flex items-center gap-1">
+                              <RefreshCw className="w-3 h-3 animate-spin" />
+                              Backfilling...
+                            </span>
+                          ) : (
+                            "Backfill"
+                          )}
+                        </Button>
+                      </div>
                       {/* Duplicate Weather */}
                       {data.duplicate_weather[loc.id.toString()] &&
                         data.duplicate_weather[loc.id.toString()].length >

@@ -77,6 +77,16 @@ async def create_lawn(
         # If no weather task was needed (data already exists), run weed pressure immediately
         calculate_weed_pressure_for_location_task.delay(db_lawn.location_id, today)
 
+    # Trigger water management initialization for the new lawn
+    from app.tasks.water_management import initialize_water_summaries_for_new_lawn_task
+
+    # If weather task was triggered, chain water management to run after it
+    if weather_task:
+        weather_task.then(initialize_water_summaries_for_new_lawn_task.s(db_lawn.id))
+    else:
+        # If no weather task was needed (data already exists), run water management immediately
+        initialize_water_summaries_for_new_lawn_task.delay(db_lawn.id)
+
     # The location relationship needs to be loaded before returning
     await db.refresh(db_lawn, attribute_names=["location"])
     return db_lawn

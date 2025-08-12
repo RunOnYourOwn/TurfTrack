@@ -13,6 +13,7 @@ from .endpoints.data_health import router as data_health_router
 from .endpoints.backfill import router as backfill_router
 from .endpoints.logs import router as logs_router
 from .endpoints.weed_pressure import router as weed_pressure_router
+from .endpoints.water_management import router as water_management_router
 
 api_router = APIRouter()
 api_router.include_router(lawn_router)
@@ -29,3 +30,4 @@ api_router.include_router(data_health_router)
 api_router.include_router(backfill_router)
 api_router.include_router(logs_router)
 api_router.include_router(weed_pressure_router)
+api_router.include_router(water_management_router)
