@@ -1,24 +1,18 @@
 import { useEffect, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
 import { Button } from "../ui/button";
-import { Badge } from "../ui/badge";
-import { Progress } from "../ui/progress";
 import { fetcher } from "../../lib/fetcher";
 import { Lawn } from "../../types/lawn";
 import { Calendar, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
-
-// WeatherData interface removed - no longer needed since we use stored weekly summaries
-
-type WeeklyWaterSummary = {
-  week_start: string;
-  week_end: string;
-  et0_total: number;
-  precipitation_total: number;
-  irrigation_applied: number;
-  water_deficit: number;
-  status: "good" | "warning" | "critical" | "excellent";
-};
+import {
+  WaterStatusBadge,
+  WaterStatusCard,
+  WaterBalanceProgress,
+  WaterRecommendation,
+} from "../water-management";
+import { Badge } from "../ui/badge";
+import { WeeklyWaterSummary } from "../../types/water-management";
 
 interface WaterManagementSummaryProps {
   lawn: Lawn;
@@ -56,43 +50,6 @@ export default function WaterManagementSummary({
   }, [lawn]);
 
   // No longer need to calculate weekly data - it comes pre-calculated from the backend
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "excellent":
-        return "bg-green-100 text-green-800 border-green-200";
-      case "good":
-        return "bg-blue-100 text-blue-800 border-blue-200";
-      case "warning":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200";
-      case "critical":
-        return "bg-red-100 text-red-800 border-red-200";
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200";
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "excellent":
-        return "🌱";
-      case "good":
-        return "✅";
-      case "warning":
-        return "⚠️";
-      case "critical":
-        return "💧";
-      default:
-        return "❓";
-    }
-  };
-
-  const getRecommendation = (deficit: number) => {
-    if (deficit <= 0) return "No irrigation needed";
-    if (deficit <= 0.5) return "Light irrigation recommended";
-    if (deficit <= 1.0) return "Moderate irrigation needed";
-    return "Heavy irrigation required";
-  };
 
   if (loading) {
     return (
@@ -148,7 +105,6 @@ export default function WaterManagementSummary({
   }
 
   const deficit = currentWeek.water_deficit;
-  const recommendation = getRecommendation(deficit);
 
   return (
     <Card className="bg-white dark:bg-gray-900 text-black dark:text-white">
@@ -159,9 +115,7 @@ export default function WaterManagementSummary({
             Water Management
           </CardTitle>
           <div className="flex items-center gap-2">
-            <Badge className={getStatusColor(currentWeek.status)}>
-              {getStatusIcon(currentWeek.status)} {currentWeek.status}
-            </Badge>
+            <WaterStatusBadge status={currentWeek.status} />
             <Button variant="outline" size="sm" asChild className="text-xs">
               <Link to={`/water?lawn=${lawn.id}`}>
                 View Details
@@ -176,59 +130,30 @@ export default function WaterManagementSummary({
           <div>
             <h3 className="text-sm font-medium mb-3">This Week's Summary</h3>
             <div className="grid grid-cols-4 gap-3">
-              <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
-                <div className="text-blue-600 dark:text-blue-400 text-lg font-semibold">
-                  {currentWeek.et0_total.toFixed(2)}"
-                </div>
-                <div className="text-blue-500 dark:text-blue-300 text-xs">
-                  Water Needed
-                </div>
-              </div>
-              <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg">
-                <div className="text-green-600 dark:text-green-400 text-lg font-semibold">
-                  {currentWeek.precipitation_total.toFixed(2)}"
-                </div>
-                <div className="text-green-500 dark:text-green-300 text-xs">
-                  Rainfall
-                </div>
-              </div>
-              <div className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-lg">
-                <div className="text-purple-600 dark:text-purple-400 text-lg font-semibold">
-                  {currentWeek.irrigation_applied.toFixed(2)}"
-                </div>
-                <div className="text-purple-500 dark:text-purple-300 text-xs">
-                  Applied
-                </div>
-              </div>
-              <div className="bg-orange-50 dark:bg-orange-900/20 p-3 rounded-lg">
-                <div className="text-orange-600 dark:text-orange-400 text-lg font-semibold">
-                  {deficit.toFixed(2)}"
-                </div>
-                <div className="text-orange-500 dark:text-orange-300 text-xs">
-                  Deficit
-                </div>
-              </div>
+              <WaterStatusCard
+                value={currentWeek.et0_total}
+                label="Water Needed"
+                color="blue"
+              />
+              <WaterStatusCard
+                value={currentWeek.precipitation_total}
+                label="Rainfall"
+                color="green"
+              />
+              <WaterStatusCard
+                value={currentWeek.irrigation_applied}
+                label="Applied"
+                color="purple"
+              />
+              <WaterStatusCard value={deficit} label="Deficit" color="orange" />
             </div>
           </div>
 
-          <div>
-            <h4 className="text-sm font-medium mb-1">Recommendation</h4>
-            <p className="text-gray-600 dark:text-gray-400 text-sm">
-              {recommendation}
-            </p>
-          </div>
+          <WaterRecommendation deficit={deficit} />
 
           <div>
             <h4 className="text-sm font-medium mb-2">Water Balance</h4>
-            <div className="flex items-center gap-3">
-              <Progress
-                value={Math.max(0, Math.min(100, (1 - deficit / 2) * 100))}
-                className="flex-1"
-              />
-              <span className="text-sm text-gray-600 dark:text-gray-400">
-                {deficit.toFixed(2)} deficit
-              </span>
-            </div>
+            <WaterBalanceProgress deficit={deficit} />
           </div>
         </div>
       </CardContent>

@@ -9,3 +9,4 @@ export * from "./lawn";
 export * from "./location";
 export * from "./product";
 export * from "./task";
+export * from "./water-management";

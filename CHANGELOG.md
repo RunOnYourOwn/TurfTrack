@@ -9,9 +9,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Complete Water Management System**:
+  - Database models for `IrrigationEntry` and `WeeklyWaterSummary` with `is_forecast` flag
+  - Full CRUD API endpoints for irrigation entries (GET, POST, PUT, DELETE)
+  - Weekly water summary calculations based on weather data and irrigation entries
+  - Background tasks for automatic water summary calculations and updates
+  - Data health checks and backfill options for water management in admin panel
+  - Automatic water summary initialization for new lawns at existing locations
+  - Water management page with weekly history, irrigation entry management, and status indicators
+  - Dashboard integration with condensed water management cards for all lawns at a location
+  - Modular frontend components for water management (WaterStatusBadge, WaterStatusCard, WaterBalanceProgress, etc.)
+  - URL parameter support for pre-selecting lawns in water management page
+  - Visual distinction between historical and forecast data in weekly water history
+  - "Connected Devices" section marked as "Coming Soon" for future IoT integration
+
 ### Fixed
 
+- **Water Management Data Consistency**:
+
+  - Fixed `is_forecast` flag assignment for weekly water summaries
+  - Resolved data mismatch between dashboard and water management page displays
+  - Corrected weather type comparison logic in water calculations
+  - Fixed task status UPSERT operations to prevent duplicate key violations
+  - Resolved validation errors for irrigation entry updates (amount validation, source enum values)
+  - Fixed data health checks for weekly water summaries vs daily weather data
+  - Corrected admin panel display logic for water management health status
+
+- **Frontend Build and Performance**:
+  - Fixed TypeScript compilation errors in water management components
+  - Resolved circular import issues in database models
+  - Fixed Pydantic schema configuration for proper ORM serialization
+  - Corrected API endpoint routing and parameter handling
+
 ### Changed
+
+- **Frontend Architecture and Performance**:
+
+  - Implemented React lazy loading and code splitting for all page components
+  - Added manual chunking in Vite build configuration for vendor libraries and UI components
+  - Reduced main bundle size by ~74% (from 1,268.75 kB to 331.57 kB)
+  - Separated page-specific code into individual chunks for better caching
+  - Added Suspense boundaries for improved loading states
+  - Refactored water management page into modular, reusable components
+  - Updated dashboard to display condensed water management cards for all lawns instead of single card
+  - Improved bundle caching strategy with separate vendor and UI chunks
+
+- **Backend Architecture**:
+
+  - Enhanced Celery task orchestration for water management calculations
+  - Improved database migration handling for new water management tables
+  - Updated task status management with proper UPSERT operations
+  - Enhanced data health monitoring to include water management metrics
+
+- **User Experience**:
+  - Improved water management page navigation with pre-selected lawn support
+  - Enhanced weekly water history display with forecast indicators
+  - Better visual feedback for water status (excellent, good, warning, critical)
+  - Streamlined irrigation entry management with consistent UI patterns
+  - Optimized mobile performance through code splitting and lazy loading
+
 ## [0.0.20] - 2025-07-21
 
 ### Added
