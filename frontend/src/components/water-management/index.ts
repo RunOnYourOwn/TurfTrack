@@ -14,3 +14,4 @@ export { ConnectedDevicesSection } from "./ConnectedDevicesSection";
 // Form components
 export { IrrigationEntryDialog } from "./IrrigationEntryDialog";
 export { IrrigationEntryDeleteDialog } from "./IrrigationEntryDeleteDialog";
+export { DailyWaterBreakdown } from "./DailyWaterBreakdown";

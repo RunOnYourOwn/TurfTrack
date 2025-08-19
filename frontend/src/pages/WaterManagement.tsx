@@ -10,6 +10,7 @@ import {
   ConnectedDevicesSection,
   IrrigationEntryDialog,
   IrrigationEntryDeleteDialog,
+  DailyWaterBreakdown,
 } from "@/components/water-management";
 import { WeeklyWaterSummary, IrrigationEntry } from "@/types/water-management";
 
@@ -27,6 +28,10 @@ export default function WaterManagement() {
   const [showAddIrrigation, setShowAddIrrigation] = useState(false);
   const [showEditIrrigation, setShowEditIrrigation] = useState(false);
   const [showDeleteIrrigation, setShowDeleteIrrigation] = useState(false);
+  const [showDailyBreakdown, setShowDailyBreakdown] = useState(false);
+  const [selectedWeek, setSelectedWeek] = useState<WeeklyWaterSummary | null>(
+    null
+  );
 
   const [editingEntry, setEditingEntry] = useState<IrrigationEntry | null>(
     null
@@ -81,13 +86,16 @@ export default function WaterManagement() {
 
     try {
       // Get water management summary (includes weekly data) from the new stored summaries
-
+      // Add cache-busting parameter to ensure fresh data
+      const timestamp = new Date().getTime();
       const summary = await fetcher<{
         lawn_id: number;
         current_week: WeeklyWaterSummary | null;
         weekly_data: WeeklyWaterSummary[];
         total_monthly_water: number;
-      }>(`/api/v1/water-management/lawn/${selectedLawn.id}/summary`);
+      }>(
+        `/api/v1/water-management/lawn/${selectedLawn.id}/summary?_t=${timestamp}`
+      );
 
       // Set the weekly data directly from the stored summaries
       setWeeklyData(summary.weekly_data || []);
@@ -209,6 +217,11 @@ export default function WaterManagement() {
     }
   };
 
+  const handleWeekClick = (week: WeeklyWaterSummary) => {
+    setSelectedWeek(week);
+    setShowDailyBreakdown(true);
+  };
+
   const currentWeek = weeklyData.find((week) => {
     const today = new Date();
     const weekStart = new Date(week.week_start);
@@ -248,7 +261,10 @@ export default function WaterManagement() {
           />
 
           <div className="mt-6">
-            <WeeklyWaterHistory weeklyData={weeklyData} />
+            <WeeklyWaterHistory
+              weeklyData={weeklyData}
+              onWeekClick={handleWeekClick}
+            />
           </div>
 
           <div className="mt-6">
@@ -326,6 +342,14 @@ export default function WaterManagement() {
         onConfirm={deleteIrrigationEntry}
         onCancel={() => setShowDeleteIrrigation(false)}
         deleting={false}
+      />
+
+      {/* Daily Water Breakdown Dialog */}
+      <DailyWaterBreakdown
+        open={showDailyBreakdown}
+        onOpenChange={setShowDailyBreakdown}
+        week={selectedWeek}
+        lawnId={selectedLawn?.id || 0}
       />
     </div>
   );

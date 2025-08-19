@@ -9,13 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Daily Water Breakdown Feature**: Added interactive daily water analysis for weekly summaries
+  - Clickable weekly water history entries that open detailed daily breakdown modal
+  - Daily bar chart showing ET0, precipitation, and irrigation data for each day of the week
+  - Daily details table with water deficit calculations and status indicators
+  - Forecast data indicators for future weeks
+  - Uses existing weather and irrigation API endpoints for data consistency
+  - Responsive design with proper dark/light mode support
+  - Clean number formatting (2 decimal places) for improved readability
+  - Optimized modal layout with proper spacing and non-overlapping elements
+  - Color-coded chart with intuitive legend (Red for ET0, Blue for Precipitation, Light Blue for Irrigation)
+  - Proper date parsing to ensure Monday-Sunday week display consistency
+
 ### Fixed
 
 - **Date Picker Rendering Issue**: Fixed react-date-range calendar display across all pages
+
   - Added missing CSS imports to DateRangePopover component for proper calendar rendering
   - Resolved concatenated day numbers issue in date picker calendar cells
   - Centralized CSS imports in DateRangePopover component to ensure consistent styling
   - Fixed date picker functionality on Dashboard (Disease Pressure, Growth Potential, Weed Pressure), Weather Summary, and other pages using DateRangePopover
+
+- **Water Management Week Display**: Fixed week date range display to match database format
+  - Updated WeeklyWaterHistory component to show full date range (Monday to Sunday) instead of "Week of"
+  - Changed display format from "Week of 6/16/2025" to "Jun 16 - Jun 22, 2025" for clarity
+  - Ensured frontend display matches backend database week calculation (Monday-Sunday)
+  - Added proper date formatting using date-fns for consistent display across all browsers
+  - Removed debug text from weekly water history for cleaner interface
+  - Fixed Daily Water Breakdown modal header layout to prevent forecast badge overlap with close button
+  - Improved X-axis date label readability in daily breakdown chart with proper rotation and spacing
 
 ### Changed
 

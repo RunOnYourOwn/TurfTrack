@@ -2,13 +2,18 @@ import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
 import { Calendar } from "lucide-react";
 import { WaterStatusBadge } from "./WaterStatusBadge";
 import { WeeklyWaterSummary } from "../../types/water-management";
+import { format } from "date-fns";
 
 interface WeeklyWaterHistoryProps {
   weeklyData: WeeklyWaterSummary[];
+  onWeekClick?: (week: WeeklyWaterSummary) => void;
 }
 
-export function WeeklyWaterHistory({ weeklyData }: WeeklyWaterHistoryProps) {
-  if (weeklyData.length === 0) {
+export function WeeklyWaterHistory({
+  weeklyData,
+  onWeekClick,
+}: WeeklyWaterHistoryProps) {
+  if (!weeklyData || weeklyData.length === 0) {
     return (
       <Card className="bg-white dark:bg-gray-900 text-black dark:text-white">
         <CardHeader>
@@ -40,16 +45,25 @@ export function WeeklyWaterHistory({ weeklyData }: WeeklyWaterHistoryProps) {
           {recentWeeks.map((week) => (
             <div
               key={week.week_start}
-              className={`flex items-center justify-between p-3 border rounded-lg ${
+              className={`flex items-center justify-between p-3 border rounded-lg transition-all duration-200 ${
                 week.is_forecast
                   ? "border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20"
                   : "border-gray-200 dark:border-gray-700"
+              } ${
+                onWeekClick
+                  ? "cursor-pointer hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600"
+                  : ""
               }`}
+              onClick={() => onWeekClick?.(week)}
             >
               <div className="flex items-center gap-3">
                 <div>
                   <div className="font-medium">
-                    Week of {new Date(week.week_start).toLocaleDateString()}
+                    {format(new Date(week.week_start + "T00:00:00"), "MMM d")} -{" "}
+                    {format(
+                      new Date(week.week_end + "T00:00:00"),
+                      "MMM d, yyyy"
+                    )}
                   </div>
                   <div className="text-sm text-gray-500 dark:text-gray-400">
                     {week.et0_total.toFixed(2)}" needed •{" "}
