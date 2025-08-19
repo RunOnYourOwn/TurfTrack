@@ -11,7 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Date Picker Rendering Issue**: Fixed react-date-range calendar display across all pages
+  - Added missing CSS imports to DateRangePopover component for proper calendar rendering
+  - Resolved concatenated day numbers issue in date picker calendar cells
+  - Centralized CSS imports in DateRangePopover component to ensure consistent styling
+  - Fixed date picker functionality on Dashboard (Disease Pressure, Growth Potential, Weed Pressure), Weather Summary, and other pages using DateRangePopover
+
 ### Changed
+
 ## [0.0.21] - 2025-08-11
 
 ### Added

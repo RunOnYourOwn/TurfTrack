@@ -55,3 +55,10 @@ RELEASE_WORKFLOW.md
 backend/app/core/__pycache__/config.cpython-312.pyc
 backend/app/core/__pycache__/database.cpython-312.pyc
 
+backend/quick_rainmachine_test.py
+backend/rainmachine_debug.py
+backend/test_watering_history.py
+backend/rainmachine_data_explorer.py
+docs/rainmachine-integration.md
+backend/rainmachine_data.json
+backend/rainmachine_final_data_gather.py
