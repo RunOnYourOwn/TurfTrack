@@ -9,7 +9,10 @@ interface WeeklyWaterHistoryProps {
   onWeekClick?: (week: WeeklyWaterSummary) => void;
 }
 
-export function WeeklyWaterHistory({ weeklyData, onWeekClick }: WeeklyWaterHistoryProps) {
+export function WeeklyWaterHistory({
+  weeklyData,
+  onWeekClick,
+}: WeeklyWaterHistoryProps) {
   if (!weeklyData || weeklyData.length === 0) {
     return (
       <Card className="bg-white dark:bg-gray-900 text-black dark:text-white">
@@ -47,8 +50,8 @@ export function WeeklyWaterHistory({ weeklyData, onWeekClick }: WeeklyWaterHisto
                   ? "border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20"
                   : "border-gray-200 dark:border-gray-700"
               } ${
-                onWeekClick 
-                  ? "cursor-pointer hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600" 
+                onWeekClick
+                  ? "cursor-pointer hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600"
                   : ""
               }`}
               onClick={() => onWeekClick?.(week)}
@@ -56,8 +59,11 @@ export function WeeklyWaterHistory({ weeklyData, onWeekClick }: WeeklyWaterHisto
               <div className="flex items-center gap-3">
                 <div>
                   <div className="font-medium">
-                    {format(new Date(week.week_start), "MMM d")} -{" "}
-                    {format(new Date(week.week_end), "MMM d, yyyy")}
+                    {format(new Date(week.week_start + "T00:00:00"), "MMM d")} -{" "}
+                    {format(
+                      new Date(week.week_end + "T00:00:00"),
+                      "MMM d, yyyy"
+                    )}
                   </div>
                   <div className="text-sm text-gray-500 dark:text-gray-400">
                     {week.et0_total.toFixed(2)}" needed •{" "}
