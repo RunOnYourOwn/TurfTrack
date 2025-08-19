@@ -1,9 +1,6 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetcher } from "../api/fetcher";
-import "react-date-range/dist/styles.css";
-import "react-date-range/dist/theme/default.css";
-import "../react-date-range-dark.css";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { NUTRIENTS } from "@/lib/nutrients";
 import { ReportsFilters } from "@/components/reports/ReportsFilters";

@@ -1,5 +1,8 @@
 import React, { useState, useRef } from "react";
 import { DateRange } from "react-date-range";
+import "react-date-range/dist/styles.css";
+import "react-date-range/dist/theme/default.css";
+import "../react-date-range-dark.css";
 import {
   startOfYear,
   endOfYear,
