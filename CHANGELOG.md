@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Fixed
+
+### Changed
+## [0.0.22] - 2025-08-18
+
+### Added
+
 - **Daily Water Breakdown Feature**: Added interactive daily water analysis for weekly summaries
   - Clickable weekly water history entries that open detailed daily breakdown modal
   - Daily bar chart showing ET0, precipitation, and irrigation data for each day of the week
