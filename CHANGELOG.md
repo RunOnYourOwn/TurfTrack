@@ -12,10 +12,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Date Picker Rendering Issue**: Fixed react-date-range calendar display across all pages
+
   - Added missing CSS imports to DateRangePopover component for proper calendar rendering
   - Resolved concatenated day numbers issue in date picker calendar cells
   - Centralized CSS imports in DateRangePopover component to ensure consistent styling
   - Fixed date picker functionality on Dashboard (Disease Pressure, Growth Potential, Weed Pressure), Weather Summary, and other pages using DateRangePopover
+
+- **Water Management Week Display**: Fixed week date range display to match database format
+  - Updated WeeklyWaterHistory component to show full date range (Monday to Sunday) instead of "Week of"
+  - Changed display format from "Week of 6/16/2025" to "Jun 16 - Jun 22, 2025" for clarity
+  - Ensured frontend display matches backend database week calculation (Monday-Sunday)
+  - Added proper date formatting using date-fns for consistent display across all browsers
 
 ### Changed
 
