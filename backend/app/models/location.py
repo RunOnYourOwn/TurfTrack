@@ -24,5 +24,8 @@ class Location(Base):
     weed_pressure_entries = relationship(
         "WeedPressure", back_populates="location", cascade="all, delete-orphan"
     )
+    mowers = relationship(
+        "Mower", back_populates="location", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (UniqueConstraint("latitude", "longitude", name="uix_lat_lon"),)

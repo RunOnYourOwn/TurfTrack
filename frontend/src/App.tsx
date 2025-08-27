@@ -12,6 +12,7 @@ const Reports = lazy(() => import("@/pages/Reports"));
 const TaskMonitor = lazy(() => import("@/pages/TaskMonitor"));
 const GDD = lazy(() => import("@/pages/GDD"));
 const WaterManagement = lazy(() => import("@/pages/WaterManagement"));
+const MowerMaintenance = lazy(() => import("@/pages/Mowers"));
 
 function App() {
   return (
@@ -33,6 +34,7 @@ function App() {
             <Route path="/admin" element={<TaskMonitor />} />
             <Route path="/gdd" element={<GDD />} />
             <Route path="/water" element={<WaterManagement />} />
+            <Route path="/mowers" element={<MowerMaintenance />} />
           </Routes>
         </Suspense>
       </AppLayout>

@@ -10,3 +10,13 @@ from .disease_pressure import DiseasePressure
 from .growth_potential import GrowthPotential
 from .weed_pressure import WeedSpecies, WeedPressure, WeedSeason, MoisturePreference
 from .water_management import IrrigationEntry, IrrigationSource, WeeklyWaterSummary
+from .mower import (
+    Mower,
+    MowerType,
+    MowingLog,
+    MaintenanceSchedule,
+    MaintenanceType,
+    MaintenancePart,
+    MaintenanceLog,
+    MaintenanceLogPart,
+)

@@ -20,6 +20,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   DropletsIcon,
+  SettingsIcon,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useTheme } from "../../ThemeProvider";
@@ -49,6 +50,12 @@ const navigationItems = [
     url: "/water",
     icon: DropletsIcon,
     description: "Track irrigation and water usage",
+  },
+  {
+    title: "Mower Maintenance",
+    url: "/mowers",
+    icon: SettingsIcon,
+    description: "Manage mowers and maintenance schedules",
   },
   {
     title: "Products",

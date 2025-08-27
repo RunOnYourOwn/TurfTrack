@@ -9,9 +9,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Mower Maintenance System**: Complete mower management system with maintenance tracking
+  - Add, edit, and delete mowers with detailed information (brand, model, year, type, engine hours)
+  - Log mowing sessions with duration, date, and lawn tracking
+  - Schedule maintenance with custom intervals (hours/months) and part tracking
+  - Log completed maintenance with cost tracking, labor costs, and parts used
+  - Track maintenance due dates and overdue alerts
+  - Support for multiple mower types (Rotary, Reel, etc.) and maintenance types (Oil Change, Backlap, etc.)
+  - Integration with existing location system for mower organization
+
 ### Fixed
 
+- Fixed maintenance schedule creation 422 error by removing duplicate `mower_id` from schema
+- Fixed maintenance log creation schema to match API endpoint structure
+- Fixed maintenance log creation 500 error by properly loading `parts_used` relationship in API response
+- Fixed maintenance schedule not updating by adding schedule linking to maintenance log dialog
+- Fixed SelectItem empty string value error in maintenance log dialog
+- Added recent maintenance logs display to mower maintenance page
+- Added "Use Current Hours" button to maintenance log dialog for easier data entry
+- Reorganized mower maintenance page into 2-column layout for better space utilization and reduced scrolling
+- Combined Mower Overview and Quick Actions into a single cohesive card for improved visual hierarchy
+- Centered quick action buttons and removed redundant "Quick Actions" text for cleaner appearance
+- Reordered right column to show Maintenance Schedules above Recent Maintenance Logs for better priority
+- Added pagination to all three data sections (Recent Mowing Logs, Maintenance Schedules, Recent Maintenance Logs) with 10 items per page
+- Updated card background styling to ensure consistency with other pages in dark mode (bg-white dark:bg-gray-900)
+- Fixed maintenance schedule creation 500 error by properly loading relationships and calculating computed fields
+- Improved maintenance due alert display with proper maintenance type names (Oil Change, Air Filter, etc.) and removed unnecessary disabled schedule button
+- Added edit and delete buttons to all three data components (Mowing Logs, Maintenance Schedules, Maintenance Logs) for full CRUD functionality
+- Fixed maintenance schedule calculation bug when deleting maintenance logs - now properly updates schedule's last maintenance hours and date when logs are deleted or updated
+- Fixed maintenance schedule update bug when creating maintenance logs - now properly updates schedule's last maintenance hours and date to reflect the most recent maintenance performed, not just the newly created log
+- Fixed mowing log edit dialog field name mismatch - corrected `date` to `mowing_date` to match backend API schema requirements
+- Fixed MissingGreenlet errors in maintenance schedule and maintenance log update endpoints by eagerly loading relationships before updating objects
+- Fixed ResponseValidationError for next_maintenance_date field by converting datetime to date object in maintenance schedule update endpoint
+
+### Refactored
+
+- **Backend Modularization**: Extracted business logic into service layer for improved maintainability
+
+  - Created `MowerService` class to centralize mower-related business logic
+  - Created `MowerUtils` utility functions for common calculations and formatting
+  - Reduced code duplication in mower endpoints by ~60%
+  - Improved separation of concerns between API routing and business logic
+  - Enhanced testability by isolating business logic in service classes
+
+- **Frontend Component Modularization**: Improved code organization and reusability
+  - Created `useMowerData` custom hook for centralized data fetching logic
+  - Created `usePagination` reusable hook for pagination state management
+  - Created reusable `Pagination` component with proper accessibility and styling
+  - Created reusable data display components (`MowingLogItem`, `MaintenanceScheduleItem`, `MaintenanceLogItem`)
+  - Improved component composition and reduced code duplication
+  - Enhanced maintainability through better separation of concerns
+
 ### Changed
+
 ## [0.0.22] - 2025-08-18
 
 ### Added
