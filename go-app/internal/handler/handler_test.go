@@ -69,3 +69,42 @@ func TestEnvOr(t *testing.T) {
 		t.Error("envOr should return fallback for unset var")
 	}
 }
+
+func TestMiddlewareSecurityHeaders(t *testing.T) {
+	s := newTestServer()
+	mux := s.Routes()
+	req := httptest.NewRequest("GET", "/health", nil)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	if v := w.Header().Get("X-Content-Type-Options"); v != "nosniff" {
+		t.Errorf("X-Content-Type-Options = %q, want nosniff", v)
+	}
+	if v := w.Header().Get("X-Frame-Options"); v != "DENY" {
+		t.Errorf("X-Frame-Options = %q, want DENY", v)
+	}
+}
+
+func TestRoutesRegistered(t *testing.T) {
+	s := newTestServer()
+	mux := s.Routes()
+
+	paths := []struct {
+		method string
+		path   string
+		want   int
+	}{
+		{"GET", "/health", 503},
+		{"GET", "/api/v1/version", 200},
+	}
+	for _, tt := range paths {
+		t.Run(tt.method+" "+tt.path, func(t *testing.T) {
+			req := httptest.NewRequest(tt.method, tt.path, nil)
+			w := httptest.NewRecorder()
+			mux.ServeHTTP(w, req)
+			if w.Code != tt.want {
+				t.Errorf("%s %s = %d, want %d", tt.method, tt.path, w.Code, tt.want)
+			}
+		})
+	}
+}
