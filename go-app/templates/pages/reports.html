@@ -2,84 +2,71 @@
 <div class="space-y-6">
     <h2 class="text-2xl font-bold">Reports</h2>
 
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-        <h3 class="text-lg font-semibold mb-4">Nutrient Applications Over Time</h3>
-        <canvas id="reports-chart" height="250"></canvas>
+    <div class="card bg-base-100 shadow-sm">
+        <div class="card-body">
+            <h3 class="card-title text-lg">Nutrient Applications Over Time</h3>
+            <canvas id="reports-chart" height="250"></canvas>
+        </div>
     </div>
 
     {{if .Applications}}
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-x-auto">
-        <table class="w-full text-sm">
-            <thead class="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                    <th class="px-4 py-3 text-left font-medium">Date</th>
-                    <th class="px-4 py-3 text-left font-medium">Product</th>
-                    <th class="px-4 py-3 text-right font-medium">N (lbs)</th>
-                    <th class="px-4 py-3 text-right font-medium">P (lbs)</th>
-                    <th class="px-4 py-3 text-right font-medium">K (lbs)</th>
-                    <th class="px-4 py-3 text-right font-medium">Fe (lbs)</th>
-                    <th class="px-4 py-3 text-right font-medium">Cost</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                {{$pm := .ProductMap}}
-                {{range .Applications}}
-                <tr>
-                    <td class="px-4 py-3">{{formatDate .ApplicationDate}}</td>
-                    <td class="px-4 py-3">{{with index $pm .ProductID}}{{.Name}}{{end}}</td>
-                    <td class="px-4 py-3 text-right">{{formatFloatPtr .NApplied 3}}</td>
-                    <td class="px-4 py-3 text-right">{{formatFloatPtr .PApplied 3}}</td>
-                    <td class="px-4 py-3 text-right">{{formatFloatPtr .KApplied 3}}</td>
-                    <td class="px-4 py-3 text-right">{{formatFloatPtr .FeApplied 3}}</td>
-                    <td class="px-4 py-3 text-right">${{formatFloatPtr .CostApplied 2}}</td>
-                </tr>
-                {{end}}
-            </tbody>
-        </table>
+    <div class="card bg-base-100 shadow-sm">
+        <div class="card-body p-0">
+            <div class="overflow-x-auto">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Product</th>
+                            <th class="text-right">N (lbs)</th>
+                            <th class="text-right">P (lbs)</th>
+                            <th class="text-right">K (lbs)</th>
+                            <th class="text-right">Fe (lbs)</th>
+                            <th class="text-right">Cost</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .Applications}}
+                        <tr>
+                            <td>{{formatDate .ApplicationDate}}</td>
+                            <td>{{$prod := index $.ProductMap .ProductID}}{{if $prod}}{{$prod.Name}}{{end}}</td>
+                            <td class="text-right">{{formatFloatPtr .NApplied 3}}</td>
+                            <td class="text-right">{{formatFloatPtr .PApplied 3}}</td>
+                            <td class="text-right">{{formatFloatPtr .KApplied 3}}</td>
+                            <td class="text-right">{{formatFloatPtr .FeApplied 3}}</td>
+                            <td class="text-right">{{formatFloatPtr .CostApplied 2}}</td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
     {{else}}
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center">
-        <p class="text-gray-500">No applications to report on yet.</p>
+    <div class="alert">
+        <span>No application data to report. Log applications first.</span>
     </div>
     {{end}}
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Build cumulative nutrient data from the table
-    const rows = document.querySelectorAll('tbody tr');
-    if (!rows.length) return;
-
-    const labels = [], nCum = [], pCum = [], kCum = [];
-    let n = 0, p = 0, k = 0;
-    rows.forEach(row => {
-        const cells = row.querySelectorAll('td');
-        labels.push(cells[0].textContent);
-        const parseVal = (s) => { const v = parseFloat(s); return isNaN(v) ? 0 : v; };
-        n += parseVal(cells[2].textContent);
-        p += parseVal(cells[3].textContent);
-        k += parseVal(cells[4].textContent);
-        nCum.push(n.toFixed(3));
-        pCum.push(p.toFixed(3));
-        kCum.push(k.toFixed(3));
-    });
-
-    new Chart(document.getElementById('reports-chart').getContext('2d'), {
-        type: 'line',
+(function() {
+    const apps = {{json .Applications}};
+    if (!apps || !apps.length) return;
+    const labels = apps.map(a => a.application_date.substring(0,10));
+    new Chart(document.getElementById('reports-chart'), {
+        type: 'bar',
         data: {
             labels: labels,
             datasets: [
-                {label: 'N (lbs)', data: nCum, borderColor: '#22c55e', fill: false},
-                {label: 'P (lbs)', data: pCum, borderColor: '#3b82f6', fill: false},
-                {label: 'K (lbs)', data: kCum, borderColor: '#a855f7', fill: false}
+                {label:'N',data:apps.map(a=>a.n_applied||0),backgroundColor:'rgba(34,197,94,0.7)'},
+                {label:'P',data:apps.map(a=>a.p_applied||0),backgroundColor:'rgba(59,130,246,0.7)'},
+                {label:'K',data:apps.map(a=>a.k_applied||0),backgroundColor:'rgba(168,85,247,0.7)'},
+                {label:'Fe',data:apps.map(a=>a.fe_applied||0),backgroundColor:'rgba(245,158,11,0.7)'}
             ]
         },
-        options: {
-            responsive: true,
-            plugins: {legend: {position: 'top'}},
-            scales: {x: {ticks: {maxTicksLimit: 10}}}
-        }
+        options: {responsive:true,plugins:{legend:{position:'bottom'}},scales:{x:{stacked:true},y:{stacked:true}}}
     });
-});
+})();
 </script>
 {{end}}

@@ -3,9 +3,9 @@
     <h2 class="text-2xl font-bold">Dashboard</h2>
 
     {{if .Locations}}
-    <div class="mb-4">
-        <label class="block text-sm font-medium mb-1">Select Location</label>
-        <select id="location-select" onchange="loadDashboard(this.value)" class="border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-600">
+    <div class="form-control w-full max-w-xs">
+        <label class="label"><span class="label-text">Select Location</span></label>
+        <select id="location-select" onchange="loadDashboard(this.value)" class="select select-bordered">
             <option value="">Choose a location...</option>
             {{range .Locations}}
             <option value="{{.ID}}">{{.Name}} ({{formatFloat .Latitude 4}}, {{formatFloat .Longitude 4}})</option>
@@ -14,99 +14,116 @@
     </div>
 
     <div id="dashboard-content" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Charts load here via JavaScript -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-            <h3 class="text-lg font-semibold mb-2">Temperature</h3>
-            <canvas id="temp-chart" height="200"></canvas>
+        <div class="card bg-base-100 shadow-sm">
+            <div class="card-body">
+                <h3 class="card-title text-lg">Temperature</h3>
+                <canvas id="temp-chart" height="200"></canvas>
+            </div>
         </div>
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-            <h3 class="text-lg font-semibold mb-2">Disease Pressure (Smith-Kerns)</h3>
-            <canvas id="disease-chart" height="200"></canvas>
+        <div class="card bg-base-100 shadow-sm">
+            <div class="card-body">
+                <h3 class="card-title text-lg">Disease Pressure</h3>
+                <canvas id="disease-chart" height="200"></canvas>
+            </div>
         </div>
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-            <h3 class="text-lg font-semibold mb-2">Growth Potential</h3>
-            <canvas id="growth-chart" height="200"></canvas>
+        <div class="card bg-base-100 shadow-sm">
+            <div class="card-body">
+                <h3 class="card-title text-lg">Growth Potential</h3>
+                <canvas id="gp-chart" height="200"></canvas>
+            </div>
         </div>
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-            <h3 class="text-lg font-semibold mb-2">Water Status</h3>
-            <div id="water-cards" class="space-y-2">
-                <p class="text-gray-500 text-sm">Select a location to view water data</p>
+        <div class="card bg-base-100 shadow-sm">
+            <div class="card-body">
+                <h3 class="card-title text-lg">Weed Pressure</h3>
+                <canvas id="weed-chart" height="200"></canvas>
             </div>
         </div>
     </div>
     {{else}}
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center">
-        <p class="text-gray-500">No locations yet. <a href="/lawns" class="text-green-600 hover:underline">Add a lawn</a> to get started.</p>
+    <div class="alert alert-info">
+        <span>No locations yet. Add a lawn to get started.</span>
     </div>
     {{end}}
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="card bg-base-100 shadow-sm">
+            <div class="card-body">
+                <h3 class="card-title text-lg">Lawns</h3>
+                {{if .Lawns}}
+                <div class="overflow-x-auto">
+                    <table class="table table-sm">
+                        <thead><tr><th>Name</th><th>Area</th><th>Type</th><th>Location</th></tr></thead>
+                        <tbody>
+                        {{range .Lawns}}
+                        <tr><td>{{.Name}}</td><td>{{formatFloat .Area 0}} sq ft</td><td>{{.GrassType}}</td><td>{{if .Location}}{{.Location.Name}}{{end}}</td></tr>
+                        {{end}}
+                        </tbody>
+                    </table>
+                </div>
+                {{else}}<p class="text-base-content/60">No lawns yet.</p>{{end}}
+            </div>
+        </div>
+        <div class="card bg-base-100 shadow-sm">
+            <div class="card-body">
+                <h3 class="card-title text-lg">Locations</h3>
+                {{if .Locations}}
+                <div class="overflow-x-auto">
+                    <table class="table table-sm">
+                        <thead><tr><th>Name</th><th>Latitude</th><th>Longitude</th></tr></thead>
+                        <tbody>
+                        {{range .Locations}}
+                        <tr><td>{{.Name}}</td><td>{{formatFloat .Latitude 4}}</td><td>{{formatFloat .Longitude 4}}</td></tr>
+                        {{end}}
+                        </tbody>
+                    </table>
+                </div>
+                {{else}}<p class="text-base-content/60">No locations yet.</p>{{end}}
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
-let tempChart, diseaseChart, growthChart;
-
-function loadDashboard(locationId) {
-    if (!locationId) return;
-
-    fetch('/api/weather/' + locationId + '?start_date=' + daysAgo(14) + '&end_date=' + daysAhead(16))
-        .then(r => r.json())
-        .then(data => {
+let charts = {};
+function loadDashboard(locationID) {
+    if (!locationID) return;
+    fetch('/api/weather/' + locationID + '?start_date=' + daysAgo(30))
+        .then(r => r.json()).then(data => {
             if (!data) return;
-            const labels = data.map(d => d.date.substring(0, 10));
-            const maxTemps = data.map(d => d.temperature_max_f);
-            const minTemps = data.map(d => d.temperature_min_f);
-            updateChart('temp-chart', tempChart, c => tempChart = c, labels, [
-                {label: 'Max Temp (F)', data: maxTemps, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', fill: true},
-                {label: 'Min Temp (F)', data: minTemps, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true}
+            const labels = data.map(d => d.date.substring(5,10));
+            updateChart('temp-chart', labels, [
+                {label:'Max',data:data.map(d=>d.temperature_max_f),borderColor:'#ef4444',fill:false},
+                {label:'Min',data:data.map(d=>d.temperature_min_f),borderColor:'#3b82f6',fill:false}
             ]);
         });
-
-    fetch('/api/disease/' + locationId)
-        .then(r => r.json())
-        .then(data => {
+    fetch('/api/disease/' + locationID + '?start_date=' + daysAgo(30))
+        .then(r => r.json()).then(data => {
             if (!data) return;
-            const labels = data.map(d => d.date.substring(0, 10));
-            const scores = data.map(d => d.risk_score ? (d.risk_score * 100).toFixed(1) : null);
-            updateChart('disease-chart', diseaseChart, c => diseaseChart = c, labels, [
-                {label: 'Risk %', data: scores, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', fill: true}
-            ]);
+            updateChart('disease-chart', data.map(d=>d.date.substring(5,10)),
+                [{label:'Risk Score',data:data.map(d=>d.risk_score),borderColor:'#f59e0b',fill:true,backgroundColor:'rgba(245,158,11,0.1)'}]);
         });
-
-    fetch('/api/growth-potential/' + locationId)
-        .then(r => r.json())
-        .then(data => {
+    fetch('/api/growth-potential/' + locationID + '?start_date=' + daysAgo(30))
+        .then(r => r.json()).then(data => {
             if (!data) return;
-            const labels = data.map(d => d.date.substring(0, 10));
-            const gp = data.map(d => d.growth_potential ? (d.growth_potential * 100).toFixed(1) : null);
-            const gp7 = data.map(d => d.gp_7d_avg ? (d.gp_7d_avg * 100).toFixed(1) : null);
-            updateChart('growth-chart', growthChart, c => growthChart = c, labels, [
-                {label: 'Daily GP %', data: gp, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.1)', fill: true},
-                {label: '7-day Avg %', data: gp7, borderColor: '#16a34a', borderDash: [5,5]}
-            ]);
+            updateChart('gp-chart', data.map(d=>d.date.substring(5,10)),
+                [{label:'GP',data:data.map(d=>d.growth_potential),borderColor:'#22c55e',fill:true,backgroundColor:'rgba(34,197,94,0.1)'}]);
+        });
+    fetch('/api/weed-pressure/' + locationID + '?start_date=' + daysAgo(30))
+        .then(r => r.json()).then(data => {
+            if (!data) return;
+            updateChart('weed-chart', data.map(d=>d.date.substring(5,10)),
+                [{label:'Weed Pressure',data:data.map(d=>d.weed_pressure_score),borderColor:'#a855f7',fill:true,backgroundColor:'rgba(168,85,247,0.1)'}]);
         });
 }
-
-function updateChart(canvasId, existing, setter, labels, datasets) {
-    if (existing) existing.destroy();
-    const ctx = document.getElementById(canvasId).getContext('2d');
-    const chart = new Chart(ctx, {
-        type: 'line',
-        data: {labels, datasets},
-        options: {
-            responsive: true,
-            plugins: {legend: {position: 'top'}},
-            scales: {x: {display: true, ticks: {maxTicksLimit: 10}}}
-        }
-    });
-    setter(chart);
-}
-
 function daysAgo(n) {
-    const d = new Date(); d.setDate(d.getDate() - n);
-    return d.toISOString().substring(0, 10);
+    const d = new Date(); d.setDate(d.getDate()-n); return d.toISOString().substring(0,10);
 }
-function daysAhead(n) {
-    const d = new Date(); d.setDate(d.getDate() + n);
-    return d.toISOString().substring(0, 10);
+function updateChart(id, labels, datasets) {
+    if (charts[id]) charts[id].destroy();
+    charts[id] = new Chart(document.getElementById(id), {
+        type:'line', data:{labels, datasets:datasets.map(d=>({...d,tension:0.3,pointRadius:1}))},
+        options:{responsive:true,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true}}}
+    });
 }
 </script>
 {{end}}

@@ -2,10 +2,10 @@
 <div class="space-y-6">
     <h2 class="text-2xl font-bold">Growing Degree Days</h2>
 
-    <div class="flex gap-4 items-end">
-        <div>
-            <label class="block text-sm font-medium mb-1">Location</label>
-            <select id="gdd-loc" onchange="window.location='/gdd?location_id='+this.value" class="border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600">
+    <div class="flex gap-4 items-end flex-wrap">
+        <div class="form-control">
+            <label class="label"><span class="label-text">Location</span></label>
+            <select id="gdd-loc" onchange="window.location='/gdd?location_id='+this.value" class="select select-bordered">
                 <option value="">Select location...</option>
                 {{range .Locations}}
                 <option value="{{.ID}}" {{if and $.SelectedLocationID (eq .ID (deref $.SelectedLocationID))}}selected{{end}}>{{.Name}}</option>
@@ -13,101 +13,96 @@
             </select>
         </div>
         {{if .SelectedLocationID}}
-        <button onclick="document.getElementById('gdd-form').classList.toggle('hidden')"
-                class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
-            + Add GDD Model
-        </button>
+        <button onclick="document.getElementById('gdd-form').classList.toggle('hidden')" class="btn btn-primary btn-sm">+ Add GDD Model</button>
         {{end}}
     </div>
 
     {{if .SelectedLocationID}}
-    <div id="gdd-form" class="hidden bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h3 class="text-lg font-semibold mb-4">New GDD Model</h3>
-        <form hx-post="/gdd-models" hx-swap="none" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <input type="hidden" name="location_id" value="{{deref .SelectedLocationID}}">
-            <div>
-                <label class="block text-sm font-medium mb-1">Name</label>
-                <input name="name" required class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600">
-            </div>
-            <div>
-                <label class="block text-sm font-medium mb-1">Base Temp</label>
-                <input name="base_temp" type="number" step="0.1" required class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600">
-            </div>
-            <div>
-                <label class="block text-sm font-medium mb-1">Unit</label>
-                <select name="unit" class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600">
-                    <option value="F">Fahrenheit</option>
-                    <option value="C">Celsius</option>
-                </select>
-            </div>
-            <div>
-                <label class="block text-sm font-medium mb-1">Start Date</label>
-                <input name="start_date" type="date" required class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600">
-            </div>
-            <div>
-                <label class="block text-sm font-medium mb-1">Threshold</label>
-                <input name="threshold" type="number" step="0.1" required class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600">
-            </div>
-            <div class="flex items-end">
-                <label class="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" name="reset_on_threshold" class="rounded">
-                    <span class="text-sm">Reset on Threshold</span>
-                </label>
-            </div>
-            <div class="md:col-span-3">
-                <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Create Model</button>
-            </div>
-        </form>
+    <div id="gdd-form" class="hidden card bg-base-100 shadow-sm">
+        <div class="card-body">
+            <h3 class="card-title">New GDD Model</h3>
+            <form hx-post="/gdd-models" hx-swap="none" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <input type="hidden" name="location_id" value="{{deref .SelectedLocationID}}">
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Name</span></label>
+                    <input name="name" required class="input input-bordered" placeholder="e.g. Crabgrass Preventer">
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Base Temp</span></label>
+                    <input name="base_temp" type="number" step="0.1" required class="input input-bordered" value="50">
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Unit</span></label>
+                    <select name="unit" class="select select-bordered">
+                        <option value="F">Fahrenheit</option>
+                        <option value="C">Celsius</option>
+                    </select>
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Start Date</span></label>
+                    <input name="start_date" type="date" required class="input input-bordered">
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Threshold</span></label>
+                    <input name="threshold" type="number" step="0.1" value="0" class="input input-bordered">
+                </div>
+                <div class="form-control">
+                    <label class="label cursor-pointer justify-start gap-2">
+                        <input name="reset_on_threshold" type="checkbox" class="checkbox checkbox-primary">
+                        <span class="label-text">Reset on Threshold</span>
+                    </label>
+                </div>
+                <div class="md:col-span-3">
+                    <button type="submit" class="btn btn-primary">Create Model</button>
+                </div>
+            </form>
+        </div>
     </div>
+
+    {{range .GDDModels}}
+    <div class="card bg-base-100 shadow-sm">
+        <div class="card-body">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h3 class="card-title">{{.Name}}</h3>
+                    <p class="text-sm text-base-content/60">Base: {{formatFloat .BaseTemp 1}}{{.Unit}} | Start: {{formatDate .StartDate}} | Threshold: {{formatFloat .Threshold 0}}</p>
+                </div>
+                <button hx-delete="/gdd-models/{{.ID}}" hx-confirm="Delete GDD model '{{.Name}}'?" class="btn btn-ghost btn-xs text-error">Delete</button>
+            </div>
+            <canvas id="gdd-chart-{{.ID}}" height="200"></canvas>
+        </div>
+    </div>
+    <script>
+    (function() {
+        fetch('/api/gdd-values/{{.ID}}')
+            .then(r => r.json()).then(data => {
+                if (!data || !data.length) return;
+                new Chart(document.getElementById('gdd-chart-{{.ID}}'), {
+                    type: 'line',
+                    data: {
+                        labels: data.map(d => d.date.substring(5,10)),
+                        datasets: [{
+                            label: 'Cumulative GDD',
+                            data: data.map(d => d.cumulative_gdd),
+                            borderColor: '#22c55e',
+                            fill: true,
+                            backgroundColor: 'rgba(34,197,94,0.1)',
+                            tension: 0.3,
+                            pointRadius: 1
+                        }]
+                    },
+                    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+                });
+            });
+    })();
+    </script>
     {{end}}
 
-    {{if .GDDModels}}
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {{range .GDDModels}}
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-            <div class="flex justify-between items-start mb-4">
-                <div>
-                    <h3 class="text-lg font-semibold">{{.Name}}</h3>
-                    <p class="text-sm text-gray-500">Base: {{formatFloat .BaseTemp 1}}{{.Unit}} | Threshold: {{formatFloat .Threshold 0}} | Start: {{formatDate .StartDate}}</p>
-                </div>
-                <button hx-delete="/gdd-models/{{.ID}}" hx-confirm="Delete this model?"
-                        class="text-red-600 hover:text-red-800 text-xs">Delete</button>
-            </div>
-            <canvas id="gdd-chart-{{.ID}}" height="150"></canvas>
-            <script>
-                fetch('/api/gdd-values/{{.ID}}')
-                    .then(r => r.json())
-                    .then(data => {
-                        if (!data || !data.length) return;
-                        const labels = data.map(d => d.date.substring(0, 10));
-                        const cumGDD = data.map(d => d.cumulative_gdd);
-                        new Chart(document.getElementById('gdd-chart-{{.ID}}').getContext('2d'), {
-                            type: 'line',
-                            data: {
-                                labels: labels,
-                                datasets: [{
-                                    label: 'Cumulative GDD',
-                                    data: cumGDD,
-                                    borderColor: '#22c55e',
-                                    backgroundColor: 'rgba(34,197,94,0.1)',
-                                    fill: true
-                                }]
-                            },
-                            options: {
-                                responsive: true,
-                                plugins: {legend: {display: false}},
-                                scales: {x: {ticks: {maxTicksLimit: 8}}}
-                            }
-                        });
-                    });
-            </script>
-        </div>
-        {{end}}
+    {{if not .GDDModels}}
+    <div class="alert">
+        <span>No GDD models for this location. Create one above.</span>
     </div>
-    {{else if .SelectedLocationID}}
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center">
-        <p class="text-gray-500">No GDD models for this location.</p>
-    </div>
+    {{end}}
     {{end}}
 </div>
 {{end}}

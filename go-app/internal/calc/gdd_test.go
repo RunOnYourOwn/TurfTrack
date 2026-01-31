@@ -74,20 +74,20 @@ func TestCalculateGDDSeriesWithThresholdReset(t *testing.T) {
 		t.Error("first 3 values should be run 1")
 	}
 
-	// Day 4 should be run 2 with cumulative = 0 (reset day)
+	// Day 4 should be run 2 with cumulative = 15 (reset day starts new run with its own daily GDD)
 	if values[3].Run != 2 {
 		t.Errorf("day 4 run = %d, want 2", values[3].Run)
 	}
-	if values[3].CumulativeGDD != 0 {
-		t.Errorf("day 4 cumulative = %v, want 0 (reset day)", values[3].CumulativeGDD)
+	if math.Abs(values[3].CumulativeGDD-15) > 0.001 {
+		t.Errorf("day 4 cumulative = %v, want 15 (reset day includes daily)", values[3].CumulativeGDD)
 	}
 
-	// Day 5 should be run 2 with cumulative = 15
+	// Day 5 should be run 2 with cumulative = 30
 	if values[4].Run != 2 {
 		t.Errorf("day 5 run = %d, want 2", values[4].Run)
 	}
-	if math.Abs(values[4].CumulativeGDD-15) > 0.001 {
-		t.Errorf("day 5 cumulative = %v, want 15", values[4].CumulativeGDD)
+	if math.Abs(values[4].CumulativeGDD-30) > 0.001 {
+		t.Errorf("day 5 cumulative = %v, want 30", values[4].CumulativeGDD)
 	}
 }
 

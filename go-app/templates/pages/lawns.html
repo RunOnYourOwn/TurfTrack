@@ -2,117 +2,117 @@
 <div class="space-y-6">
     <div class="flex justify-between items-center">
         <h2 class="text-2xl font-bold">Lawns</h2>
-        <button onclick="document.getElementById('lawn-form').classList.toggle('hidden')"
-                class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
-            + Add Lawn
-        </button>
+        <button onclick="document.getElementById('lawn-form').classList.toggle('hidden')" class="btn btn-primary btn-sm">+ Add Lawn</button>
     </div>
 
     <!-- Add Lawn Form -->
-    <div id="lawn-form" class="hidden bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h3 class="text-lg font-semibold mb-4">New Lawn</h3>
-        <form hx-post="/lawns" hx-swap="none" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-                <label class="block text-sm font-medium mb-1">Name</label>
-                <input name="name" required class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600">
-            </div>
-            <div>
-                <label class="block text-sm font-medium mb-1">Area (sq ft)</label>
-                <input name="area" type="number" step="0.01" required class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600">
-            </div>
-            <div>
-                <label class="block text-sm font-medium mb-1">Grass Type</label>
-                <select name="grass_type" class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600">
-                    <option value="cold_season">Cool Season</option>
-                    <option value="warm_season">Warm Season</option>
-                </select>
-            </div>
-            <div>
-                <label class="block text-sm font-medium mb-1">Location</label>
-                <select name="location_id" id="loc-select" onchange="toggleNewLoc(this)" class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600">
-                    {{range .Locations}}
-                    <option value="{{.ID}}">{{.Name}}</option>
-                    {{end}}
-                    <option value="new">+ New Location</option>
-                </select>
-            </div>
-            <div id="new-loc-fields" class="hidden md:col-span-2 grid grid-cols-3 gap-4">
-                <div>
-                    <label class="block text-sm font-medium mb-1">Location Name</label>
-                    <input name="location_name" class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600">
+    <div id="lawn-form" class="hidden card bg-base-100 shadow-sm">
+        <div class="card-body">
+            <h3 class="card-title">New Lawn</h3>
+            <form hx-post="/lawns" hx-swap="none" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Name</span></label>
+                    <input name="name" required class="input input-bordered">
                 </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">Latitude</label>
-                    <input name="latitude" type="number" step="0.0001" class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600">
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Area (sq ft)</span></label>
+                    <input name="area" type="number" step="0.01" min="0" required class="input input-bordered">
                 </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">Longitude</label>
-                    <input name="longitude" type="number" step="0.0001" class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600">
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Grass Type</span></label>
+                    <select name="grass_type" required class="select select-bordered">
+                        <option value="cold_season">Cool Season</option>
+                        <option value="warm_season">Warm Season</option>
+                    </select>
                 </div>
-            </div>
-            <div>
-                <label class="block text-sm font-medium mb-1">Timezone</label>
-                <input name="timezone" value="America/Chicago" class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600">
-            </div>
-            <div>
-                <label class="block text-sm font-medium mb-1">Notes</label>
-                <input name="notes" class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600">
-            </div>
-            <div class="flex items-end">
-                <label class="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" name="weather_enabled" checked class="rounded">
-                    <span class="text-sm">Weather Enabled</span>
-                </label>
-            </div>
-            <div class="md:col-span-2">
-                <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Create Lawn</button>
-            </div>
-        </form>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Location</span></label>
+                    <select name="location_id" id="location-select" onchange="toggleNewLoc(this.value)" class="select select-bordered">
+                        {{range .Locations}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+                        <option value="new">+ New Location</option>
+                    </select>
+                </div>
+                <div id="new-loc-fields" class="hidden md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="form-control">
+                        <label class="label"><span class="label-text">Location Name</span></label>
+                        <input name="location_name" class="input input-bordered">
+                    </div>
+                    <div class="form-control">
+                        <label class="label"><span class="label-text">Latitude</span></label>
+                        <input name="latitude" type="number" step="0.0001" class="input input-bordered">
+                    </div>
+                    <div class="form-control">
+                        <label class="label"><span class="label-text">Longitude</span></label>
+                        <input name="longitude" type="number" step="0.0001" class="input input-bordered">
+                    </div>
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Timezone</span></label>
+                    <input name="timezone" value="America/Chicago" class="input input-bordered">
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Notes</span></label>
+                    <input name="notes" class="input input-bordered">
+                </div>
+                <div class="form-control">
+                    <label class="label cursor-pointer justify-start gap-2">
+                        <input name="weather_enabled" type="checkbox" checked class="checkbox checkbox-primary">
+                        <span class="label-text">Enable Weather Fetching</span>
+                    </label>
+                </div>
+                <div class="md:col-span-2">
+                    <button type="submit" class="btn btn-primary">Create Lawn</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <!-- Lawns Table -->
     {{if .Lawns}}
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-        <table class="w-full text-sm">
-            <thead class="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                    <th class="px-4 py-3 text-left font-medium">Location</th>
-                    <th class="px-4 py-3 text-left font-medium">Name</th>
-                    <th class="px-4 py-3 text-left font-medium">Area</th>
-                    <th class="px-4 py-3 text-left font-medium">Grass Type</th>
-                    <th class="px-4 py-3 text-left font-medium">Weather</th>
-                    <th class="px-4 py-3 text-left font-medium">Notes</th>
-                    <th class="px-4 py-3 text-right font-medium">Actions</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                {{range .Lawns}}
-                <tr class="hover:bg-gray-50 dark:hover:bg-gray-750">
-                    <td class="px-4 py-3">{{if .Location}}{{.Location.Name}}{{end}}</td>
-                    <td class="px-4 py-3 font-medium">{{.Name}}</td>
-                    <td class="px-4 py-3">{{formatFloat .Area 0}} sq ft</td>
-                    <td class="px-4 py-3">{{.GrassType}}</td>
-                    <td class="px-4 py-3">{{if .WeatherEnabled}}On{{else}}Off{{end}}</td>
-                    <td class="px-4 py-3 text-gray-500">{{nullStr .Notes}}</td>
-                    <td class="px-4 py-3 text-right">
-                        <button hx-delete="/lawns/{{.ID}}" hx-confirm="Delete this lawn?"
-                                class="text-red-600 hover:text-red-800 text-xs">Delete</button>
-                    </td>
-                </tr>
-                {{end}}
-            </tbody>
-        </table>
+    <div class="card bg-base-100 shadow-sm">
+        <div class="card-body p-0">
+            <div class="overflow-x-auto">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Area</th>
+                            <th>Grass Type</th>
+                            <th>Location</th>
+                            <th>Weather</th>
+                            <th>Created</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .Lawns}}
+                        <tr>
+                            <td class="font-medium">{{.Name}}</td>
+                            <td>{{formatFloat .Area 0}} sq ft</td>
+                            <td><span class="badge badge-outline badge-sm">{{.GrassType}}</span></td>
+                            <td>{{if .Location}}{{.Location.Name}}{{end}}</td>
+                            <td>{{if .WeatherEnabled}}<span class="badge badge-success badge-sm">On</span>{{else}}<span class="badge badge-ghost badge-sm">Off</span>{{end}}</td>
+                            <td>{{formatDate .CreatedAt}}</td>
+                            <td>
+                                <button hx-delete="/lawns/{{.ID}}" hx-confirm="Delete lawn '{{.Name}}'? This will also delete all related data." class="btn btn-ghost btn-xs text-error">Delete</button>
+                            </td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
     {{else}}
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center">
-        <p class="text-gray-500">No lawns yet. Click "Add Lawn" to create one.</p>
+    <div class="alert">
+        <span>No lawns yet. Click "Add Lawn" to create one.</span>
     </div>
     {{end}}
 </div>
 
 <script>
-function toggleNewLoc(sel) {
-    document.getElementById('new-loc-fields').classList.toggle('hidden', sel.value !== 'new');
+function toggleNewLoc(val) {
+    document.getElementById('new-loc-fields').classList.toggle('hidden', val !== 'new');
 }
 </script>
 {{end}}

@@ -46,13 +46,13 @@ func NewServer(db *sql.DB, templatesDir string) (*Server, error) {
 		},
 		"statusBadge": func(s string) template.HTML {
 			colors := map[string]string{
-				"excellent": "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-				"good":      "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-				"warning":   "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-				"critical":  "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+				"excellent": "badge-success",
+				"good":      "badge-info",
+				"warning":   "badge-warning",
+				"critical":  "badge-error",
 			}
 			cls := colors[s]
-			return template.HTML(fmt.Sprintf(`<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium %s">%s</span>`, cls, s))
+			return template.HTML(fmt.Sprintf(`<span class="badge %s badge-sm">%s</span>`, cls, s))
 		},
 		"json": func(v interface{}) template.JS {
 			b, _ := json.Marshal(v)

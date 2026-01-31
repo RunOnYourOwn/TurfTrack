@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.23-alpine AS build
+FROM golang:1.24-alpine AS build
 
 WORKDIR /app
 
@@ -27,13 +27,12 @@ WORKDIR /app
 COPY --from=build /server /app/server
 COPY --from=build /app/migrations /app/migrations
 COPY --from=build /app/templates /app/templates
-COPY --from=build /app/static /app/static
 
 # Environment defaults
 ENV PORT=8080
 ENV MIGRATIONS_DIR=/app/migrations
 ENV TEMPLATES_DIR=/app/templates
-ENV STATIC_DIR=/app/static
+
 
 EXPOSE 8080
 

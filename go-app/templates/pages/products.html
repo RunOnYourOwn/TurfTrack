@@ -2,90 +2,88 @@
 <div class="space-y-6">
     <div class="flex justify-between items-center">
         <h2 class="text-2xl font-bold">Products</h2>
-        <button onclick="document.getElementById('product-form').classList.toggle('hidden')"
-                class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
-            + Add Product
-        </button>
+        <button onclick="document.getElementById('product-form').classList.toggle('hidden')" class="btn btn-primary btn-sm">+ Add Product</button>
     </div>
 
-    <!-- Add Product Form -->
-    <div id="product-form" class="hidden bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h3 class="text-lg font-semibold mb-4">New Product</h3>
-        <form hx-post="/products" hx-swap="none" class="space-y-4">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="md:col-span-3">
-                    <label class="block text-sm font-medium mb-1">Name</label>
-                    <input name="name" required class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600">
+    <div id="product-form" class="hidden card bg-base-100 shadow-sm">
+        <div class="card-body">
+            <h3 class="card-title">New Product</h3>
+            <form hx-post="/products" hx-swap="none" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="md:col-span-3 form-control">
+                        <label class="label"><span class="label-text">Name</span></label>
+                        <input name="name" required class="input input-bordered">
+                    </div>
+                    <div class="form-control">
+                        <label class="label"><span class="label-text">N %</span></label>
+                        <input name="n_pct" type="number" step="0.01" value="0" class="input input-bordered">
+                    </div>
+                    <div class="form-control">
+                        <label class="label"><span class="label-text">P %</span></label>
+                        <input name="p_pct" type="number" step="0.01" value="0" class="input input-bordered">
+                    </div>
+                    <div class="form-control">
+                        <label class="label"><span class="label-text">K %</span></label>
+                        <input name="k_pct" type="number" step="0.01" value="0" class="input input-bordered">
+                    </div>
+                    <div class="form-control">
+                        <label class="label"><span class="label-text">Fe %</span></label>
+                        <input name="fe_pct" type="number" step="0.01" value="0" class="input input-bordered">
+                    </div>
+                    <div class="form-control">
+                        <label class="label"><span class="label-text">Weight (lbs)</span></label>
+                        <input name="weight_lbs" type="number" step="0.01" class="input input-bordered">
+                    </div>
+                    <div class="form-control">
+                        <label class="label"><span class="label-text">Cost per Bag ($)</span></label>
+                        <input name="cost_per_bag" type="number" step="0.01" class="input input-bordered">
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">N %</label>
-                    <input name="n_pct" type="number" step="0.01" value="0" class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">P %</label>
-                    <input name="p_pct" type="number" step="0.01" value="0" class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">K %</label>
-                    <input name="k_pct" type="number" step="0.01" value="0" class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">Fe %</label>
-                    <input name="fe_pct" type="number" step="0.01" value="0" class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">Weight (lbs)</label>
-                    <input name="weight_lbs" type="number" step="0.01" class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">Cost per Bag</label>
-                    <input name="cost_per_bag" type="number" step="0.01" class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600">
-                </div>
-            </div>
-            <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Create Product</button>
-        </form>
+                <button type="submit" class="btn btn-primary">Create Product</button>
+            </form>
+        </div>
     </div>
 
-    <!-- Products Table -->
     {{if .Products}}
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-x-auto">
-        <table class="w-full text-sm">
-            <thead class="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                    <th class="px-4 py-3 text-left font-medium">Name</th>
-                    <th class="px-4 py-3 text-right font-medium">N</th>
-                    <th class="px-4 py-3 text-right font-medium">P</th>
-                    <th class="px-4 py-3 text-right font-medium">K</th>
-                    <th class="px-4 py-3 text-right font-medium">Fe</th>
-                    <th class="px-4 py-3 text-right font-medium">Weight</th>
-                    <th class="px-4 py-3 text-right font-medium">$/Bag</th>
-                    <th class="px-4 py-3 text-right font-medium">$/lb N</th>
-                    <th class="px-4 py-3 text-right font-medium">Actions</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                {{range .Products}}
-                <tr class="hover:bg-gray-50 dark:hover:bg-gray-750">
-                    <td class="px-4 py-3 font-medium">{{.Name}}</td>
-                    <td class="px-4 py-3 text-right">{{pctToStr .NPct}}</td>
-                    <td class="px-4 py-3 text-right">{{pctToStr .PPct}}</td>
-                    <td class="px-4 py-3 text-right">{{pctToStr .KPct}}</td>
-                    <td class="px-4 py-3 text-right">{{pctToStr .FePct}}</td>
-                    <td class="px-4 py-3 text-right">{{formatFloatPtr .WeightLbs 1}} lbs</td>
-                    <td class="px-4 py-3 text-right">${{formatFloatPtr .CostPerBag 2}}</td>
-                    <td class="px-4 py-3 text-right">${{formatFloatPtr .CostPerLbN 2}}</td>
-                    <td class="px-4 py-3 text-right">
-                        <button hx-delete="/products/{{.ID}}" hx-confirm="Delete this product?"
-                                class="text-red-600 hover:text-red-800 text-xs">Delete</button>
-                    </td>
-                </tr>
-                {{end}}
-            </tbody>
-        </table>
+    <div class="card bg-base-100 shadow-sm">
+        <div class="card-body p-0">
+            <div class="overflow-x-auto">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th class="text-right">N-P-K</th>
+                            <th class="text-right">Fe %</th>
+                            <th class="text-right">Weight</th>
+                            <th class="text-right">$/Bag</th>
+                            <th class="text-right">$/lb N</th>
+                            <th class="text-right">$/lb</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .Products}}
+                        <tr>
+                            <td class="font-medium">{{.Name}}</td>
+                            <td class="text-right">{{formatFloat .NPct 1}}-{{formatFloat .PPct 1}}-{{formatFloat .KPct 1}}</td>
+                            <td class="text-right">{{formatFloat .FePct 1}}</td>
+                            <td class="text-right">{{formatFloatPtr .WeightLbs 1}} lbs</td>
+                            <td class="text-right">{{formatFloatPtr .CostPerBag 2}}</td>
+                            <td class="text-right">{{formatFloatPtr .CostPerLbN 2}}</td>
+                            <td class="text-right">{{formatFloatPtr .CostPerLb 2}}</td>
+                            <td>
+                                <button hx-delete="/products/{{.ID}}" hx-confirm="Delete product '{{.Name}}'?" class="btn btn-ghost btn-xs text-error">Delete</button>
+                            </td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
     {{else}}
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center">
-        <p class="text-gray-500">No products yet. Click "Add Product" to create one.</p>
+    <div class="alert">
+        <span>No products yet. Click "Add Product" to create one.</span>
     </div>
     {{end}}
 </div>

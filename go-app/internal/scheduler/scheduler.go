@@ -147,7 +147,7 @@ func calculateAndStoreDisease(db *sql.DB, locationID int, weatherData []model.Da
 		_, err := db.Exec(`
 			INSERT INTO disease_pressure (date, location_id, disease, risk_score)
 			VALUES ($1, $2, 'smith_kerns', $3)
-			ON CONFLICT DO NOTHING`,
+			ON CONFLICT (date, location_id, disease) DO UPDATE SET risk_score=EXCLUDED.risk_score`,
 			date, locationID, *risk)
 		if err != nil {
 			log.Printf("[scheduler] Failed to store disease pressure: %v", err)
@@ -302,9 +302,13 @@ func calculateWaterForLawn(db *sql.DB, lawnID, locationID int, start, end time.T
 
 		_, err = db.Exec(`
 			INSERT INTO weekly_water_summaries (lawn_id, week_start, week_end, et0_total, precipitation_total,
-				irrigation_applied, water_deficit, status, is_forecast)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-			ON CONFLICT DO NOTHING`,
+				irrigation_applied, water_deficit, status, is_forecast, updated_at)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
+			ON CONFLICT (lawn_id, week_start) DO UPDATE SET
+				week_end=EXCLUDED.week_end, et0_total=EXCLUDED.et0_total,
+				precipitation_total=EXCLUDED.precipitation_total, irrigation_applied=EXCLUDED.irrigation_applied,
+				water_deficit=EXCLUDED.water_deficit, status=EXCLUDED.status,
+				is_forecast=EXCLUDED.is_forecast, updated_at=NOW()`,
 			lawnID, weekStart, weekEnd, et0Total, precipTotal, irrigTotal, deficit, status, hasForecast)
 		if err != nil {
 			log.Printf("[scheduler] Failed to store water summary: %v", err)

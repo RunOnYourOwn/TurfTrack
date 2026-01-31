@@ -22,16 +22,16 @@ func CalculateGDDSeries(weather []WeatherDay, baseTemp, threshold float64, reset
 
 		if resetNext {
 			run++
-			cumulative = 0
+			cumulative = daily // new run starts with this day's GDD
 			resetNext = false
-			// On reset day, cumulative stays 0
 			results[i] = GDDResult{
 				DailyGDD:      daily,
-				CumulativeGDD: 0,
+				CumulativeGDD: cumulative,
 				Run:           run,
 			}
-			// Start accumulating from next day
-			cumulative = 0
+			if resetOnThreshold && cumulative >= threshold {
+				resetNext = true
+			}
 			continue
 		}
 

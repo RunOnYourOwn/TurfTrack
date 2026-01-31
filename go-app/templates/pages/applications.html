@@ -2,102 +2,117 @@
 <div class="space-y-6">
     <div class="flex justify-between items-center">
         <h2 class="text-2xl font-bold">Applications</h2>
-        <button onclick="document.getElementById('app-form').classList.toggle('hidden')"
-                class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
-            + Log Application
-        </button>
+        <button onclick="document.getElementById('app-form').classList.toggle('hidden')" class="btn btn-primary btn-sm">+ Log Application</button>
     </div>
 
-    <div id="app-form" class="hidden bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h3 class="text-lg font-semibold mb-4">New Application</h3>
-        <form hx-post="/applications" hx-swap="none" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-                <label class="block text-sm font-medium mb-1">Lawn</label>
-                <select name="lawn_id" required class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600">
-                    {{range .Lawns}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
-                </select>
-            </div>
-            <div>
-                <label class="block text-sm font-medium mb-1">Product</label>
-                <select name="product_id" required class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600">
-                    {{range .Products}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
-                </select>
-            </div>
-            <div>
-                <label class="block text-sm font-medium mb-1">Date</label>
-                <input name="application_date" type="date" required class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600">
-            </div>
-            <div>
-                <label class="block text-sm font-medium mb-1">Amount per Area</label>
-                <input name="amount_per_area" type="number" step="0.01" required class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600">
-            </div>
-            <div>
-                <label class="block text-sm font-medium mb-1">Unit</label>
-                <select name="unit" class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600">
-                    <option value="lbs">lbs</option>
-                    <option value="oz">oz</option>
-                    <option value="bags">bags</option>
-                    <option value="gal">gal</option>
-                    <option value="fl_oz">fl oz</option>
-                </select>
-            </div>
-            <div>
-                <label class="block text-sm font-medium mb-1">Status</label>
-                <select name="status" class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600">
-                    <option value="completed">Completed</option>
-                    <option value="planned">Planned</option>
-                    <option value="skipped">Skipped</option>
-                </select>
-            </div>
-            <div class="md:col-span-2">
-                <label class="block text-sm font-medium mb-1">Notes</label>
-                <input name="notes" class="w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600">
-            </div>
-            <div class="md:col-span-3">
-                <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Log Application</button>
-            </div>
-        </form>
+    <div id="app-form" class="hidden card bg-base-100 shadow-sm">
+        <div class="card-body">
+            <h3 class="card-title">New Application</h3>
+            <form hx-post="/applications" hx-swap="none" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Lawn</span></label>
+                    <select name="lawn_id" required class="select select-bordered">
+                        {{range .Lawns}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+                    </select>
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Product</span></label>
+                    <select name="product_id" required class="select select-bordered">
+                        {{range .Products}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+                    </select>
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Date</span></label>
+                    <input name="application_date" type="date" required class="input input-bordered">
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Amount per Area</span></label>
+                    <input name="amount_per_area" type="number" step="0.01" required class="input input-bordered">
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Unit</span></label>
+                    <select name="unit" class="select select-bordered">
+                        <option value="lbs">lbs</option>
+                        <option value="oz">oz</option>
+                        <option value="kg">kg</option>
+                        <option value="g">g</option>
+                        <option value="gal">gal</option>
+                        <option value="fl_oz">fl oz</option>
+                        <option value="L">L</option>
+                        <option value="mL">mL</option>
+                    </select>
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Area Unit (sq ft)</span></label>
+                    <input name="area_unit" type="number" value="1000" class="input input-bordered">
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Status</span></label>
+                    <select name="status" class="select select-bordered">
+                        <option value="completed">Completed</option>
+                        <option value="planned">Planned</option>
+                        <option value="skipped">Skipped</option>
+                    </select>
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Notes</span></label>
+                    <input name="notes" class="input input-bordered">
+                </div>
+                <div class="md:col-span-3">
+                    <button type="submit" class="btn btn-primary">Log Application</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     {{if .Applications}}
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-x-auto">
-        <table class="w-full text-sm">
-            <thead class="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                    <th class="px-4 py-3 text-left font-medium">Date</th>
-                    <th class="px-4 py-3 text-left font-medium">Lawn</th>
-                    <th class="px-4 py-3 text-left font-medium">Product</th>
-                    <th class="px-4 py-3 text-right font-medium">Amount</th>
-                    <th class="px-4 py-3 text-right font-medium">N Applied</th>
-                    <th class="px-4 py-3 text-right font-medium">Cost</th>
-                    <th class="px-4 py-3 text-left font-medium">Status</th>
-                    <th class="px-4 py-3 text-right font-medium">Actions</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                {{$lawnMap := .LawnMap}}
-                {{$productMap := .ProductMap}}
-                {{range .Applications}}
-                <tr class="hover:bg-gray-50 dark:hover:bg-gray-750">
-                    <td class="px-4 py-3">{{formatDate .ApplicationDate}}</td>
-                    <td class="px-4 py-3">{{with index $lawnMap .LawnID}}{{.Name}}{{end}}</td>
-                    <td class="px-4 py-3">{{with index $productMap .ProductID}}{{.Name}}{{end}}</td>
-                    <td class="px-4 py-3 text-right">{{formatFloat .AmountPerArea 2}} {{.Unit}}</td>
-                    <td class="px-4 py-3 text-right">{{formatFloatPtr .NApplied 3}} lbs</td>
-                    <td class="px-4 py-3 text-right">${{formatFloatPtr .CostApplied 2}}</td>
-                    <td class="px-4 py-3">{{.Status}}</td>
-                    <td class="px-4 py-3 text-right">
-                        <button hx-delete="/applications/{{.ID}}" hx-confirm="Delete this application?"
-                                class="text-red-600 hover:text-red-800 text-xs">Delete</button>
-                    </td>
-                </tr>
-                {{end}}
-            </tbody>
-        </table>
+    <div class="card bg-base-100 shadow-sm">
+        <div class="card-body p-0">
+            <div class="overflow-x-auto">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Lawn</th>
+                            <th>Product</th>
+                            <th class="text-right">Amount</th>
+                            <th>Status</th>
+                            <th class="text-right">N</th>
+                            <th class="text-right">P</th>
+                            <th class="text-right">K</th>
+                            <th class="text-right">Cost</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .Applications}}
+                        <tr>
+                            <td>{{formatDate .ApplicationDate}}</td>
+                            <td>{{$lawn := index $.LawnMap .LawnID}}{{if $lawn}}{{$lawn.Name}}{{end}}</td>
+                            <td>{{$prod := index $.ProductMap .ProductID}}{{if $prod}}{{$prod.Name}}{{end}}</td>
+                            <td class="text-right">{{formatFloat .AmountPerArea 2}} {{.Unit}}</td>
+                            <td>
+                                {{if eq (printf "%s" .Status) "completed"}}<span class="badge badge-success badge-sm">completed</span>
+                                {{else if eq (printf "%s" .Status) "planned"}}<span class="badge badge-warning badge-sm">planned</span>
+                                {{else}}<span class="badge badge-ghost badge-sm">{{.Status}}</span>{{end}}
+                            </td>
+                            <td class="text-right">{{formatFloatPtr .NApplied 3}}</td>
+                            <td class="text-right">{{formatFloatPtr .PApplied 3}}</td>
+                            <td class="text-right">{{formatFloatPtr .KApplied 3}}</td>
+                            <td class="text-right">{{formatFloatPtr .CostApplied 2}}</td>
+                            <td>
+                                <button hx-delete="/applications/{{.ID}}" hx-confirm="Delete this application?" class="btn btn-ghost btn-xs text-error">Delete</button>
+                            </td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
     {{else}}
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center">
-        <p class="text-gray-500">No applications logged yet.</p>
+    <div class="alert">
+        <span>No applications yet. Click "Log Application" to add one.</span>
     </div>
     {{end}}
 </div>

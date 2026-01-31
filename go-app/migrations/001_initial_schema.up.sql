@@ -194,9 +194,9 @@ CREATE TABLE IF NOT EXISTS disease_pressure (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_disease_pressure_unique ON disease_pressure(date, location_id, disease);
 CREATE INDEX IF NOT EXISTS idx_disease_pressure_date ON disease_pressure(date);
 CREATE INDEX IF NOT EXISTS idx_disease_pressure_location ON disease_pressure(location_id);
-CREATE INDEX IF NOT EXISTS idx_disease_pressure_disease ON disease_pressure(disease);
 
 -- Growth Potential
 CREATE TABLE IF NOT EXISTS growth_potential (
@@ -245,8 +245,8 @@ CREATE TABLE IF NOT EXISTS weekly_water_summaries (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_water_summary_unique ON weekly_water_summaries(lawn_id, week_start);
 CREATE INDEX IF NOT EXISTS idx_water_summary_week ON weekly_water_summaries(week_start);
-CREATE INDEX IF NOT EXISTS idx_water_summary_lawn ON weekly_water_summaries(lawn_id);
 
 -- Weed Species
 CREATE TABLE IF NOT EXISTS weed_species (
