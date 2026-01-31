@@ -3,123 +3,298 @@ name: CI
 on:
   push:
     branches:
-      - "main"
-      - "release/*"
+      - main
+    paths-ignore:
+      - 'docs/**'
+      - '.claude/**'
+      - '*.md'
   pull_request:
     branches:
-      - "main"
-      - "release/*"
+      - main
+    paths-ignore:
+      - 'docs/**'
+      - '.claude/**'
+      - '*.md'
+
+# Cancel in-progress runs when a new commit is pushed to the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  test:
-    name: Test and Analyze
-    runs-on: ubuntu-latest
+  # Run Go unit tests
+  test-go:
+    runs-on: [self-hosted, Linux]
     permissions:
       contents: read
-      checks: write
       pull-requests: write
+    steps:
+      - name: Pre-checkout cleanup
+        run: |
+          echo "Cleaning workspace before checkout..."
+          rm -rf $GITHUB_WORKSPACE/* || true
+          rm -rf $GITHUB_WORKSPACE/.git || true
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: false  # Disable built-in cache on self-hosted runner
+
+      - name: Run Go unit tests with coverage
+        working-directory: go-app
+        run: |
+          go test ./... -race -count=1 -coverprofile=coverage.out -covermode=atomic -v 2>&1 | tee test-output.txt
+
+      - name: Generate test summary
+        if: always()
+        working-directory: go-app
+        run: |
+          TOTAL_COVERAGE=$(go tool cover -func=coverage.out 2>/dev/null | grep "^total:" | awk '{print $NF}' || echo "N/A")
+
+          # Count test results more robustly - grep returns count, handle empty/error cases
+          TEST_PASSED=$(grep -c "^--- PASS:" test-output.txt 2>/dev/null || echo 0)
+          TEST_PASSED=${TEST_PASSED:-0}
+          TEST_PASSED=$(echo "$TEST_PASSED" | tr -d '[:space:]' | head -c 10)
+
+          TEST_FAILED=$(grep -c "^--- FAIL:" test-output.txt 2>/dev/null || echo 0)
+          TEST_FAILED=${TEST_FAILED:-0}
+          TEST_FAILED=$(echo "$TEST_FAILED" | tr -d '[:space:]' | head -c 10)
+
+          # Ensure we have valid integers
+          [[ "$TEST_PASSED" =~ ^[0-9]+$ ]] || TEST_PASSED=0
+          [[ "$TEST_FAILED" =~ ^[0-9]+$ ]] || TEST_FAILED=0
+
+          SUMMARY="## Go Test Results\n\n"
+
+          if [ "$TEST_FAILED" -gt 0 ]; then
+            SUMMARY+=":x: **${TEST_PASSED} passed, ${TEST_FAILED} failed** | Coverage: ${TOTAL_COVERAGE}\n"
+          else
+            SUMMARY+=":white_check_mark: **${TEST_PASSED} passed** | Coverage: ${TOTAL_COVERAGE}\n"
+          fi
+
+          SUMMARY+="\n| Package | Coverage |\n"
+          SUMMARY+="|---------|----------|\n"
+
+          # Parse per-package coverage from test output (lines like: "ok  pkg  1.2s  coverage: 84.3% of statements")
+          while IFS= read -r line; do
+            PKG=$(echo "$line" | awk '{print $2}')
+            COV=$(echo "$line" | grep -o 'coverage: [0-9.]*%' | grep -o '[0-9.]*%')
+            if [ -n "$COV" ]; then
+              SHORT=$(echo "$PKG" | sed 's|github.com/RunOnYourOwn/TurfTrack/go-app/||')
+              SUMMARY+="| \`${SHORT}\` | ${COV} |\n"
+            fi
+          done < <(grep "^ok" test-output.txt 2>/dev/null)
+
+          printf '%b' "$SUMMARY" >> $GITHUB_STEP_SUMMARY
+
+      - name: Run Go lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          working-directory: go-app
+          version: latest
+          install-mode: goinstall
+
+      - name: Build Go binary
+        working-directory: go-app
+        run: |
+          CGO_ENABLED=0 go build -o /dev/null ./cmd/server
+
+      - name: Cleanup workspace
+        if: always()
+        run: rm -rf $GITHUB_WORKSPACE/*
+
+  # Run Go integration tests
+  test-integration:
+    runs-on: [self-hosted, Linux]
+    permissions:
+      contents: read
     services:
       postgres:
-        image: postgres:16
+        image: postgres:16-alpine
         env:
+          POSTGRES_USER: turftrack
+          POSTGRES_PASSWORD: turftrack
           POSTGRES_DB: turftrack_test
-          POSTGRES_USER: test_user
-          POSTGRES_PASSWORD: test_password
         ports:
           - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U test_user -d turftrack_test" --health-interval=5s --health-timeout=5s --health-retries=5
-      redis:
-        image: redis:7
-        ports:
-          - 6379:6379
+        options: --health-cmd="pg_isready -U turftrack -d turftrack_test" --health-interval=5s --health-timeout=5s --health-retries=5
     env:
-      TEST_DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/turftrack_test
-      TEST_REDIS_URL: redis://localhost:6379/1
-      PYTHONUNBUFFERED: 1
-      DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/turftrack_test
-      REDIS_URL: redis://localhost:6379/0
-      CELERY_BROKER_URL: redis://localhost:6379/0
-      CELERY_RESULT_BACKEND: redis://localhost:6379/0
-      REDBEAT_REDIS_URL: redis://localhost:6379/0
-      ALEMBIC_DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/turftrack_test
+      TEST_DATABASE_URL: "host=localhost port=5432 user=turftrack password=turftrack dbname=turftrack_test sslmode=disable"
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
-
-      - name: Create virtual environment
-        working-directory: backend
-        run: uv venv
-
-      - name: Install dependencies
-        working-directory: backend
-        run: uv pip install -e .
-
-      - name: Set up database
-        working-directory: backend
-        run: uv run alembic upgrade head
-
-      - name: Run tests with coverage
-        id: tests
-        working-directory: backend
-        run: uv run pytest --cov=app --cov-report=xml --junitxml=pytest-report.xml
-
-      - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-data
-          path: backend/coverage.xml
-
-      - name: Publish Test Report
-        uses: EnricoMi/publish-unit-test-result-action@v2
-        if: always()
-        with:
-          files: backend/pytest-report.xml
-
-      - name: Generate coverage badge
-        working-directory: backend
+      - name: Pre-checkout cleanup
         run: |
-          COVERAGE=$(python -c "import xml.etree.ElementTree as ET; tree = ET.parse('coverage.xml'); root = tree.getroot(); coverage = float(root.attrib['line-rate']) * 100; print(f'{coverage:.1f}')")
-          echo "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"120\" height=\"20\"><rect width=\"120\" height=\"20\" fill=\"#555\"/><rect width=\"60\" height=\"20\" fill=\"#007ec6\"/><rect x=\"60\" width=\"60\" height=\"20\" fill=\"#4c1\"/><text x=\"30\" y=\"14\" text-anchor=\"middle\" fill=\"white\" font-family=\"DejaVu Sans,Verdana,Geneva,sans-serif\" font-size=\"11\">coverage</text><text x=\"90\" y=\"14\" text-anchor=\"middle\" fill=\"white\" font-family=\"DejaVu Sans,Verdana,Geneva,sans-serif\" font-size=\"11\">${COVERAGE}%</text></svg>" > ../coverage-badge.svg
-          echo "Generated coverage badge with ${COVERAGE}% coverage"
+          echo "Cleaning workspace before checkout..."
+          rm -rf $GITHUB_WORKSPACE/* || true
+          rm -rf $GITHUB_WORKSPACE/.git || true
 
-  test-frontend:
-    name: Test Frontend
-    runs-on: ubuntu-latest
-    steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
+          go-version: '1.24'
+          cache: false
 
-      - name: Install dependencies
-        working-directory: frontend
-        run: npm ci
+      - name: Run integration tests
+        working-directory: go-app
+        run: |
+          go test ./... -tags integration -race -count=1 -v 2>&1 | tee integration-test-output.txt
 
-      - name: Run linting
-        working-directory: frontend
-        run: npm run lint || echo "Linting failed but continuing build - TypeScript fixes needed"
-        continue-on-error: true
+      - name: Generate integration test summary
+        if: always()
+        working-directory: go-app
+        run: |
+          TEST_PASSED=$(grep -c "^--- PASS:" integration-test-output.txt 2>/dev/null || echo 0)
+          TEST_PASSED=${TEST_PASSED:-0}
+          TEST_PASSED=$(echo "$TEST_PASSED" | tr -d '[:space:]' | head -c 10)
 
-      - name: Build production bundle
-        working-directory: frontend
-        run: npm run build
+          TEST_FAILED=$(grep -c "^--- FAIL:" integration-test-output.txt 2>/dev/null || echo 0)
+          TEST_FAILED=${TEST_FAILED:-0}
+          TEST_FAILED=$(echo "$TEST_FAILED" | tr -d '[:space:]' | head -c 10)
 
+          [[ "$TEST_PASSED" =~ ^[0-9]+$ ]] || TEST_PASSED=0
+          [[ "$TEST_FAILED" =~ ^[0-9]+$ ]] || TEST_FAILED=0
+
+          SUMMARY="## Integration Test Results\n\n"
+
+          if [ "$TEST_FAILED" -gt 0 ]; then
+            SUMMARY+=":x: **${TEST_PASSED} passed, ${TEST_FAILED} failed**\n"
+          else
+            SUMMARY+=":white_check_mark: **${TEST_PASSED} passed**\n"
+          fi
+
+          printf '%b' "$SUMMARY" >> $GITHUB_STEP_SUMMARY
+
+      - name: Cleanup workspace
+        if: always()
+        run: rm -rf $GITHUB_WORKSPACE/*
+
+  # Final status check
+  ci-status:
+    needs: [test-go, test-integration]
+    if: always()
+    runs-on: [self-hosted, Linux]
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: write
+    steps:
+      - name: Update PR comment with CI status
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runId = context.runId;
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
+
+            // Fetch jobs for this workflow run to get individual job URLs
+            const { data: jobsData } = await github.rest.actions.listJobsForWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: runId,
+            });
+
+            const jobs = jobsData.jobs;
+
+            const checks = [
+              {
+                jobName: 'test-go',
+                displayName: 'Go Unit Tests & Lint',
+                result: '${{ needs.test-go.result }}'
+              },
+              {
+                jobName: 'test-integration',
+                displayName: 'Go Integration Tests',
+                result: '${{ needs.test-integration.result }}'
+              }
+            ];
+
+            let comment = `## CI/CD Status\n\n`;
+            comment += `All checks must pass before merging to main:\n\n`;
+
+            let allPassed = true;
+
+            for (const check of checks) {
+              const job = jobs.find(j => j.name === check.jobName);
+              const jobUrl = job ? job.html_url : runUrl;
+
+              let icon = '';
+              let checkbox = '[ ]';
+
+              if (check.result === 'success') {
+                icon = 'PASS';
+                checkbox = '[x]';
+              } else if (check.result === 'failure') {
+                icon = 'FAIL';
+                checkbox = '[ ]';
+                allPassed = false;
+              } else if (check.result === 'cancelled') {
+                icon = 'CANCELLED';
+                checkbox = '[ ]';
+                allPassed = false;
+              } else if (check.result === 'skipped') {
+                icon = 'SKIPPED';
+                checkbox = '[ ]';
+              }
+
+              comment += `- ${checkbox} ${icon} **${check.displayName}** - [View Details](${jobUrl})\n`;
+            }
+
+            const overallStatus = allPassed ? 'All Checks Passed' : 'Some Checks Failed';
+            comment += `\n**Overall Status**: ${overallStatus}\n`;
+            comment += `\n[View Full CI Run](${runUrl})`;
+
+            // Find existing CI comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(c => c.user.type === 'Bot' && c.body.includes('CI/CD Status'));
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: comment,
+              });
+              console.log('Updated existing PR comment');
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment,
+              });
+              console.log('Created new PR comment');
+            }
+
+      - name: Check CI status
+        run: |
+          if [[ "${{ needs.test-go.result }}" == "failure" || \
+                "${{ needs.test-integration.result }}" == "failure" ]]; then
+            echo "CI pipeline failed"
+            exit 1
+          fi
+          echo "CI pipeline passed"
+
+      - name: Cleanup workspace
+        if: always()
+        run: |
+          echo "Cleaning up workspace for self-hosted runner..."
+          rm -rf $GITHUB_WORKSPACE/*
+          echo "Workspace cleaned"
+
+  # Deploy documentation to GitHub Pages
   deploy-docs:
-    needs: test-frontend
+    needs: [test-go, test-integration]
     name: Deploy Documentation
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -131,7 +306,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Not needed if lastUpdated is not enabled
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -147,9 +322,6 @@ jobs:
       - name: Build documentation site
         working-directory: docs
         run: npm run docs:build
-
-      - name: List build output for debugging
-        run: ls -R docs/.vitepress/dist
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
