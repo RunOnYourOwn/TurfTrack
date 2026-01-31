@@ -15,17 +15,41 @@
     <style>
         .htmx-indicator { opacity: 0; transition: opacity 0.2s ease; }
         .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }
-        #sidebar { transition: width 0.2s ease, opacity 0.2s ease; }
-        #sidebar.collapsed { width: 0; overflow: hidden; opacity: 0; pointer-events: none; }
-        #open-sidebar { display: none; }
-        #sidebar.collapsed ~ main #open-sidebar { display: flex; }
+        /* Sidebar transition */
+        #sidebar { transition: width 0.2s ease; }
+        /* Collapsed: narrow icon column */
+        #sidebar.collapsed { width: 3.5rem; }
+        #sidebar.collapsed .nav-label,
+        #sidebar.collapsed .brand-text,
+        #sidebar.collapsed .sidebar-toggle-btn { display: none; }
+        #sidebar.collapsed .brand-icon { display: flex; }
+        #sidebar.collapsed .menu a { justify-content: center; padding-left: 0; padding-right: 0; }
+        /* Tooltip on hover when collapsed */
+        #sidebar.collapsed [data-tip] { position: relative; }
+        #sidebar.collapsed [data-tip]:hover::after {
+            content: attr(data-tip);
+            position: absolute;
+            left: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+            margin-left: 0.5rem;
+            padding: 0.25rem 0.75rem;
+            background: oklch(var(--n));
+            color: oklch(var(--nc));
+            border-radius: var(--rounded-btn, 0.5rem);
+            font-size: 0.75rem;
+            white-space: nowrap;
+            z-index: 50;
+        }
+        /* Open button: hidden by default, shown on hover over collapsed sidebar */
+        #sidebar-open-btn { display: none; }
+        #sidebar.collapsed:hover #sidebar-open-btn { display: flex; }
     </style>
     <script>
         // Restore saved theme
         (function() {
             const saved = localStorage.getItem('theme');
             if (saved) document.documentElement.setAttribute('data-theme', saved);
-            // Toggle flatpickr dark theme based on current theme
             var fpDark = document.getElementById('flatpickr-dark');
             if (fpDark) fpDark.disabled = (document.documentElement.getAttribute('data-theme') === 'emerald');
         })();
@@ -44,22 +68,21 @@
             }
             // Sidebar toggle
             var sidebar = document.getElementById('sidebar');
-            var btn = document.getElementById('sidebar-toggle');
-            if (sidebar && btn) {
+            var closeBtn = document.getElementById('sidebar-close');
+            var openBtn = document.getElementById('sidebar-open-btn');
+            if (sidebar) {
                 if (localStorage.getItem('sidebar') === 'collapsed') {
                     sidebar.classList.add('collapsed');
-                    btn.classList.add('swap-active');
                 }
-                btn.addEventListener('click', function() {
-                    sidebar.classList.toggle('collapsed');
-                    btn.classList.toggle('swap-active');
-                    localStorage.setItem('sidebar', sidebar.classList.contains('collapsed') ? 'collapsed' : 'open');
-                });
-                var openBtn = document.getElementById('open-sidebar');
+                if (closeBtn) {
+                    closeBtn.addEventListener('click', function() {
+                        sidebar.classList.add('collapsed');
+                        localStorage.setItem('sidebar', 'collapsed');
+                    });
+                }
                 if (openBtn) {
                     openBtn.addEventListener('click', function() {
                         sidebar.classList.remove('collapsed');
-                        btn.classList.remove('swap-active');
                         localStorage.setItem('sidebar', 'open');
                     });
                 }
@@ -71,14 +94,19 @@
     <!-- Sidebar -->
     <aside id="sidebar" class="w-48 bg-base-100 h-screen sticky top-0 flex flex-col overflow-y-auto">
         <!-- Brand -->
-        <div class="p-4 flex items-center justify-between">
-            <span class="text-xl font-bold text-primary">TurfTrack</span>
-            <button id="sidebar-toggle" class="btn btn-ghost btn-square swap swap-rotate">
-                <!-- Collapse icon: sidebar-left (shown when expanded) -->
-                <svg class="swap-off h-6 w-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"><path stroke-linecap="round" stroke-linejoin="round" d="M9 4.5v15m-4.875 0h15.75c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H4.125C3.504 4.5 3 5.004 3 5.625v12.75c0 .621.504 1.125 1.125 1.125Z" /></svg>
-                <!-- Expand icon: sidebar-right (shown when collapsed) -->
-                <svg class="swap-on h-6 w-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"><path stroke-linecap="round" stroke-linejoin="round" d="M15 4.5v15m4.875 0H4.125A1.125 1.125 0 0 1 3 18.375V5.625C3 5.004 3.504 4.5 4.125 4.5h15.75c.621 0 1.125.504 1.125 1.125v12.75c0 .621-.504 1.125-1.125 1.125z" /></svg>
+        <div class="p-3 flex items-center justify-between">
+            <!-- Expanded: full brand + close button -->
+            <span class="brand-text text-xl font-bold text-primary">TurfTrack</span>
+            <button id="sidebar-close" class="sidebar-toggle-btn btn btn-ghost btn-square btn-sm" title="Collapse sidebar">
+                <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"><path stroke-linecap="round" stroke-linejoin="round" d="M9 4.5v15m-4.875 0h15.75c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H4.125C3.504 4.5 3 5.004 3 5.625v12.75c0 .621.504 1.125 1.125 1.125Z" /></svg>
             </button>
+            <!-- Collapsed: T icon + hover-reveal open button -->
+            <div class="brand-icon hidden items-center justify-center w-full relative">
+                <span class="text-xl font-bold text-primary">T</span>
+                <button id="sidebar-open-btn" class="btn btn-ghost btn-square btn-sm absolute -right-1 top-1/2 -translate-y-1/2" title="Expand sidebar">
+                    <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"><path stroke-linecap="round" stroke-linejoin="round" d="M15 4.5v15m4.875 0H4.125A1.125 1.125 0 0 1 3 18.375V5.625C3 5.004 3.504 4.5 4.125 4.5h15.75c.621 0 1.125.504 1.125 1.125v12.75c0 .621-.504 1.125-1.125 1.125z" /></svg>
+                </button>
+            </div>
         </div>
 
         <!-- Navigation -->
@@ -128,11 +156,7 @@
     </aside>
 
     <!-- Main Content -->
-    <main class="flex-1 p-6 overflow-auto relative">
-        <!-- Floating open sidebar button (visible when sidebar is collapsed) -->
-        <button id="open-sidebar" class="btn btn-ghost btn-square absolute top-2 left-0 z-10">
-            <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"><path stroke-linecap="round" stroke-linejoin="round" d="M15 4.5v15m4.875 0H4.125A1.125 1.125 0 0 1 3 18.375V5.625C3 5.004 3.504 4.5 4.125 4.5h15.75c.621 0 1.125.504 1.125 1.125v12.75c0 .621-.504 1.125-1.125 1.125z" /></svg>
-        </button>
+    <main class="flex-1 p-6 overflow-auto">
         {{if eq .Page "dashboard"}}{{template "dashboard.html" .}}{{end}}
         {{if eq .Page "lawns"}}{{template "lawns.html" .}}{{end}}
         {{if eq .Page "products"}}{{template "products.html" .}}{{end}}
