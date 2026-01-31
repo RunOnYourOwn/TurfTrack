@@ -516,8 +516,84 @@ func CreateGDDModel(db *sql.DB, m *model.GDDModel) (*model.GDDModel, error) {
 	return m, err
 }
 
+func GetGDDModel(db *sql.DB, id int) (*model.GDDModel, error) {
+	var m model.GDDModel
+	err := db.QueryRow(
+		"SELECT id, location_id, name, base_temp, unit, start_date, threshold, reset_on_threshold, created_at, updated_at FROM gdd_models WHERE id = $1", id,
+	).Scan(&m.ID, &m.LocationID, &m.Name, &m.BaseTemp, &m.Unit, &m.StartDate,
+		&m.Threshold, &m.ResetOnThreshold, &m.CreatedAt, &m.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return &m, err
+}
+
+func UpdateGDDModel(db *sql.DB, m *model.GDDModel) (*model.GDDModel, error) {
+	err := db.QueryRow(`
+		UPDATE gdd_models SET name=$1, base_temp=$2, unit=$3, start_date=$4,
+		       threshold=$5, reset_on_threshold=$6, updated_at=NOW()
+		WHERE id=$7
+		RETURNING id, location_id, name, base_temp, unit, start_date, threshold, reset_on_threshold, created_at, updated_at`,
+		m.Name, m.BaseTemp, m.Unit, m.StartDate,
+		m.Threshold, m.ResetOnThreshold, m.ID,
+	).Scan(&m.ID, &m.LocationID, &m.Name, &m.BaseTemp, &m.Unit, &m.StartDate,
+		&m.Threshold, &m.ResetOnThreshold, &m.CreatedAt, &m.UpdatedAt)
+	return m, err
+}
+
 func DeleteGDDModel(db *sql.DB, id int) error {
 	_, err := db.Exec("DELETE FROM gdd_models WHERE id = $1", id)
+	return err
+}
+
+// --- GDD Resets ---
+
+func CreateGDDReset(db *sql.DB, modelID int, resetDate time.Time, resetType model.ResetType) (*model.GDDReset, error) {
+	// Determine next run_number for this model
+	var maxRun int
+	err := db.QueryRow("SELECT COALESCE(MAX(run_number), 0) FROM gdd_resets WHERE gdd_model_id = $1", modelID).Scan(&maxRun)
+	if err != nil {
+		return nil, err
+	}
+
+	var r model.GDDReset
+	err = db.QueryRow(`
+		INSERT INTO gdd_resets (gdd_model_id, reset_date, run_number, reset_type)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id, gdd_model_id, reset_date, run_number, reset_type, created_at`,
+		modelID, resetDate, maxRun+1, resetType,
+	).Scan(&r.ID, &r.GDDModelID, &r.ResetDate, &r.RunNumber, &r.ResetType, &r.CreatedAt)
+	return &r, err
+}
+
+func ListGDDResets(db *sql.DB, modelID int) ([]model.GDDReset, error) {
+	rows, err := db.Query(
+		"SELECT id, gdd_model_id, reset_date, run_number, reset_type, created_at FROM gdd_resets WHERE gdd_model_id = $1 ORDER BY reset_date",
+		modelID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close() //nolint:errcheck
+
+	var resets []model.GDDReset
+	for rows.Next() {
+		var r model.GDDReset
+		if err := rows.Scan(&r.ID, &r.GDDModelID, &r.ResetDate, &r.RunNumber, &r.ResetType, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		resets = append(resets, r)
+	}
+	return resets, rows.Err()
+}
+
+func DeleteGDDReset(db *sql.DB, id int) error {
+	_, err := db.Exec("DELETE FROM gdd_resets WHERE id = $1", id)
+	return err
+}
+
+// DeleteGDDResetsByType removes all resets of a given type for a model.
+func DeleteGDDResetsByType(db *sql.DB, modelID int, resetType model.ResetType) error {
+	_, err := db.Exec("DELETE FROM gdd_resets WHERE gdd_model_id = $1 AND reset_type = $2", modelID, resetType)
 	return err
 }
 

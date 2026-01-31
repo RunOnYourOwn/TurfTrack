@@ -10,10 +10,23 @@ import (
 )
 
 const baseURL = "https://api.open-meteo.com/v1/forecast"
+const defaultArchiveBaseURL = "https://archive-api.open-meteo.com/v1/archive"
+
+// archiveDailyVars is the same as forecast daily vars but without precipitation_probability_max
+// (which is not available in the archive API).
+const archiveDailyVars = "temperature_2m_max,temperature_2m_min,precipitation_sum," +
+	"windspeed_10m_max,windgusts_10m_max," +
+	"winddirection_10m_dominant,et0_fao_evapotranspiration," +
+	"relative_humidity_2m_mean,relative_humidity_2m_max,relative_humidity_2m_min," +
+	"dew_point_2m_max,dew_point_2m_min,dew_point_2m_mean,sunshine_duration"
+
+// maxChunkDays is the maximum number of days per archive API request.
+const maxChunkDays = 45
 
 // Client fetches weather data from Open-Meteo.
 type Client struct {
-	HTTPClient *http.Client
+	HTTPClient     *http.Client
+	ArchiveBaseURL string // empty = use defaultArchiveBaseURL; settable for testing
 }
 
 // NewClient creates a new Open-Meteo client.
@@ -154,6 +167,77 @@ func sanitizePtr(v float64) *float64 {
 		return nil
 	}
 	return &v
+}
+
+// FetchHistoricalWeather fetches weather data from the Open-Meteo Archive API
+// for the given date range. Chunks requests into maxChunkDays segments and
+// deduplicates results by date. Sleeps 1s between chunks as free-API courtesy.
+func (c *Client) FetchHistoricalWeather(lat, lon float64, startDate, endDate time.Time) ([]DailyData, error) {
+	archiveURL := c.ArchiveBaseURL
+	if archiveURL == "" {
+		archiveURL = defaultArchiveBaseURL
+	}
+
+	startDate = startDate.Truncate(24 * time.Hour)
+	endDate = endDate.Truncate(24 * time.Hour)
+	if endDate.Before(startDate) {
+		return nil, fmt.Errorf("endDate %s is before startDate %s", endDate.Format("2006-01-02"), startDate.Format("2006-01-02"))
+	}
+
+	seen := map[string]bool{}
+	var allData []DailyData
+
+	chunkStart := startDate
+	first := true
+	for !chunkStart.After(endDate) {
+		if !first {
+			time.Sleep(1 * time.Second)
+		}
+		first = false
+
+		chunkEnd := chunkStart.AddDate(0, 0, maxChunkDays-1)
+		if chunkEnd.After(endDate) {
+			chunkEnd = endDate
+		}
+
+		url := fmt.Sprintf(
+			"%s?latitude=%.4f&longitude=%.4f&start_date=%s&end_date=%s&daily=%s&timezone=auto",
+			archiveURL, lat, lon,
+			chunkStart.Format("2006-01-02"), chunkEnd.Format("2006-01-02"),
+			archiveDailyVars,
+		)
+
+		resp, err := c.HTTPClient.Get(url)
+		if err != nil {
+			return nil, fmt.Errorf("archive API request failed: %w", err)
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close() //nolint:errcheck
+			return nil, fmt.Errorf("archive API returned status %d for %s to %s",
+				resp.StatusCode, chunkStart.Format("2006-01-02"), chunkEnd.Format("2006-01-02"))
+		}
+
+		var omResp openMeteoResponse
+		if err := json.NewDecoder(resp.Body).Decode(&omResp); err != nil {
+			resp.Body.Close() //nolint:errcheck
+			return nil, fmt.Errorf("failed to decode archive response: %w", err)
+		}
+		resp.Body.Close() //nolint:errcheck
+
+		days := parseDailyData(omResp)
+		for _, d := range days {
+			key := d.Date.Format("2006-01-02")
+			if !seen[key] {
+				seen[key] = true
+				allData = append(allData, d)
+			}
+		}
+
+		chunkStart = chunkEnd.AddDate(0, 0, 1)
+	}
+
+	return allData, nil
 }
 
 // CtoF converts Celsius to Fahrenheit.

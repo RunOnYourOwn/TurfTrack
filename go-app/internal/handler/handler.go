@@ -18,12 +18,14 @@ import (
 	dbpkg "github.com/RunOnYourOwn/TurfTrack/go-app/internal/db"
 	"github.com/RunOnYourOwn/TurfTrack/go-app/internal/model"
 	"github.com/RunOnYourOwn/TurfTrack/go-app/internal/scheduler"
+	"github.com/RunOnYourOwn/TurfTrack/go-app/internal/weather"
 )
 
 // Server holds shared dependencies for all handlers.
 type Server struct {
-	DB        *sql.DB
-	Templates *template.Template
+	DB            *sql.DB
+	Templates     *template.Template
+	WeatherClient *weather.Client // nil = use weather.NewClient(); settable for testing
 }
 
 // NewServer creates a new Server and parses templates.
@@ -177,7 +179,11 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("DELETE /applications/{id}", s.handleDeleteApplication)
 
 	mux.HandleFunc("POST /gdd-models", s.handleCreateGDDModel)
+	mux.HandleFunc("PUT /gdd-models/{id}", s.handleUpdateGDDModel)
 	mux.HandleFunc("DELETE /gdd-models/{id}", s.handleDeleteGDDModel)
+
+	mux.HandleFunc("POST /gdd-resets", s.handleCreateGDDReset)
+	mux.HandleFunc("DELETE /gdd-resets/{id}", s.handleDeleteGDDReset)
 
 	mux.HandleFunc("POST /irrigation", s.handleCreateIrrigation)
 	mux.HandleFunc("DELETE /irrigation/{id}", s.handleDeleteIrrigation)
@@ -342,6 +348,10 @@ func (s *Server) handleGDD(w http.ResponseWriter, r *http.Request) {
 		locs, _ = dbpkg.ListLocations(s.DB)
 		if locID != nil {
 			models, _ = dbpkg.ListGDDModels(s.DB, locID)
+			// Load resets for each model
+			for i := range models {
+				models[i].Resets, _ = dbpkg.ListGDDResets(s.DB, models[i].ID)
+			}
 		}
 	}
 	data := map[string]interface{}{
@@ -804,14 +814,168 @@ func (s *Server) handleCreateGDDModel(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to create GDD model", http.StatusBadRequest)
 		return
 	}
+
+	// Backfill weather if start date is before available data
+	s.backfillWeatherIfNeeded(m.LocationID, m.StartDate)
+
+	// Calculate GDD values immediately
+	s.recalculateGDDModel(m)
+
 	w.Header().Set("HX-Redirect", fmt.Sprintf("/gdd?location_id=%d", m.LocationID))
 	w.WriteHeader(http.StatusCreated)
+}
+
+func (s *Server) handleUpdateGDDModel(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r, "id")
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	_ = r.ParseForm()
+	m := &model.GDDModel{ID: id}
+	m.Name = r.FormValue("name")
+	m.BaseTemp, _ = strconv.ParseFloat(r.FormValue("base_temp"), 64)
+	m.Unit = model.TempUnit(r.FormValue("unit"))
+	startDate, _ := time.Parse("2006-01-02", r.FormValue("start_date"))
+	m.StartDate = startDate
+	m.Threshold, _ = strconv.ParseFloat(r.FormValue("threshold"), 64)
+	m.ResetOnThreshold = r.FormValue("reset_on_threshold") == "on"
+
+	m, err = dbpkg.UpdateGDDModel(s.DB, m)
+	if err != nil {
+		http.Error(w, "Failed to update GDD model", http.StatusBadRequest)
+		return
+	}
+
+	// Backfill weather if start date is before available data
+	s.backfillWeatherIfNeeded(m.LocationID, m.StartDate)
+
+	// Recalculate GDD values with updated parameters
+	s.recalculateGDDModel(m)
+
+	w.Header().Set("HX-Redirect", fmt.Sprintf("/gdd?location_id=%d", m.LocationID))
 }
 
 func (s *Server) handleDeleteGDDModel(w http.ResponseWriter, r *http.Request) {
 	id, _ := pathID(r, "id")
 	_ = dbpkg.DeleteGDDModel(s.DB, id)
 	w.Header().Set("HX-Redirect", "/gdd")
+}
+
+func (s *Server) handleCreateGDDReset(w http.ResponseWriter, r *http.Request) {
+	_ = r.ParseForm()
+	modelID, _ := strconv.Atoi(r.FormValue("gdd_model_id"))
+	resetDate, _ := time.Parse("2006-01-02", r.FormValue("reset_date"))
+
+	_, err := dbpkg.CreateGDDReset(s.DB, modelID, resetDate, model.ResetManual)
+	if err != nil {
+		http.Error(w, "Failed to create GDD reset", http.StatusBadRequest)
+		return
+	}
+
+	// Recalculate GDD values with new reset
+	m, err := dbpkg.GetGDDModel(s.DB, modelID)
+	if err != nil || m == nil {
+		http.Error(w, "GDD model not found", http.StatusNotFound)
+		return
+	}
+	s.recalculateGDDModel(m)
+
+	w.Header().Set("HX-Redirect", fmt.Sprintf("/gdd?location_id=%d", m.LocationID))
+	w.WriteHeader(http.StatusCreated)
+}
+
+func (s *Server) handleDeleteGDDReset(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r, "id")
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	// Get the model ID from the reset before deleting
+	var modelID int
+	_ = s.DB.QueryRow("SELECT gdd_model_id FROM gdd_resets WHERE id = $1", id).Scan(&modelID)
+
+	_ = dbpkg.DeleteGDDReset(s.DB, id)
+
+	if modelID > 0 {
+		m, _ := dbpkg.GetGDDModel(s.DB, modelID)
+		if m != nil {
+			s.recalculateGDDModel(m)
+			w.Header().Set("HX-Redirect", fmt.Sprintf("/gdd?location_id=%d", m.LocationID))
+			return
+		}
+	}
+	w.Header().Set("HX-Redirect", "/gdd")
+}
+
+// recalculateGDDModel fetches weather data and recalculates GDD for a model.
+func (s *Server) recalculateGDDModel(m *model.GDDModel) {
+	today := time.Now().UTC().Truncate(24 * time.Hour)
+	end := today.AddDate(0, 0, 15)
+	weatherData, err := dbpkg.GetWeatherForLocation(s.DB, m.LocationID, &m.StartDate, &end)
+	if err != nil {
+		log.Printf("[handler] Failed to get weather for GDD recalculation: %v", err)
+		return
+	}
+	if err := scheduler.RecalculateGDDForModel(s.DB, m, weatherData); err != nil {
+		log.Printf("[handler] Failed to recalculate GDD for model %d: %v", m.ID, err)
+	}
+}
+
+// weatherClient returns the configured weather client, or creates a new default one.
+func (s *Server) weatherClient() *weather.Client {
+	if s.WeatherClient != nil {
+		return s.WeatherClient
+	}
+	return weather.NewClient()
+}
+
+// backfillWeatherIfNeeded checks if the location has weather data covering startDate.
+// If not, it fetches historical weather from the archive API to fill the gap.
+func (s *Server) backfillWeatherIfNeeded(locationID int, startDate time.Time) {
+	var minDate sql.NullTime
+	err := s.DB.QueryRow("SELECT MIN(date) FROM daily_weather WHERE location_id = $1", locationID).Scan(&minDate)
+	if err != nil {
+		log.Printf("[handler] Failed to query min weather date: %v", err)
+		return
+	}
+
+	// If no weather data at all, nothing to backfill against (scheduler will fetch on next run)
+	if !minDate.Valid {
+		return
+	}
+
+	// If we already have data covering the start date, nothing to do
+	if !startDate.Before(minDate.Time) {
+		return
+	}
+
+	// Fetch the gap: from startDate to the day before the earliest existing data
+	gapEnd := minDate.Time.AddDate(0, 0, -1)
+	log.Printf("[handler] Backfilling weather for location %d: %s to %s",
+		locationID, startDate.Format("2006-01-02"), gapEnd.Format("2006-01-02"))
+
+	loc, err := dbpkg.GetLocation(s.DB, locationID)
+	if err != nil || loc == nil {
+		log.Printf("[handler] Failed to get location for backfill: %v", err)
+		return
+	}
+
+	client := s.weatherClient()
+	days, err := client.FetchHistoricalWeather(loc.Latitude, loc.Longitude, startDate, gapEnd)
+	if err != nil {
+		log.Printf("[handler] Historical weather backfill failed: %v", err)
+		return
+	}
+
+	for _, day := range days {
+		if err := dbpkg.UpsertDailyWeather(s.DB, locationID, day, model.WeatherHistorical); err != nil {
+			log.Printf("[handler] Failed to upsert backfill weather for %s: %v", day.Date.Format("2006-01-02"), err)
+		}
+	}
+	log.Printf("[handler] Backfilled %d days of weather for location %d", len(days), locationID)
 }
 
 func (s *Server) handleCreateIrrigation(w http.ResponseWriter, r *http.Request) {
@@ -948,7 +1112,7 @@ func envOr(key, fallback string) string {
 
 func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
-	for _, key := range []string{"weather_update_hour", "weather_update_timezone"} {
+	for _, key := range []string{"weather_update_hour", "weather_update_timezone", "weather_history_days"} {
 		if val := r.FormValue(key); val != "" {
 			_ = dbpkg.SetSetting(s.DB, key, val)
 		}

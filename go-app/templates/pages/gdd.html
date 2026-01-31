@@ -39,7 +39,7 @@
                 </div>
                 <div class="form-control">
                     <label class="label"><span class="label-text">Start Date</span></label>
-                    <input name="start_date" type="date" required class="input input-bordered">
+                    <input name="start_date" type="date" required class="input input-bordered" onchange="checkBackfillWarning(this, 'create')">
                 </div>
                 <div class="form-control">
                     <label class="label"><span class="label-text">Threshold</span></label>
@@ -51,8 +51,9 @@
                         <span class="label-text">Reset on Threshold</span>
                     </label>
                 </div>
+                <div id="backfill-warning-create" class="md:col-span-3 hidden"></div>
                 <div class="md:col-span-3 flex items-center gap-3">
-                    <button type="submit" class="btn btn-primary">Create Model</button>
+                    <button type="submit" id="gdd-create-btn" class="btn btn-primary">Create Model</button>
                     <span id="gdd-loading" class="loading loading-spinner loading-sm htmx-indicator"></span>
                 </div>
             </form>
@@ -65,20 +66,152 @@
             <div class="flex justify-between items-center">
                 <div>
                     <h3 class="card-title">{{.Name}}</h3>
-                    <p class="text-sm text-base-content/60">Base: {{formatFloat .BaseTemp 1}}{{.Unit}} | Start: {{formatDate .StartDate}} | Threshold: {{formatFloat .Threshold 0}}</p>
+                    <p class="text-sm text-base-content/60">Base: {{formatFloat .BaseTemp 1}}{{.Unit}} | Start: {{formatDate .StartDate}} | Threshold: {{formatFloat .Threshold 0}}{{if .ResetOnThreshold}} (auto-reset){{end}}</p>
                 </div>
-                <button class="btn btn-ghost btn-xs text-error" onclick="confirmDelete('/gdd-models/{{.ID}}', 'Delete GDD model \'{{.Name}}\'?')">Delete</button>
+                <div class="flex gap-2">
+                    <button class="btn btn-ghost btn-xs" onclick="document.getElementById('edit-modal-{{.ID}}').showModal()">Edit</button>
+                    <button class="btn btn-ghost btn-xs text-error" onclick="confirmDelete('/gdd-models/{{.ID}}', 'Delete GDD model \'{{.Name}}\'?')">Delete</button>
+                </div>
             </div>
             <div id="gdd-chart-{{.ID}}"></div>
+
+            <!-- Resets Section -->
+            <div class="collapse collapse-arrow bg-base-200/50 mt-2">
+                <input type="checkbox" />
+                <div class="collapse-title text-sm font-medium">
+                    Resets ({{len .Resets}})
+                </div>
+                <div class="collapse-content">
+                    <!-- Add Reset Form -->
+                    <form hx-post="/gdd-resets" hx-swap="none" class="flex gap-2 items-end mb-3 pt-2">
+                        <input type="hidden" name="gdd_model_id" value="{{.ID}}">
+                        <div class="form-control">
+                            <label class="label"><span class="label-text text-xs">Reset Date</span></label>
+                            <input name="reset_date" type="date" required class="input input-bordered input-sm">
+                        </div>
+                        <button type="submit" class="btn btn-sm btn-outline btn-primary">Add Reset</button>
+                    </form>
+
+                    {{if .Resets}}
+                    <div class="overflow-x-auto">
+                        <table class="table table-xs">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Run #</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{range .Resets}}
+                                <tr>
+                                    <td>{{formatDate .ResetDate}}</td>
+                                    <td>
+                                        {{if eq (printf "%s" .ResetType) "manual"}}<span class="badge badge-info badge-xs">manual</span>
+                                        {{else if eq (printf "%s" .ResetType) "threshold"}}<span class="badge badge-warning badge-xs">threshold</span>
+                                        {{else}}<span class="badge badge-success badge-xs">{{.ResetType}}</span>
+                                        {{end}}
+                                    </td>
+                                    <td>{{.RunNumber}}</td>
+                                    <td>
+                                        {{if eq (printf "%s" .ResetType) "manual"}}
+                                        <button class="btn btn-ghost btn-xs text-error" onclick="confirmDelete('/gdd-resets/{{.ID}}', 'Remove this manual reset?')">Remove</button>
+                                        {{end}}
+                                    </td>
+                                </tr>
+                                {{end}}
+                            </tbody>
+                        </table>
+                    </div>
+                    {{else}}
+                    <p class="text-xs text-base-content/50">No resets recorded.</p>
+                    {{end}}
+                </div>
+            </div>
         </div>
     </div>
+
+    <!-- Edit Modal -->
+    <dialog id="edit-modal-{{.ID}}" class="modal">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg mb-4">Edit GDD Model: {{.Name}}</h3>
+            <form hx-put="/gdd-models/{{.ID}}" hx-swap="none" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Name</span></label>
+                    <input name="name" required class="input input-bordered" value="{{.Name}}">
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Base Temp</span></label>
+                    <input name="base_temp" type="number" step="0.1" required class="input input-bordered" value="{{formatFloat .BaseTemp 1}}">
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Unit</span></label>
+                    <select name="unit" class="select select-bordered">
+                        <option value="F" {{if eq (printf "%s" .Unit) "F"}}selected{{end}}>Fahrenheit</option>
+                        <option value="C" {{if eq (printf "%s" .Unit) "C"}}selected{{end}}>Celsius</option>
+                    </select>
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Start Date</span></label>
+                    <input name="start_date" type="date" required class="input input-bordered" value="{{formatDate .StartDate}}" onchange="checkBackfillWarning(this, 'edit-{{.ID}}')">
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Threshold</span></label>
+                    <input name="threshold" type="number" step="0.1" class="input input-bordered" value="{{formatFloat .Threshold 1}}">
+                </div>
+                <div class="form-control">
+                    <label class="label cursor-pointer justify-start gap-2">
+                        <input name="reset_on_threshold" type="checkbox" class="checkbox checkbox-primary" {{if .ResetOnThreshold}}checked{{end}}>
+                        <span class="label-text">Reset on Threshold</span>
+                    </label>
+                </div>
+                <div id="backfill-warning-edit-{{.ID}}" class="md:col-span-2 hidden"></div>
+                <div class="md:col-span-2 modal-action">
+                    <button type="submit" id="gdd-edit-btn-{{.ID}}" class="btn btn-primary">Save Changes</button>
+                    <button type="button" class="btn" onclick="this.closest('dialog').close()">Cancel</button>
+                </div>
+            </form>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button>close</button></form>
+    </dialog>
+
     <script>
     (function() {
         var themeMode = document.documentElement.getAttribute('data-theme') === 'emerald' ? 'light' : 'dark';
         var fmtGDD = function(v) { return v != null ? parseFloat(v).toFixed(1) : ''; };
+        var resets = {{json .Resets}};
         fetch('/api/gdd-values/{{.ID}}')
             .then(r => r.json()).then(data => {
                 if (!data || !data.length) return;
+
+                // Build reset annotations
+                var annotations = [];
+                if (resets && resets.length) {
+                    resets.forEach(function(r) {
+                        var dateLabel = r.reset_date.substring(5, 10);
+                        var color = '#3b82f6'; // blue for manual
+                        var label = 'Manual Reset';
+                        if (r.reset_type === 'threshold') {
+                            color = '#f97316'; // orange
+                            label = 'Threshold Reset';
+                        } else if (r.reset_type === 'initial') {
+                            color = '#22c55e'; // green
+                            label = 'Initial';
+                        }
+                        annotations.push({
+                            x: dateLabel,
+                            strokeDashArray: 4,
+                            borderColor: color,
+                            label: {
+                                text: label,
+                                borderColor: color,
+                                style: { color: '#fff', background: color, fontSize: '10px' }
+                            }
+                        });
+                    });
+                }
+
                 var chart = new ApexCharts(document.getElementById('gdd-chart-{{.ID}}'), {
                     chart: {type:'area',height:250,toolbar:{show:true,tools:{download:true,zoom:true,pan:true,reset:true}},background:'transparent'},
                     theme: {mode: themeMode},
@@ -90,7 +223,8 @@
                     xaxis: {type:'category',labels:{rotate:-45,rotateAlways:false,hideOverlappingLabels:true},tickAmount:10},
                     yaxis: {title:{text:'GDD'},labels:{formatter:fmtGDD}},
                     legend: {position:'bottom'},
-                    tooltip: {shared:true,intersect:false,y:{formatter:fmtGDD}}
+                    tooltip: {shared:true,intersect:false,y:{formatter:fmtGDD}},
+                    annotations: {xaxis: annotations}
                 });
                 chart.render();
             });
@@ -105,4 +239,71 @@
     {{end}}
     {{end}}
 </div>
+
+<script>
+function checkBackfillWarning(input, formId) {
+    var warning = document.getElementById('backfill-warning-' + formId);
+    if (!warning || !input.value) return;
+
+    var startDate = new Date(input.value + 'T00:00:00');
+    var today = new Date();
+    today.setHours(0,0,0,0);
+    var diffDays = Math.floor((today - startDate) / (1000*60*60*24));
+
+    // Find the submit button for this form
+    var submitBtn = formId === 'create'
+        ? document.getElementById('gdd-create-btn')
+        : document.getElementById('gdd-edit-btn-' + formId.replace('edit-', ''));
+
+    if (diffDays > 92) {
+        warning.className = 'md:col-span-3 alert alert-warning';
+        warning.innerHTML =
+            '<div class="flex flex-col sm:flex-row sm:items-center gap-3 w-full">' +
+                '<span class="flex-1">This start date is ' + diffDays + ' days ago. Weather data will be fetched from the Historical API, which may take a moment.</span>' +
+                '<div class="flex gap-2 flex-shrink-0">' +
+                    '<button type="button" class="btn btn-sm btn-warning" onclick="confirmBackfill(\'' + formId + '\')">Yes, I\'m sure</button>' +
+                    '<button type="button" class="btn btn-sm btn-ghost" onclick="cancelBackfill(\'' + formId + '\', this)">No, change date</button>' +
+                '</div>' +
+            '</div>';
+        if (submitBtn) submitBtn.disabled = true;
+    } else {
+        warning.className = 'md:col-span-3 hidden';
+        warning.innerHTML = '';
+        if (submitBtn) submitBtn.disabled = false;
+    }
+}
+
+function confirmBackfill(formId) {
+    var warning = document.getElementById('backfill-warning-' + formId);
+    if (warning) {
+        warning.className = 'md:col-span-3 hidden';
+        warning.innerHTML = '';
+    }
+    var submitBtn = formId === 'create'
+        ? document.getElementById('gdd-create-btn')
+        : document.getElementById('gdd-edit-btn-' + formId.replace('edit-', ''));
+    if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.click();
+    }
+}
+
+function cancelBackfill(formId, btn) {
+    var warning = document.getElementById('backfill-warning-' + formId);
+    if (warning) {
+        warning.className = 'md:col-span-3 hidden';
+        warning.innerHTML = '';
+    }
+    var submitBtn = formId === 'create'
+        ? document.getElementById('gdd-create-btn')
+        : document.getElementById('gdd-edit-btn-' + formId.replace('edit-', ''));
+    if (submitBtn) submitBtn.disabled = false;
+    // Focus the date input
+    var form = btn.closest('form');
+    if (form) {
+        var dateInput = form.querySelector('input[name="start_date"]');
+        if (dateInput) dateInput.focus();
+    }
+}
+</script>
 {{end}}

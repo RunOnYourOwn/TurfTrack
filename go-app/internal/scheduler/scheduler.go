@@ -73,10 +73,17 @@ func runDailyUpdate(db *sql.DB, isRecurring bool) {
 	today := time.Now().UTC().Truncate(24 * time.Hour)
 
 	// On recurring daily runs, only fetch 2 days back (yesterday's actuals + today)
-	// On startup, fetch 60 days to backfill if needed
-	pastDays := 60
+	// On startup, read the configured history depth (default 92)
+	pastDays := 92
 	if isRecurring {
 		pastDays = 2
+	} else {
+		if h, err := dbpkg.GetSetting(db, "weather_history_days"); err == nil {
+			if v, err := strconv.Atoi(h); err == nil && v >= 1 && v <= 730 {
+				pastDays = v
+			}
+		}
+		log.Printf("[scheduler] Startup history depth: %d days", pastDays)
 	}
 
 	for _, loc := range locs {
@@ -92,7 +99,7 @@ func runDailyUpdate(db *sql.DB, isRecurring bool) {
 		}
 
 		// Run cascade calculations
-		runCalculations(db, loc)
+		runCalculations(db, loc, isRecurring)
 
 		result := "Weather updated and calculations complete"
 		_ = dbpkg.UpdateTaskStatus(db, taskID, model.TaskSuccess, &result, nil)
@@ -103,10 +110,31 @@ func runDailyUpdate(db *sql.DB, isRecurring bool) {
 }
 
 func fetchAndStoreWeather(db *sql.DB, client *weather.Client, loc model.Location, today time.Time, pastDays int) error {
-	// Single API call: pastDays historical + 15 days forecast
-	days, err := client.FetchDailyWeather(loc.Latitude, loc.Longitude, pastDays, 15)
+	// Forecast API supports max 92 past_days. For recent data, always use it.
+	forecastPast := pastDays
+	if forecastPast > 92 {
+		forecastPast = 92
+	}
+
+	days, err := client.FetchDailyWeather(loc.Latitude, loc.Longitude, forecastPast, 15)
 	if err != nil {
 		return fmt.Errorf("weather fetch: %w", err)
+	}
+
+	// If we need more than 92 days, fetch the older range from the archive API
+	if pastDays > 92 {
+		archiveStart := today.AddDate(0, 0, -pastDays)
+		archiveEnd := today.AddDate(0, 0, -93) // up to where forecast API starts
+		log.Printf("[scheduler] Fetching historical archive for location %d: %s to %s",
+			loc.ID, archiveStart.Format("2006-01-02"), archiveEnd.Format("2006-01-02"))
+
+		archiveDays, err := client.FetchHistoricalWeather(loc.Latitude, loc.Longitude, archiveStart, archiveEnd)
+		if err != nil {
+			log.Printf("[scheduler] Archive fetch failed for location %d (continuing with forecast data): %v", loc.ID, err)
+		} else {
+			// Prepend archive data (older dates first)
+			days = append(archiveDays, days...)
+		}
 	}
 
 	for _, day := range days {
@@ -123,32 +151,60 @@ func fetchAndStoreWeather(db *sql.DB, client *weather.Client, loc model.Location
 	return nil
 }
 
-func runCalculations(db *sql.DB, loc model.Location) {
+func runCalculations(db *sql.DB, loc model.Location, isRecurring bool) {
 	today := time.Now().UTC().Truncate(24 * time.Hour)
-	start := today.AddDate(0, 0, -60)
-	end := today.AddDate(0, 0, 15)
 
-	// Get weather data for calculations
-	weatherData, err := dbpkg.GetWeatherForLocation(db, loc.ID, &start, &end)
-	if err != nil {
-		log.Printf("[scheduler] Failed to get weather for calculations: %v", err)
+	if !isRecurring {
+		// Startup: full 60-day window, all calculations
+		start := today.AddDate(0, 0, -60)
+		end := today.AddDate(0, 0, 15)
+
+		weatherData, err := dbpkg.GetWeatherForLocation(db, loc.ID, &start, &end)
+		if err != nil {
+			log.Printf("[scheduler] Failed to get weather for calculations: %v", err)
+			return
+		}
+
+		calculateAndStoreDisease(db, loc.ID, weatherData)
+		calculateAndStoreGrowthPotential(db, loc.ID, weatherData)
+		recalculateGDD(db, loc.ID, weatherData)
+		calculateAndStoreWeedPressure(db, loc.ID, weatherData, time.Time{})
+		calculateWaterSummaries(db, loc.ID, start, end)
 		return
 	}
 
-	// Calculate disease pressure (Smith-Kerns)
-	calculateAndStoreDisease(db, loc.ID, weatherData)
+	// Recurring: optimized windows per calculation type
+	log.Printf("[scheduler] Running optimized recurring calculations for location %d", loc.ID)
 
-	// Calculate growth potential
-	calculateAndStoreGrowthPotential(db, loc.ID, weatherData)
+	// Disease & Growth Potential: only need ~10 days back (covers 7-day rolling + buffer) + 15 forecast
+	dgStart := today.AddDate(0, 0, -10)
+	dgEnd := today.AddDate(0, 0, 15)
+	dgWeather, err := dbpkg.GetWeatherForLocation(db, loc.ID, &dgStart, &dgEnd)
+	if err != nil {
+		log.Printf("[scheduler] Failed to get weather for disease/GP: %v", err)
+	} else {
+		calculateAndStoreDisease(db, loc.ID, dgWeather)
+		calculateAndStoreGrowthPotential(db, loc.ID, dgWeather)
+	}
 
-	// Recalculate GDD for all models at this location
-	recalculateGDD(db, loc.ID, weatherData)
+	// GDD: RecalculateGDDForModel self-fetches from DB if needed, pass minimal weather
+	recalculateGDD(db, loc.ID, dgWeather)
 
-	// Calculate weed pressure for all species at this location
-	calculateAndStoreWeedPressure(db, loc.ID, weatherData)
+	// Weed Pressure: needs YTD GDD accumulation, but only write DB rows for recent dates
+	jan1 := time.Date(today.Year(), 1, 1, 0, 0, 0, 0, time.UTC)
+	wpEnd := today.AddDate(0, 0, 15)
+	wpWeather, err := dbpkg.GetWeatherForLocation(db, loc.ID, &jan1, &wpEnd)
+	if err != nil {
+		log.Printf("[scheduler] Failed to get weather for weed pressure: %v", err)
+	} else {
+		writeFrom := today.AddDate(0, 0, -10)
+		calculateAndStoreWeedPressure(db, loc.ID, wpWeather, writeFrom)
+	}
 
-	// Calculate water summaries for all lawns at this location
-	calculateWaterSummaries(db, loc.ID, start, end)
+	// Water: only 2 full weeks + forecast
+	waterStart := today.AddDate(0, 0, -14)
+	waterEnd := today.AddDate(0, 0, 15)
+	calculateWaterSummaries(db, loc.ID, waterStart, waterEnd)
 }
 
 func calculateAndStoreDisease(db *sql.DB, locationID int, weatherData []model.DailyWeather) {
@@ -220,7 +276,10 @@ func calculateAndStoreGrowthPotential(db *sql.DB, locationID int, weatherData []
 	}
 }
 
-func calculateAndStoreWeedPressure(db *sql.DB, locationID int, weatherData []model.DailyWeather) {
+// calculateAndStoreWeedPressure computes weed pressure for all active species.
+// If writeFrom is non-zero, only DB upserts for dates on or after writeFrom are performed
+// (GDD accumulation is still computed for the full range).
+func calculateAndStoreWeedPressure(db *sql.DB, locationID int, weatherData []model.DailyWeather, writeFrom time.Time) {
 	species, err := dbpkg.ListWeedSpecies(db, true)
 	if err != nil || len(species) == 0 {
 		return
@@ -303,6 +362,11 @@ func calculateAndStoreWeedPressure(db *sql.DB, locationID int, weatherData []mod
 			seasonalTiming := calc.SeasonalTiming(month, calc.WeedSeasonType(sp.Season))
 			composite := calc.CompositeWeedPressure(gddRisk, soilTempRisk, moistureRisk, turfStress, seasonalTiming)
 
+			// Skip DB writes for dates before writeFrom (optimized recurring mode)
+			if !writeFrom.IsZero() && date.Before(writeFrom) {
+				continue
+			}
+
 			isForecast := w.Type == model.WeatherForecast
 
 			_, err := db.Exec(`
@@ -345,47 +409,103 @@ func recalculateGDD(db *sql.DB, locationID int, weatherData []model.DailyWeather
 	}
 
 	for _, m := range models {
-		// Filter weather data from model start date
-		var days []calc.WeatherDay
-		var dates []time.Time
-		var forecasts []bool
-		for _, w := range weatherData {
-			if !w.Date.Before(m.StartDate) {
-				tmax := w.TemperatureMaxC
-				tmin := w.TemperatureMinC
-				if m.Unit == model.TempUnitF {
-					// Weather is stored in C, but model uses F base temp
-					// Convert weather to F for calculation
-					tmax = weather.CtoF(tmax)
-					tmin = weather.CtoF(tmin)
-				}
-				days = append(days, calc.WeatherDay{TmaxC: tmax, TminC: tmin})
-				dates = append(dates, w.Date)
-				forecasts = append(forecasts, w.Type == model.WeatherForecast)
-			}
-		}
-
-		results := calc.CalculateGDDSeries(days, m.BaseTemp, m.Threshold, m.ResetOnThreshold)
-
-		values := make([]struct {
-			Date          time.Time
-			DailyGDD      float64
-			CumulativeGDD float64
-			IsForecast    bool
-			Run           int
-		}, len(results))
-		for i, r := range results {
-			values[i].Date = dates[i]
-			values[i].DailyGDD = r.DailyGDD
-			values[i].CumulativeGDD = r.CumulativeGDD
-			values[i].IsForecast = forecasts[i]
-			values[i].Run = r.Run
-		}
-
-		if err := dbpkg.UpsertGDDValues(db, m.ID, values); err != nil {
-			log.Printf("[scheduler] Failed to store GDD values for model %d: %v", m.ID, err)
+		if err := RecalculateGDDForModel(db, &m, weatherData); err != nil {
+			log.Printf("[scheduler] Failed to recalculate GDD for model %d: %v", m.ID, err)
 		}
 	}
+}
+
+// RecalculateGDDForModel computes GDD values for a single model using the
+// provided weather data. If the weather data doesn't cover the model's start
+// date, it fetches additional data from the database automatically.
+// Exported so handlers can trigger recalculation on model create/update/reset changes.
+func RecalculateGDDForModel(db *sql.DB, m *model.GDDModel, weatherData []model.DailyWeather) error {
+	// If provided weather doesn't cover the model's start date, fetch from DB
+	if len(weatherData) == 0 || weatherData[0].Date.After(m.StartDate) {
+		today := time.Now().UTC().Truncate(24 * time.Hour)
+		end := today.AddDate(0, 0, 15)
+		startDate := m.StartDate
+		fullWeather, err := dbpkg.GetWeatherForLocation(db, m.LocationID, &startDate, &end)
+		if err == nil && len(fullWeather) > 0 {
+			weatherData = fullWeather
+		}
+	}
+
+	// Filter weather data from model start date
+	var days []calc.WeatherDay
+	var dates []time.Time
+	var forecasts []bool
+	for _, w := range weatherData {
+		if !w.Date.Before(m.StartDate) {
+			tmax := w.TemperatureMaxC
+			tmin := w.TemperatureMinC
+			if m.Unit == model.TempUnitF {
+				tmax = weather.CtoF(tmax)
+				tmin = weather.CtoF(tmin)
+			}
+			days = append(days, calc.WeatherDay{TmaxC: tmax, TminC: tmin})
+			dates = append(dates, w.Date)
+			forecasts = append(forecasts, w.Type == model.WeatherForecast)
+		}
+	}
+
+	// Fetch manual resets for this model
+	resets, err := dbpkg.ListGDDResets(db, m.ID)
+	if err != nil {
+		return fmt.Errorf("list resets: %w", err)
+	}
+	var manualResetDates []time.Time
+	for _, r := range resets {
+		if r.ResetType == model.ResetManual {
+			manualResetDates = append(manualResetDates, r.ResetDate)
+		}
+	}
+
+	results := calc.CalculateGDDSeries(days, m.BaseTemp, m.Threshold, m.ResetOnThreshold, dates, manualResetDates)
+
+	values := make([]struct {
+		Date          time.Time
+		DailyGDD      float64
+		CumulativeGDD float64
+		IsForecast    bool
+		Run           int
+	}, len(results))
+	for i, r := range results {
+		values[i].Date = dates[i]
+		values[i].DailyGDD = r.DailyGDD
+		values[i].CumulativeGDD = r.CumulativeGDD
+		values[i].IsForecast = forecasts[i]
+		values[i].Run = r.Run
+	}
+
+	if err := dbpkg.UpsertGDDValues(db, m.ID, values); err != nil {
+		return fmt.Errorf("upsert values: %w", err)
+	}
+
+	// Record threshold resets: clear old threshold resets and write new ones
+	if err := dbpkg.DeleteGDDResetsByType(db, m.ID, model.ResetThreshold); err != nil {
+		return fmt.Errorf("delete threshold resets: %w", err)
+	}
+	if m.ResetOnThreshold && m.Threshold > 0 {
+		for i := 1; i < len(results); i++ {
+			if results[i].Run > results[i-1].Run {
+				// Check this isn't a manual reset date
+				isManual := false
+				dateStr := dates[i].Format("2006-01-02")
+				for _, mrd := range manualResetDates {
+					if mrd.Format("2006-01-02") == dateStr {
+						isManual = true
+						break
+					}
+				}
+				if !isManual {
+					_, _ = dbpkg.CreateGDDReset(db, m.ID, dates[i], model.ResetThreshold)
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 func calculateWaterSummaries(db *sql.DB, locationID int, start, end time.Time) {
@@ -470,13 +590,13 @@ func FetchWeatherForLocation(db *sql.DB, loc model.Location) {
 		locID := loc.ID
 		_ = dbpkg.CreateTaskStatus(db, taskID, "update_weather", &locID)
 
-		if err := fetchAndStoreWeather(db, client, loc, today, 60); err != nil {
+		if err := fetchAndStoreWeather(db, client, loc, today, 92); err != nil {
 			log.Printf("[scheduler] On-demand weather fetch failed for location %d: %v", loc.ID, err)
 			errStr := err.Error()
 			_ = dbpkg.UpdateTaskStatus(db, taskID, model.TaskFailure, nil, &errStr)
 			return
 		}
-		runCalculations(db, loc)
+		runCalculations(db, loc, false)
 
 		result := "On-demand weather fetch and calculations complete"
 		_ = dbpkg.UpdateTaskStatus(db, taskID, model.TaskSuccess, &result, nil)

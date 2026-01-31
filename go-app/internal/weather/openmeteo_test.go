@@ -1,8 +1,13 @@
 package weather
 
 import (
+	"encoding/json"
 	"math"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestCtoF(t *testing.T) {
@@ -102,6 +107,146 @@ func TestParseDailyData(t *testing.T) {
 	}
 	if data[0].RelativeHumidityMean == nil || *data[0].RelativeHumidityMean != 75 {
 		t.Error("day 1 humidity mean should be 75")
+	}
+}
+
+// makeArchiveResponse builds a minimal openMeteoResponse JSON with the given dates.
+func makeArchiveResponse(dates []string) []byte {
+	resp := openMeteoResponse{}
+	resp.Daily.Time = dates
+	n := len(dates)
+	resp.Daily.Temperature2mMax = make([]float64, n)
+	resp.Daily.Temperature2mMin = make([]float64, n)
+	resp.Daily.PrecipitationSum = make([]float64, n)
+	resp.Daily.Windspeed10mMax = make([]float64, n)
+	resp.Daily.Windgusts10mMax = make([]float64, n)
+	resp.Daily.WinddirectionDominant = make([]float64, n)
+	resp.Daily.ET0Evapotranspiration = make([]float64, n)
+	resp.Daily.RelativeHumidity2mMean = make([]float64, n)
+	resp.Daily.RelativeHumidity2mMax = make([]float64, n)
+	resp.Daily.RelativeHumidity2mMin = make([]float64, n)
+	resp.Daily.DewPoint2mMax = make([]float64, n)
+	resp.Daily.DewPoint2mMin = make([]float64, n)
+	resp.Daily.DewPoint2mMean = make([]float64, n)
+	resp.Daily.SunshineDuration = make([]float64, n)
+	for i, d := range dates {
+		resp.Daily.Temperature2mMax[i] = 25
+		resp.Daily.Temperature2mMin[i] = 15
+		_ = d
+	}
+	b, _ := json.Marshal(resp)
+	return b
+}
+
+func TestFetchHistoricalWeatherChunking(t *testing.T) {
+	requestCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		startStr := r.URL.Query().Get("start_date")
+		endStr := r.URL.Query().Get("end_date")
+		start, _ := time.Parse("2006-01-02", startStr)
+		end, _ := time.Parse("2006-01-02", endStr)
+
+		var dates []string
+		for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
+			dates = append(dates, d.Format("2006-01-02"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(makeArchiveResponse(dates)) //nolint:errcheck
+	}))
+	defer server.Close()
+
+	client := &Client{
+		HTTPClient:     server.Client(),
+		ArchiveBaseURL: server.URL,
+	}
+
+	// 200 days → ceil(200/45) = 5 chunks
+	start := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	end := start.AddDate(0, 0, 199) // 200 days total
+
+	data, err := client.FetchHistoricalWeather(40.0, -90.0, start, end)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if requestCount != 5 {
+		t.Errorf("expected 5 HTTP requests, got %d", requestCount)
+	}
+	if len(data) != 200 {
+		t.Errorf("expected 200 days of data, got %d", len(data))
+	}
+
+	// Verify no duplicate dates
+	seen := map[string]bool{}
+	for _, d := range data {
+		key := d.Date.Format("2006-01-02")
+		if seen[key] {
+			t.Errorf("duplicate date: %s", key)
+		}
+		seen[key] = true
+	}
+}
+
+func TestFetchHistoricalWeatherSingleChunk(t *testing.T) {
+	requestCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		startStr := r.URL.Query().Get("start_date")
+		endStr := r.URL.Query().Get("end_date")
+		start, _ := time.Parse("2006-01-02", startStr)
+		end, _ := time.Parse("2006-01-02", endStr)
+
+		var dates []string
+		for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
+			dates = append(dates, d.Format("2006-01-02"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(makeArchiveResponse(dates)) //nolint:errcheck
+	}))
+	defer server.Close()
+
+	client := &Client{
+		HTTPClient:     server.Client(),
+		ArchiveBaseURL: server.URL,
+	}
+
+	start := time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC)
+	end := start.AddDate(0, 0, 29) // 30 days
+
+	data, err := client.FetchHistoricalWeather(40.0, -90.0, start, end)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if requestCount != 1 {
+		t.Errorf("expected 1 HTTP request, got %d", requestCount)
+	}
+	if len(data) != 30 {
+		t.Errorf("expected 30 days, got %d", len(data))
+	}
+}
+
+func TestFetchHistoricalWeatherError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+	}))
+	defer server.Close()
+
+	client := &Client{
+		HTTPClient:     server.Client(),
+		ArchiveBaseURL: server.URL,
+	}
+
+	start := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	end := start.AddDate(0, 0, 29)
+
+	_, err := client.FetchHistoricalWeather(40.0, -90.0, start, end)
+	if err == nil {
+		t.Fatal("expected error for non-200 status")
+	}
+	if !strings.Contains(err.Error(), "status 400") {
+		t.Errorf("error should mention status 400, got: %v", err)
 	}
 }
 

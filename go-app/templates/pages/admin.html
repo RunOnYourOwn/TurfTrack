@@ -8,7 +8,8 @@
             <h3 class="card-title text-lg">Weather Update Schedule</h3>
             {{$hour := index .Settings "weather_update_hour"}}
             {{$tz := index .Settings "weather_update_timezone"}}
-            <form hx-post="/admin/settings" hx-swap="none" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {{$histDays := index .Settings "weather_history_days"}}
+            <form hx-post="/admin/settings" hx-swap="none" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div class="form-control">
                     <label class="label"><span class="label-text">Update Hour</span></label>
                     <select name="weather_update_hour" class="select select-bordered">
@@ -24,6 +25,11 @@
                         <option value="{{$zone}}" {{if eq $zone $tz}}selected{{end}}>{{$zone}}</option>
                         {{end}}
                     </select>
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">History Depth (days)</span></label>
+                    <input name="weather_history_days" type="number" min="1" max="730" value="{{if $histDays}}{{$histDays}}{{else}}92{{end}}" class="input input-bordered">
+                    <label class="label"><span class="label-text-alt">Default 92. Set higher to use Historical API for older data.</span></label>
                 </div>
                 <div class="form-control justify-end">
                     <button type="submit" class="btn btn-primary">Save</button>
