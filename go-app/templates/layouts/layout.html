@@ -23,9 +23,11 @@
         #sidebar.collapsed .brand-text,
         #sidebar.collapsed .sidebar-toggle-btn { display: none; }
         #sidebar.collapsed .brand-icon { display: flex; }
-        #sidebar.collapsed .menu { padding: 0.25rem; gap: 0.25rem; align-items: center; }
-        #sidebar.collapsed .menu a { justify-content: center; padding: 0.5rem; width: 2.5rem; height: 2.5rem; border-radius: 0.5rem; }
-        #sidebar.collapsed .menu a svg { width: 1.25rem; height: 1.25rem; }
+        #sidebar.collapsed .menu { padding: 0; gap: 0.125rem; align-items: center; width: 100%; }
+        #sidebar.collapsed .menu li { width: 100%; display: flex; justify-content: center; }
+        #sidebar.collapsed .menu a { justify-content: center; align-items: center; padding: 0; width: 2.25rem; height: 2.25rem; border-radius: 0.5rem; }
+        #sidebar.collapsed .brand-area { justify-content: center; padding: 0.75rem 0; }
+        #sidebar.collapsed .theme-area { padding: 0.75rem 0; }
         /* Tooltip on hover when collapsed */
         #sidebar.collapsed [data-tip] { position: relative; }
         #sidebar.collapsed [data-tip]:hover::after {
@@ -96,7 +98,7 @@
     <!-- Sidebar -->
     <aside id="sidebar" class="w-48 bg-base-100 h-screen sticky top-0 flex flex-col overflow-y-auto">
         <!-- Brand -->
-        <div class="p-3 flex items-center justify-between">
+        <div class="brand-area p-3 flex items-center justify-between">
             <!-- Expanded: full brand + close button -->
             <span class="brand-text text-xl font-bold text-primary">TurfTrack</span>
             <button id="sidebar-close" class="sidebar-toggle-btn btn btn-ghost btn-square btn-sm" title="Collapse sidebar">
@@ -148,7 +150,7 @@
         </ul>
 
         <!-- Theme toggle -->
-        <div class="p-4 flex justify-center">
+        <div class="theme-area p-4 flex justify-center">
             <label class="swap swap-rotate">
                 <input id="theme-toggle" type="checkbox" class="theme-controller" value="emerald" />
                 <svg class="swap-off h-5 w-5 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5.64,17l-.71.71a1,1,0,0,0,0,1.41,1,1,0,0,0,1.41,0l.71-.71A1,1,0,0,0,5.64,17ZM5,12a1,1,0,0,0-1-1H3a1,1,0,0,0,0,2H4A1,1,0,0,0,5,12Zm7-7a1,1,0,0,0,1-1V3a1,1,0,0,0-2,0V4A1,1,0,0,0,12,5ZM5.64,7.05a1,1,0,0,0,.7.29,1,1,0,0,0,.71-.29,1,1,0,0,0,0-1.41l-.71-.71A1,1,0,0,0,4.93,6.34Zm12,.29a1,1,0,0,0,.7-.29l.71-.71a1,1,0,1,0-1.41-1.41L17,5.64a1,1,0,0,0,0,1.41A1,1,0,0,0,17.66,7.34ZM21,11H20a1,1,0,0,0,0,2h1a1,1,0,0,0,0-2Zm-9,8a1,1,0,0,0-1,1v1a1,1,0,0,0,2,0V20A1,1,0,0,0,12,19ZM18.36,17A1,1,0,0,0,17,18.36l.71.71a1,1,0,0,0,1.41,0,1,1,0,0,0,0-1.41ZM12,6.5A5.5,5.5,0,1,0,17.5,12,5.51,5.51,0,0,0,12,6.5Zm0,9A3.5,3.5,0,1,1,15.5,12,3.5,3.5,0,0,1,12,15.5Z"/></svg>
