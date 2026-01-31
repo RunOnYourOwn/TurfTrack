@@ -145,26 +145,30 @@ function loadDashboard(locationID) {
     fetch('/api/weed-pressure/' + locationID + '?start_date=' + daysAgo(30))
         .then(function(r){return r.json()}).then(function(data) {
             if (!data) return;
-            // Aggregate: max weed_pressure_score per date (multiple species per date)
-            var byDate = {};
+            // Group by species, one series per weed species
+            var speciesMap = {};
+            var dateSet = {};
             data.forEach(function(d) {
                 var dt = d.date.substring(5,10);
-                var score = d.weed_pressure_score || 0;
-                if (!byDate[dt] || score > byDate[dt]) byDate[dt] = score;
+                var name = d.weed_species ? d.weed_species.common_name : ('Species ' + d.weed_species_id);
+                dateSet[dt] = true;
+                if (!speciesMap[name]) speciesMap[name] = {};
+                speciesMap[name][dt] = Math.round((d.weed_pressure_score||0)*100)/100;
             });
-            var dates = Object.keys(byDate).sort();
-            var series = dates.map(function(dt){return{x:dt,y:Math.round(byDate[dt]*100)/100}});
+            var dates = Object.keys(dateSet).sort();
+            var series = Object.keys(speciesMap).sort().map(function(name) {
+                return {name:name, data:dates.map(function(dt){return{x:dt,y:speciesMap[name][dt]||0}})};
+            });
             renderChart('weed-chart', {
-                chart:{type:'area',height:250,toolbar:{show:false},background:'transparent'},
+                chart:{type:'line',height:250,toolbar:{show:false},background:'transparent'},
                 theme:{mode:themeMode},
                 dataLabels:{enabled:false},
-                series:[{name:'Weed Pressure',data:series}],
-                colors:['#a855f7'],
-                fill:{type:'gradient',gradient:{shadeIntensity:1,opacityFrom:0.4,opacityTo:0.1}},
+                series:series,
+                colors:['#a855f7','#f59e0b','#ef4444','#3b82f6','#22c55e'],
                 stroke:{curve:'smooth',width:2},
                 xaxis:xaxisOpts,
                 yaxis:{min:0,max:10,labels:{formatter:function(v){return v.toFixed(1)}}},
-                legend:{position:'bottom'},
+                legend:{position:'bottom',fontSize:'11px'},
                 tooltip:{shared:true,intersect:false,y:{formatter:function(v){return v.toFixed(1)+'/10'}}}
             });
         });
