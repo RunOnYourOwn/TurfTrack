@@ -79,24 +79,26 @@
 <script>
 (function() {
     var themeMode = document.documentElement.getAttribute('data-theme') === 'emerald' ? 'light' : 'dark';
+    var fmtLbs = function(v) { return v != null ? parseFloat(v).toFixed(3) : ''; };
     var apps = {{json .Applications}};
     if (!apps || !apps.length) return;
     var categories = apps.map(a => a.application_date.substring(0,10));
     var chart = new ApexCharts(document.getElementById('reports-chart'), {
         chart: {type:'bar',height:300,stacked:true,toolbar:{show:false},background:'transparent'},
         theme: {mode: themeMode},
+        dataLabels: {enabled:false},
         series: [
-            {name:'N',data:apps.map(a=>a.n_applied||0)},
-            {name:'P',data:apps.map(a=>a.p_applied||0)},
-            {name:'K',data:apps.map(a=>a.k_applied||0)},
-            {name:'Fe',data:apps.map(a=>a.fe_applied||0)}
+            {name:'N',data:apps.map(a=>parseFloat((a.n_applied||0).toFixed(3)))},
+            {name:'P',data:apps.map(a=>parseFloat((a.p_applied||0).toFixed(3)))},
+            {name:'K',data:apps.map(a=>parseFloat((a.k_applied||0).toFixed(3)))},
+            {name:'Fe',data:apps.map(a=>parseFloat((a.fe_applied||0).toFixed(3)))}
         ],
         colors: ['#22c55e','#3b82f6','#a855f7','#f59e0b'],
         plotOptions: {bar:{columnWidth:'50%'}},
         xaxis: {categories:categories},
-        yaxis: {title:{text:'lbs/1000 sq ft'}},
+        yaxis: {title:{text:'lbs/1000 sq ft'},labels:{formatter:fmtLbs}},
         legend: {position:'bottom'},
-        tooltip: {shared:true,intersect:false}
+        tooltip: {shared:true,intersect:false,y:{formatter:fmtLbs}}
     });
     chart.render();
 })();

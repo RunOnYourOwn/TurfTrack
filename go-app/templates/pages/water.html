@@ -125,6 +125,7 @@
 <script>
 (function() {
     var themeMode = document.documentElement.getAttribute('data-theme') === 'emerald' ? 'light' : 'dark';
+    var fmtIn = function(v) { return v != null ? parseFloat(v).toFixed(2) + '"' : ''; };
     fetch('/api/water-summary/{{deref .SelectedID}}')
         .then(r => r.json()).then(data => {
             if (!data || !data.length) return;
@@ -133,17 +134,18 @@
             var chart = new ApexCharts(document.getElementById('water-chart'), {
                 chart: {type:'bar',height:300,toolbar:{show:false},background:'transparent'},
                 theme: {mode: themeMode},
+                dataLabels: {enabled:false},
                 series: [
-                    {name:'ET0',data:data.map(d=>d.et0_total)},
-                    {name:'Precip',data:data.map(d=>d.precipitation_total)},
-                    {name:'Irrigation',data:data.map(d=>d.irrigation_applied)}
+                    {name:'ET0',data:data.map(d=>parseFloat(d.et0_total.toFixed(2)))},
+                    {name:'Precip',data:data.map(d=>parseFloat(d.precipitation_total.toFixed(2)))},
+                    {name:'Irrigation',data:data.map(d=>parseFloat(d.irrigation_applied.toFixed(2)))}
                 ],
                 colors: ['#ef4444','#3b82f6','#22c55e'],
                 plotOptions: {bar:{columnWidth:'60%'}},
                 xaxis: {categories:categories},
-                yaxis: {title:{text:'Inches'}},
+                yaxis: {title:{text:'Inches'},labels:{formatter:function(v){return v != null ? parseFloat(v).toFixed(2) : '';}}},
                 legend: {position:'bottom'},
-                tooltip: {shared:true,intersect:false}
+                tooltip: {shared:true,intersect:false,y:{formatter:fmtIn}}
             });
             chart.render();
         });

@@ -85,74 +85,83 @@
 
 <script>
 let charts = {};
+var themeMode = document.documentElement.getAttribute('data-theme') === 'emerald' ? 'light' : 'dark';
+var xaxisOpts = {type:'category',labels:{rotate:-45,rotateAlways:false,hideOverlappingLabels:true,maxHeight:60},tickAmount:10};
 function loadDashboard(locationID) {
     if (!locationID) return;
     fetch('/api/weather/' + locationID + '?start_date=' + daysAgo(30))
-        .then(r => r.json()).then(data => {
+        .then(function(r){return r.json()}).then(function(data) {
             if (!data) return;
             renderChart('temp-chart', {
-                chart: {type:'line',height:250,toolbar:{show:false},background:'transparent'},
-                theme: {mode: document.documentElement.getAttribute('data-theme') === 'emerald' ? 'light' : 'dark'},
-                series: [
-                    {name:'Max',data:data.map(d=>({x:d.date.substring(0,10),y:d.temperature_max_f}))},
-                    {name:'Min',data:data.map(d=>({x:d.date.substring(0,10),y:d.temperature_min_f}))}
+                chart:{type:'line',height:250,toolbar:{show:false},background:'transparent'},
+                theme:{mode:themeMode},
+                dataLabels:{enabled:false},
+                series:[
+                    {name:'Max',data:data.map(function(d){return{x:d.date.substring(5,10),y:Math.round(d.temperature_max_f*10)/10}})},
+                    {name:'Min',data:data.map(function(d){return{x:d.date.substring(5,10),y:Math.round(d.temperature_min_f*10)/10}})}
                 ],
-                colors: ['#ef4444','#3b82f6'],
-                stroke: {curve:'smooth',width:2},
-                xaxis: {type:'category',labels:{rotate:-45,rotateAlways:false}},
-                yaxis: {title:{text:'\u00b0F'}},
-                legend: {position:'bottom'},
-                tooltip: {shared:true,intersect:false}
+                colors:['#ef4444','#3b82f6'],
+                stroke:{curve:'smooth',width:2},
+                xaxis:xaxisOpts,
+                yaxis:{title:{text:'\u00b0F'},labels:{formatter:function(v){return Math.round(v)}}},
+                legend:{position:'bottom'},
+                tooltip:{shared:true,intersect:false,y:{formatter:function(v){return v.toFixed(1)+'\u00b0F'}}}
             });
         });
     fetch('/api/disease/' + locationID + '?start_date=' + daysAgo(30))
-        .then(r => r.json()).then(data => {
+        .then(function(r){return r.json()}).then(function(data) {
             if (!data) return;
             renderChart('disease-chart', {
-                chart: {type:'area',height:250,toolbar:{show:false},background:'transparent'},
-                theme: {mode: document.documentElement.getAttribute('data-theme') === 'emerald' ? 'light' : 'dark'},
-                series: [{name:'Risk Score',data:data.map(d=>({x:d.date.substring(0,10),y:d.risk_score}))}],
-                colors: ['#f59e0b'],
-                fill: {type:'gradient',gradient:{shadeIntensity:1,opacityFrom:0.4,opacityTo:0.1}},
-                stroke: {curve:'smooth',width:2},
-                xaxis: {type:'category'},
-                legend: {position:'bottom'},
-                tooltip: {shared:true,intersect:false}
+                chart:{type:'area',height:250,toolbar:{show:false},background:'transparent'},
+                theme:{mode:themeMode},
+                dataLabels:{enabled:false},
+                series:[{name:'Risk Score',data:data.map(function(d){return{x:d.date.substring(5,10),y:Math.round((d.risk_score||0)*100)/100}})}],
+                colors:['#f59e0b'],
+                fill:{type:'gradient',gradient:{shadeIntensity:1,opacityFrom:0.4,opacityTo:0.1}},
+                stroke:{curve:'smooth',width:2},
+                xaxis:xaxisOpts,
+                yaxis:{labels:{formatter:function(v){return v.toFixed(2)}}},
+                legend:{position:'bottom'},
+                tooltip:{shared:true,intersect:false,y:{formatter:function(v){return v.toFixed(2)}}}
             });
         });
     fetch('/api/growth-potential/' + locationID + '?start_date=' + daysAgo(30))
-        .then(r => r.json()).then(data => {
+        .then(function(r){return r.json()}).then(function(data) {
             if (!data) return;
             renderChart('gp-chart', {
-                chart: {type:'area',height:250,toolbar:{show:false},background:'transparent'},
-                theme: {mode: document.documentElement.getAttribute('data-theme') === 'emerald' ? 'light' : 'dark'},
-                series: [{name:'Growth Potential',data:data.map(d=>({x:d.date.substring(0,10),y:d.growth_potential}))}],
-                colors: ['#22c55e'],
-                fill: {type:'gradient',gradient:{shadeIntensity:1,opacityFrom:0.4,opacityTo:0.1}},
-                stroke: {curve:'smooth',width:2},
-                xaxis: {type:'category'},
-                legend: {position:'bottom'},
-                tooltip: {shared:true,intersect:false}
+                chart:{type:'area',height:250,toolbar:{show:false},background:'transparent'},
+                theme:{mode:themeMode},
+                dataLabels:{enabled:false},
+                series:[{name:'Growth Potential',data:data.map(function(d){return{x:d.date.substring(5,10),y:Math.round((d.growth_potential||0)*100)/100}})}],
+                colors:['#22c55e'],
+                fill:{type:'gradient',gradient:{shadeIntensity:1,opacityFrom:0.4,opacityTo:0.1}},
+                stroke:{curve:'smooth',width:2},
+                xaxis:xaxisOpts,
+                yaxis:{min:0,max:1,labels:{formatter:function(v){return v.toFixed(2)}}},
+                legend:{position:'bottom'},
+                tooltip:{shared:true,intersect:false,y:{formatter:function(v){return v.toFixed(2)}}}
             });
         });
     fetch('/api/weed-pressure/' + locationID + '?start_date=' + daysAgo(30))
-        .then(r => r.json()).then(data => {
+        .then(function(r){return r.json()}).then(function(data) {
             if (!data) return;
             renderChart('weed-chart', {
-                chart: {type:'area',height:250,toolbar:{show:false},background:'transparent'},
-                theme: {mode: document.documentElement.getAttribute('data-theme') === 'emerald' ? 'light' : 'dark'},
-                series: [{name:'Weed Pressure',data:data.map(d=>({x:d.date.substring(0,10),y:d.weed_pressure_score}))}],
-                colors: ['#a855f7'],
-                fill: {type:'gradient',gradient:{shadeIntensity:1,opacityFrom:0.4,opacityTo:0.1}},
-                stroke: {curve:'smooth',width:2},
-                xaxis: {type:'category'},
-                legend: {position:'bottom'},
-                tooltip: {shared:true,intersect:false}
+                chart:{type:'area',height:250,toolbar:{show:false},background:'transparent'},
+                theme:{mode:themeMode},
+                dataLabels:{enabled:false},
+                series:[{name:'Weed Pressure',data:data.map(function(d){return{x:d.date.substring(5,10),y:Math.round((d.weed_pressure_score||0)*100)/100}})}],
+                colors:['#a855f7'],
+                fill:{type:'gradient',gradient:{shadeIntensity:1,opacityFrom:0.4,opacityTo:0.1}},
+                stroke:{curve:'smooth',width:2},
+                xaxis:xaxisOpts,
+                yaxis:{labels:{formatter:function(v){return v.toFixed(1)}}},
+                legend:{position:'bottom'},
+                tooltip:{shared:true,intersect:false,y:{formatter:function(v){return v.toFixed(2)}}}
             });
         });
 }
 function daysAgo(n) {
-    const d = new Date(); d.setDate(d.getDate()-n); return d.toISOString().substring(0,10);
+    var d = new Date(); d.setDate(d.getDate()-n); return d.toISOString().substring(0,10);
 }
 function renderChart(id, options) {
     if (charts[id]) charts[id].destroy();

@@ -75,20 +75,22 @@
     <script>
     (function() {
         var themeMode = document.documentElement.getAttribute('data-theme') === 'emerald' ? 'light' : 'dark';
+        var fmtGDD = function(v) { return v != null ? parseFloat(v).toFixed(1) : ''; };
         fetch('/api/gdd-values/{{.ID}}')
             .then(r => r.json()).then(data => {
                 if (!data || !data.length) return;
                 var chart = new ApexCharts(document.getElementById('gdd-chart-{{.ID}}'), {
                     chart: {type:'area',height:250,toolbar:{show:true,tools:{download:true,zoom:true,pan:true,reset:true}},background:'transparent'},
                     theme: {mode: themeMode},
-                    series: [{name:'Cumulative GDD',data:data.map(d=>({x:d.date.substring(0,10),y:d.cumulative_gdd}))}],
+                    dataLabels: {enabled:false},
+                    series: [{name:'Cumulative GDD',data:data.map(d=>({x:d.date.substring(5,10),y:parseFloat(d.cumulative_gdd.toFixed(1))}))}],
                     colors: ['#22c55e'],
                     fill: {type:'gradient',gradient:{shadeIntensity:1,opacityFrom:0.4,opacityTo:0.1}},
                     stroke: {curve:'smooth',width:2},
-                    xaxis: {type:'category',labels:{rotate:-45,rotateAlways:false}},
-                    yaxis: {title:{text:'GDD'}},
+                    xaxis: {type:'category',labels:{rotate:-45,rotateAlways:false,hideOverlappingLabels:true},tickAmount:10},
+                    yaxis: {title:{text:'GDD'},labels:{formatter:fmtGDD}},
                     legend: {position:'bottom'},
-                    tooltip: {shared:true,intersect:false}
+                    tooltip: {shared:true,intersect:false,y:{formatter:fmtGDD}}
                 });
                 chart.render();
             });
