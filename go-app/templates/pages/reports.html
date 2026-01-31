@@ -1,0 +1,85 @@
+{{define "reports.html"}}
+<div class="space-y-6">
+    <h2 class="text-2xl font-bold">Reports</h2>
+
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+        <h3 class="text-lg font-semibold mb-4">Nutrient Applications Over Time</h3>
+        <canvas id="reports-chart" height="250"></canvas>
+    </div>
+
+    {{if .Applications}}
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 dark:bg-gray-700">
+                <tr>
+                    <th class="px-4 py-3 text-left font-medium">Date</th>
+                    <th class="px-4 py-3 text-left font-medium">Product</th>
+                    <th class="px-4 py-3 text-right font-medium">N (lbs)</th>
+                    <th class="px-4 py-3 text-right font-medium">P (lbs)</th>
+                    <th class="px-4 py-3 text-right font-medium">K (lbs)</th>
+                    <th class="px-4 py-3 text-right font-medium">Fe (lbs)</th>
+                    <th class="px-4 py-3 text-right font-medium">Cost</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                {{$pm := .ProductMap}}
+                {{range .Applications}}
+                <tr>
+                    <td class="px-4 py-3">{{formatDate .ApplicationDate}}</td>
+                    <td class="px-4 py-3">{{with index $pm .ProductID}}{{.Name}}{{end}}</td>
+                    <td class="px-4 py-3 text-right">{{formatFloatPtr .NApplied 3}}</td>
+                    <td class="px-4 py-3 text-right">{{formatFloatPtr .PApplied 3}}</td>
+                    <td class="px-4 py-3 text-right">{{formatFloatPtr .KApplied 3}}</td>
+                    <td class="px-4 py-3 text-right">{{formatFloatPtr .FeApplied 3}}</td>
+                    <td class="px-4 py-3 text-right">${{formatFloatPtr .CostApplied 2}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+    {{else}}
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center">
+        <p class="text-gray-500">No applications to report on yet.</p>
+    </div>
+    {{end}}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Build cumulative nutrient data from the table
+    const rows = document.querySelectorAll('tbody tr');
+    if (!rows.length) return;
+
+    const labels = [], nCum = [], pCum = [], kCum = [];
+    let n = 0, p = 0, k = 0;
+    rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        labels.push(cells[0].textContent);
+        const parseVal = (s) => { const v = parseFloat(s); return isNaN(v) ? 0 : v; };
+        n += parseVal(cells[2].textContent);
+        p += parseVal(cells[3].textContent);
+        k += parseVal(cells[4].textContent);
+        nCum.push(n.toFixed(3));
+        pCum.push(p.toFixed(3));
+        kCum.push(k.toFixed(3));
+    });
+
+    new Chart(document.getElementById('reports-chart').getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {label: 'N (lbs)', data: nCum, borderColor: '#22c55e', fill: false},
+                {label: 'P (lbs)', data: pCum, borderColor: '#3b82f6', fill: false},
+                {label: 'K (lbs)', data: kCum, borderColor: '#a855f7', fill: false}
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: {legend: {position: 'top'}},
+            scales: {x: {ticks: {maxTicksLimit: 10}}}
+        }
+    });
+});
+</script>
+{{end}}

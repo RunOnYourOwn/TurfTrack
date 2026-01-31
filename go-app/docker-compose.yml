@@ -1,0 +1,45 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: turftrack-go-db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-turftrack}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-turftrack}
+      POSTGRES_DB: ${POSTGRES_DB:-turftrack}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U turftrack -d turftrack"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - turftrack
+
+  app:
+    build: .
+    container_name: turftrack-go-app
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER:-turftrack}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-turftrack}
+      POSTGRES_DB: ${POSTGRES_DB:-turftrack}
+      PORT: "8080"
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - turftrack
+
+volumes:
+  postgres_data:
+
+networks:
+  turftrack:
+    driver: bridge

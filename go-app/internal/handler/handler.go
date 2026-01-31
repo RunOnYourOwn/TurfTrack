@@ -1,0 +1,695 @@
+// Package handler implements HTTP request handlers for TurfTrack.
+package handler
+
+import (
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"html/template"
+	"log"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/RunOnYourOwn/TurfTrack/go-app/internal/calc"
+	dbpkg "github.com/RunOnYourOwn/TurfTrack/go-app/internal/db"
+	"github.com/RunOnYourOwn/TurfTrack/go-app/internal/model"
+	"github.com/RunOnYourOwn/TurfTrack/go-app/internal/scheduler"
+)
+
+// Server holds shared dependencies for all handlers.
+type Server struct {
+	DB        *sql.DB
+	Templates *template.Template
+}
+
+// NewServer creates a new Server and parses templates.
+func NewServer(db *sql.DB, templatesDir string) (*Server, error) {
+	funcMap := template.FuncMap{
+		"formatDate": func(t time.Time) string { return t.Format("2006-01-02") },
+		"formatDateTime": func(t time.Time) string { return t.Format("Jan 02, 2006 3:04 PM") },
+		"formatFloat": func(f float64, prec int) string { return strconv.FormatFloat(f, 'f', prec, 64) },
+		"formatFloatPtr": func(f *float64, prec int) string {
+			if f == nil {
+				return "-"
+			}
+			return strconv.FormatFloat(*f, 'f', prec, 64)
+		},
+		"pctToStr": func(f float64) string {
+			if f == 0 {
+				return "-"
+			}
+			return strconv.FormatFloat(f, 'f', 2, 64) + "%"
+		},
+		"statusBadge": func(s string) template.HTML {
+			colors := map[string]string{
+				"excellent": "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+				"good":      "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+				"warning":   "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+				"critical":  "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+			}
+			cls := colors[s]
+			return template.HTML(fmt.Sprintf(`<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium %s">%s</span>`, cls, s))
+		},
+		"json": func(v interface{}) template.JS {
+			b, _ := json.Marshal(v)
+			return template.JS(b)
+		},
+		"nullStr": func(s sql.NullString) string {
+			if s.Valid {
+				return s.String
+			}
+			return ""
+		},
+		"deref": func(p *int) int {
+			if p == nil {
+				return 0
+			}
+			return *p
+		},
+		"derefTime": func(p *time.Time) time.Time {
+			if p == nil {
+				return time.Time{}
+			}
+			return *p
+		},
+		"mul": func(a, b float64) float64 { return a * b },
+		"seq": func(n int) []int {
+			s := make([]int, n)
+			for i := range s {
+				s[i] = i
+			}
+			return s
+		},
+	}
+
+	pattern := filepath.Join(templatesDir, "**", "*.html")
+	tmpl, err := template.New("").Funcs(funcMap).ParseGlob(pattern)
+	if err != nil {
+		// Try flat pattern
+		pattern = filepath.Join(templatesDir, "*.html")
+		tmpl, err = template.New("").Funcs(funcMap).ParseGlob(pattern)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse templates: %w", err)
+		}
+	}
+
+	// Also parse subdirectories
+	for _, sub := range []string{"layouts", "pages", "partials"} {
+		subPattern := filepath.Join(templatesDir, sub, "*.html")
+		if matches, _ := filepath.Glob(subPattern); len(matches) > 0 {
+			tmpl, err = tmpl.ParseGlob(subPattern)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse templates in %s: %w", sub, err)
+			}
+		}
+	}
+
+	return &Server{DB: db, Templates: tmpl}, nil
+}
+
+// Routes registers all HTTP routes.
+func (s *Server) Routes() http.Handler {
+	mux := http.NewServeMux()
+
+	// Static files
+	staticDir := os.Getenv("STATIC_DIR")
+	if staticDir == "" {
+		staticDir = "static"
+	}
+	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir(staticDir))))
+
+	// Pages (server-rendered HTML)
+	mux.HandleFunc("GET /", s.handleDashboard)
+	mux.HandleFunc("GET /lawns", s.handleLawns)
+	mux.HandleFunc("GET /products", s.handleProducts)
+	mux.HandleFunc("GET /applications", s.handleApplications)
+	mux.HandleFunc("GET /gdd", s.handleGDD)
+	mux.HandleFunc("GET /water", s.handleWater)
+	mux.HandleFunc("GET /reports", s.handleReports)
+	mux.HandleFunc("GET /admin", s.handleAdmin)
+
+	// HTMX partials / API actions
+	mux.HandleFunc("POST /lawns", s.handleCreateLawn)
+	mux.HandleFunc("PUT /lawns/{id}", s.handleUpdateLawn)
+	mux.HandleFunc("DELETE /lawns/{id}", s.handleDeleteLawn)
+
+	mux.HandleFunc("POST /products", s.handleCreateProduct)
+	mux.HandleFunc("DELETE /products/{id}", s.handleDeleteProduct)
+
+	mux.HandleFunc("POST /applications", s.handleCreateApplication)
+	mux.HandleFunc("DELETE /applications/{id}", s.handleDeleteApplication)
+
+	mux.HandleFunc("POST /gdd-models", s.handleCreateGDDModel)
+	mux.HandleFunc("DELETE /gdd-models/{id}", s.handleDeleteGDDModel)
+
+	mux.HandleFunc("POST /irrigation", s.handleCreateIrrigation)
+	mux.HandleFunc("DELETE /irrigation/{id}", s.handleDeleteIrrigation)
+
+	mux.HandleFunc("POST /locations", s.handleCreateLocation)
+
+	// JSON API endpoints (for charts)
+	mux.HandleFunc("GET /api/weather/{locationID}", s.apiWeather)
+	mux.HandleFunc("GET /api/disease/{locationID}", s.apiDisease)
+	mux.HandleFunc("GET /api/growth-potential/{locationID}", s.apiGrowthPotential)
+	mux.HandleFunc("GET /api/gdd-values/{modelID}", s.apiGDDValues)
+	mux.HandleFunc("GET /api/water-summary/{lawnID}", s.apiWaterSummary)
+	mux.HandleFunc("GET /api/weed-pressure/{locationID}", s.apiWeedPressure)
+
+	// Health & version
+	mux.HandleFunc("GET /health", s.handleHealth)
+	mux.HandleFunc("GET /api/v1/version", s.handleVersion)
+
+	return s.withMiddleware(mux)
+}
+
+func (s *Server) withMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		next.ServeHTTP(w, r)
+		log.Printf("%s %s %s", r.Method, r.URL.Path, time.Since(start))
+	})
+}
+
+func (s *Server) render(w http.ResponseWriter, name string, data interface{}) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := s.Templates.ExecuteTemplate(w, name, data); err != nil {
+		log.Printf("Template error (%s): %v", name, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) renderJSON(w http.ResponseWriter, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(data)
+}
+
+func pathID(r *http.Request, param string) (int, error) {
+	return strconv.Atoi(r.PathValue(param))
+}
+
+func queryInt(r *http.Request, key string) *int {
+	v := r.URL.Query().Get(key)
+	if v == "" {
+		return nil
+	}
+	i, err := strconv.Atoi(v)
+	if err != nil {
+		return nil
+	}
+	return &i
+}
+
+func queryDate(r *http.Request, key string) *time.Time {
+	v := r.URL.Query().Get(key)
+	if v == "" {
+		return nil
+	}
+	t, err := time.Parse("2006-01-02", v)
+	if err != nil {
+		return nil
+	}
+	return &t
+}
+
+// --- Page Handlers ---
+
+func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+	locs, _ := dbpkg.ListLocations(s.DB)
+	lawns, _ := dbpkg.ListLawns(s.DB)
+
+	data := map[string]interface{}{
+		"Page":      "dashboard",
+		"Locations": locs,
+		"Lawns":     lawns,
+	}
+	s.render(w, "layout.html", data)
+}
+
+func (s *Server) handleLawns(w http.ResponseWriter, r *http.Request) {
+	lawns, _ := dbpkg.ListLawns(s.DB)
+	locs, _ := dbpkg.ListLocations(s.DB)
+	data := map[string]interface{}{
+		"Page":      "lawns",
+		"Lawns":     lawns,
+		"Locations": locs,
+	}
+	s.render(w, "layout.html", data)
+}
+
+func (s *Server) handleProducts(w http.ResponseWriter, r *http.Request) {
+	products, _ := dbpkg.ListProducts(s.DB)
+	data := map[string]interface{}{
+		"Page":     "products",
+		"Products": products,
+	}
+	s.render(w, "layout.html", data)
+}
+
+func (s *Server) handleApplications(w http.ResponseWriter, r *http.Request) {
+	apps, _ := dbpkg.ListApplications(s.DB, nil)
+	lawns, _ := dbpkg.ListLawns(s.DB)
+	products, _ := dbpkg.ListProducts(s.DB)
+	gddModels, _ := dbpkg.ListGDDModels(s.DB, nil)
+
+	// Build lookup maps
+	lawnMap := map[int]model.Lawn{}
+	for _, l := range lawns {
+		lawnMap[l.ID] = l
+	}
+	productMap := map[int]model.Product{}
+	for _, p := range products {
+		productMap[p.ID] = p
+	}
+
+	data := map[string]interface{}{
+		"Page":         "applications",
+		"Applications": apps,
+		"Lawns":        lawns,
+		"Products":     products,
+		"GDDModels":    gddModels,
+		"LawnMap":      lawnMap,
+		"ProductMap":   productMap,
+	}
+	s.render(w, "layout.html", data)
+}
+
+func (s *Server) handleGDD(w http.ResponseWriter, r *http.Request) {
+	locs, _ := dbpkg.ListLocations(s.DB)
+	locID := queryInt(r, "location_id")
+	var models []model.GDDModel
+	if locID != nil {
+		models, _ = dbpkg.ListGDDModels(s.DB, locID)
+	}
+	data := map[string]interface{}{
+		"Page":               "gdd",
+		"Locations":          locs,
+		"GDDModels":          models,
+		"SelectedLocationID": locID,
+	}
+	s.render(w, "layout.html", data)
+}
+
+func (s *Server) handleWater(w http.ResponseWriter, r *http.Request) {
+	lawns, _ := dbpkg.ListLawns(s.DB)
+	lawnID := queryInt(r, "lawn")
+
+	var summaries []model.WeeklyWaterSummary
+	var entries []model.IrrigationEntry
+	if lawnID != nil {
+		summaries, _ = dbpkg.GetWeeklyWaterSummaries(s.DB, *lawnID)
+		entries, _ = dbpkg.ListIrrigationEntries(s.DB, *lawnID, nil, nil)
+	}
+
+	data := map[string]interface{}{
+		"Page":       "water",
+		"Lawns":      lawns,
+		"SelectedID": lawnID,
+		"Summaries":  summaries,
+		"Irrigation": entries,
+	}
+	s.render(w, "layout.html", data)
+}
+
+func (s *Server) handleReports(w http.ResponseWriter, r *http.Request) {
+	lawns, _ := dbpkg.ListLawns(s.DB)
+	apps, _ := dbpkg.ListApplications(s.DB, nil)
+	products, _ := dbpkg.ListProducts(s.DB)
+
+	productMap := map[int]model.Product{}
+	for _, p := range products {
+		productMap[p.ID] = p
+	}
+
+	data := map[string]interface{}{
+		"Page":         "reports",
+		"Lawns":        lawns,
+		"Applications": apps,
+		"ProductMap":   productMap,
+	}
+	s.render(w, "layout.html", data)
+}
+
+func (s *Server) handleAdmin(w http.ResponseWriter, r *http.Request) {
+	tasks, _ := dbpkg.ListTaskStatuses(s.DB, 50)
+	data := map[string]interface{}{
+		"Page":  "admin",
+		"Tasks": tasks,
+	}
+	s.render(w, "layout.html", data)
+}
+
+// --- Action Handlers ---
+
+func (s *Server) handleCreateLawn(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	name := r.FormValue("name")
+	area, _ := strconv.ParseFloat(r.FormValue("area"), 64)
+	grassType := model.GrassType(r.FormValue("grass_type"))
+	notes := r.FormValue("notes")
+	freq := model.WeatherFetchFrequency(r.FormValue("weather_fetch_frequency"))
+	if freq == "" {
+		freq = model.Freq24h
+	}
+	tz := r.FormValue("timezone")
+	if tz == "" {
+		tz = "America/Chicago"
+	}
+	weatherEnabled := r.FormValue("weather_enabled") == "on" || r.FormValue("weather_enabled") == "true"
+
+	locIDStr := r.FormValue("location_id")
+	var locationID int
+
+	if locIDStr == "new" {
+		lat, _ := strconv.ParseFloat(r.FormValue("latitude"), 64)
+		lon, _ := strconv.ParseFloat(r.FormValue("longitude"), 64)
+		locName := r.FormValue("location_name")
+		if locName == "" {
+			locName = fmt.Sprintf("Location (%.4f, %.4f)", lat, lon)
+		}
+		loc, err := dbpkg.CreateLocation(s.DB, locName, lat, lon)
+		if err != nil {
+			http.Error(w, "Failed to create location: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		locationID = loc.ID
+		// Trigger weather fetch for new location
+		scheduler.FetchWeatherForLocation(s.DB, *loc)
+	} else {
+		locationID, _ = strconv.Atoi(locIDStr)
+	}
+
+	_, err := dbpkg.CreateLawn(s.DB, name, area, grassType, notes, freq, tz, weatherEnabled, locationID)
+	if err != nil {
+		http.Error(w, "Failed to create lawn: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("HX-Redirect", "/lawns")
+	w.WriteHeader(http.StatusCreated)
+}
+
+func (s *Server) handleUpdateLawn(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r, "id")
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+	r.ParseForm()
+	name := r.FormValue("name")
+	area, _ := strconv.ParseFloat(r.FormValue("area"), 64)
+	grassType := model.GrassType(r.FormValue("grass_type"))
+	notes := r.FormValue("notes")
+	freq := model.WeatherFetchFrequency(r.FormValue("weather_fetch_frequency"))
+	tz := r.FormValue("timezone")
+	weatherEnabled := r.FormValue("weather_enabled") == "on"
+	locationID, _ := strconv.Atoi(r.FormValue("location_id"))
+
+	_, err = dbpkg.UpdateLawn(s.DB, id, name, area, grassType, notes, freq, tz, weatherEnabled, locationID)
+	if err != nil {
+		http.Error(w, "Failed to update lawn", http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("HX-Redirect", "/lawns")
+}
+
+func (s *Server) handleDeleteLawn(w http.ResponseWriter, r *http.Request) {
+	id, _ := pathID(r, "id")
+	dbpkg.DeleteLawn(s.DB, id)
+	w.Header().Set("HX-Redirect", "/lawns")
+}
+
+func (s *Server) handleCreateProduct(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	p := &model.Product{
+		Name: r.FormValue("name"),
+	}
+	p.NPct, _ = strconv.ParseFloat(r.FormValue("n_pct"), 64)
+	p.PPct, _ = strconv.ParseFloat(r.FormValue("p_pct"), 64)
+	p.KPct, _ = strconv.ParseFloat(r.FormValue("k_pct"), 64)
+	p.CaPct, _ = strconv.ParseFloat(r.FormValue("ca_pct"), 64)
+	p.MgPct, _ = strconv.ParseFloat(r.FormValue("mg_pct"), 64)
+	p.SPct, _ = strconv.ParseFloat(r.FormValue("s_pct"), 64)
+	p.FePct, _ = strconv.ParseFloat(r.FormValue("fe_pct"), 64)
+	p.CuPct, _ = strconv.ParseFloat(r.FormValue("cu_pct"), 64)
+	p.MnPct, _ = strconv.ParseFloat(r.FormValue("mn_pct"), 64)
+	p.BPct, _ = strconv.ParseFloat(r.FormValue("b_pct"), 64)
+	p.ZnPct, _ = strconv.ParseFloat(r.FormValue("zn_pct"), 64)
+
+	if v := r.FormValue("weight_lbs"); v != "" {
+		f, _ := strconv.ParseFloat(v, 64)
+		p.WeightLbs = &f
+	}
+	if v := r.FormValue("cost_per_bag"); v != "" {
+		f, _ := strconv.ParseFloat(v, 64)
+		p.CostPerBag = &f
+	}
+
+	_, err := dbpkg.CreateProduct(s.DB, p)
+	if err != nil {
+		http.Error(w, "Failed to create product", http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("HX-Redirect", "/products")
+	w.WriteHeader(http.StatusCreated)
+}
+
+func (s *Server) handleDeleteProduct(w http.ResponseWriter, r *http.Request) {
+	id, _ := pathID(r, "id")
+	dbpkg.DeleteProduct(s.DB, id)
+	w.Header().Set("HX-Redirect", "/products")
+}
+
+func (s *Server) handleCreateApplication(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	a := &model.Application{}
+	a.LawnID, _ = strconv.Atoi(r.FormValue("lawn_id"))
+	a.ProductID, _ = strconv.Atoi(r.FormValue("product_id"))
+	date, _ := time.Parse("2006-01-02", r.FormValue("application_date"))
+	a.ApplicationDate = date
+	a.AmountPerArea, _ = strconv.ParseFloat(r.FormValue("amount_per_area"), 64)
+	a.AreaUnit, _ = strconv.Atoi(r.FormValue("area_unit"))
+	if a.AreaUnit == 0 {
+		a.AreaUnit = 1000
+	}
+	a.Unit = model.ApplicationUnit(r.FormValue("unit"))
+	a.Status = model.ApplicationStatus(r.FormValue("status"))
+	if a.Status == "" {
+		a.Status = model.AppPlanned
+	}
+	if v := r.FormValue("notes"); v != "" {
+		a.Notes = sql.NullString{String: v, Valid: true}
+	}
+
+	// Calculate nutrient amounts
+	product, _ := dbpkg.GetProduct(s.DB, a.ProductID)
+	lawn, _ := dbpkg.GetLawn(s.DB, a.LawnID)
+	if product != nil && lawn != nil {
+		baseAmount := calc.ConvertToBaseUnit(a.AmountPerArea, string(a.Unit))
+		setFloat := func(pct float64) *float64 {
+			v := calc.NutrientApplied(baseAmount, pct)
+			return &v
+		}
+		a.NApplied = setFloat(product.NPct)
+		a.PApplied = setFloat(product.PPct)
+		a.KApplied = setFloat(product.KPct)
+		a.CaApplied = setFloat(product.CaPct)
+		a.MgApplied = setFloat(product.MgPct)
+		a.SApplied = setFloat(product.SPct)
+		a.FeApplied = setFloat(product.FePct)
+		a.CuApplied = setFloat(product.CuPct)
+		a.MnApplied = setFloat(product.MnPct)
+		a.BApplied = setFloat(product.BPct)
+		a.ZnApplied = setFloat(product.ZnPct)
+
+		if product.CostPerLb != nil {
+			cost := calc.ApplicationCost(*product.CostPerLb, baseAmount, lawn.Area, float64(a.AreaUnit))
+			a.CostApplied = &cost
+		}
+	}
+
+	_, err := dbpkg.CreateApplication(s.DB, a)
+	if err != nil {
+		http.Error(w, "Failed to create application", http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("HX-Redirect", "/applications")
+	w.WriteHeader(http.StatusCreated)
+}
+
+func (s *Server) handleDeleteApplication(w http.ResponseWriter, r *http.Request) {
+	id, _ := pathID(r, "id")
+	dbpkg.DeleteApplication(s.DB, id)
+	w.Header().Set("HX-Redirect", "/applications")
+}
+
+func (s *Server) handleCreateGDDModel(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	m := &model.GDDModel{}
+	m.LocationID, _ = strconv.Atoi(r.FormValue("location_id"))
+	m.Name = r.FormValue("name")
+	m.BaseTemp, _ = strconv.ParseFloat(r.FormValue("base_temp"), 64)
+	m.Unit = model.TempUnit(r.FormValue("unit"))
+	startDate, _ := time.Parse("2006-01-02", r.FormValue("start_date"))
+	m.StartDate = startDate
+	m.Threshold, _ = strconv.ParseFloat(r.FormValue("threshold"), 64)
+	m.ResetOnThreshold = r.FormValue("reset_on_threshold") == "on"
+
+	_, err := dbpkg.CreateGDDModel(s.DB, m)
+	if err != nil {
+		http.Error(w, "Failed to create GDD model", http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("HX-Redirect", fmt.Sprintf("/gdd?location_id=%d", m.LocationID))
+	w.WriteHeader(http.StatusCreated)
+}
+
+func (s *Server) handleDeleteGDDModel(w http.ResponseWriter, r *http.Request) {
+	id, _ := pathID(r, "id")
+	dbpkg.DeleteGDDModel(s.DB, id)
+	w.Header().Set("HX-Redirect", "/gdd")
+}
+
+func (s *Server) handleCreateIrrigation(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	e := &model.IrrigationEntry{}
+	e.LawnID, _ = strconv.Atoi(r.FormValue("lawn_id"))
+	date, _ := time.Parse("2006-01-02", r.FormValue("date"))
+	e.Date = date
+	e.Amount, _ = strconv.ParseFloat(r.FormValue("amount"), 64)
+	e.Duration, _ = strconv.Atoi(r.FormValue("duration"))
+	e.Source = model.IrrigationSource(r.FormValue("source"))
+	if e.Source == "" {
+		e.Source = model.IrrigationManual
+	}
+
+	_, err := dbpkg.CreateIrrigationEntry(s.DB, e)
+	if err != nil {
+		http.Error(w, "Failed to create irrigation entry", http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("HX-Redirect", fmt.Sprintf("/water?lawn=%d", e.LawnID))
+	w.WriteHeader(http.StatusCreated)
+}
+
+func (s *Server) handleDeleteIrrigation(w http.ResponseWriter, r *http.Request) {
+	id, _ := pathID(r, "id")
+	dbpkg.DeleteIrrigationEntry(s.DB, id)
+	w.Header().Set("HX-Redirect", "/water")
+}
+
+func (s *Server) handleCreateLocation(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	name := r.FormValue("name")
+	lat, _ := strconv.ParseFloat(r.FormValue("latitude"), 64)
+	lon, _ := strconv.ParseFloat(r.FormValue("longitude"), 64)
+
+	loc, err := dbpkg.CreateLocation(s.DB, name, lat, lon)
+	if err != nil {
+		http.Error(w, "Failed to create location", http.StatusBadRequest)
+		return
+	}
+
+	// Start weather fetch in background
+	scheduler.FetchWeatherForLocation(s.DB, *loc)
+
+	s.renderJSON(w, loc)
+}
+
+// --- JSON API Handlers (for charts) ---
+
+func (s *Server) apiWeather(w http.ResponseWriter, r *http.Request) {
+	locID, err := pathID(r, "locationID")
+	if err != nil {
+		http.Error(w, "Invalid location ID", http.StatusBadRequest)
+		return
+	}
+	start := queryDate(r, "start_date")
+	end := queryDate(r, "end_date")
+
+	data, err := dbpkg.GetWeatherForLocation(s.DB, locID, start, end)
+	if err != nil {
+		http.Error(w, "Failed to get weather", http.StatusInternalServerError)
+		return
+	}
+	s.renderJSON(w, data)
+}
+
+func (s *Server) apiDisease(w http.ResponseWriter, r *http.Request) {
+	locID, _ := pathID(r, "locationID")
+	start := queryDate(r, "start_date")
+	end := queryDate(r, "end_date")
+	data, _ := dbpkg.GetDiseasePressure(s.DB, locID, start, end)
+	s.renderJSON(w, data)
+}
+
+func (s *Server) apiGrowthPotential(w http.ResponseWriter, r *http.Request) {
+	locID, _ := pathID(r, "locationID")
+	start := queryDate(r, "start_date")
+	end := queryDate(r, "end_date")
+	data, _ := dbpkg.GetGrowthPotential(s.DB, locID, start, end)
+	s.renderJSON(w, data)
+}
+
+func (s *Server) apiGDDValues(w http.ResponseWriter, r *http.Request) {
+	modelID, _ := pathID(r, "modelID")
+	data, _ := dbpkg.GetGDDValues(s.DB, modelID)
+	s.renderJSON(w, data)
+}
+
+func (s *Server) apiWaterSummary(w http.ResponseWriter, r *http.Request) {
+	lawnID, _ := pathID(r, "lawnID")
+	data, _ := dbpkg.GetWeeklyWaterSummaries(s.DB, lawnID)
+	s.renderJSON(w, data)
+}
+
+func (s *Server) apiWeedPressure(w http.ResponseWriter, r *http.Request) {
+	locID, _ := pathID(r, "locationID")
+	start := queryDate(r, "start_date")
+	end := queryDate(r, "end_date")
+	data, _ := dbpkg.GetWeedPressure(s.DB, locID, start, end)
+	s.renderJSON(w, data)
+}
+
+// --- Health & Version ---
+
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	if s.DB == nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		s.renderJSON(w, map[string]string{"status": "unhealthy", "error": "no database connection"})
+		return
+	}
+	if err := s.DB.Ping(); err != nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		s.renderJSON(w, map[string]string{"status": "unhealthy", "error": err.Error()})
+		return
+	}
+	s.renderJSON(w, map[string]string{"status": "healthy"})
+}
+
+func (s *Server) handleVersion(w http.ResponseWriter, r *http.Request) {
+	s.renderJSON(w, map[string]string{
+		"version":     "0.0.22",
+		"environment": envOr("ENVIRONMENT", "development"),
+		"go_version":  "1.23",
+	})
+}
+
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}
+
+// Unused import guard
+var _ = strings.TrimSpace

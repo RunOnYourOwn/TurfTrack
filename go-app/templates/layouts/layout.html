@@ -1,0 +1,56 @@
+{{define "layout.html"}}<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TurfTrack</title>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { extend: {} }
+        }
+    </script>
+    <style>
+        [hx-indicator] .htmx-indicator { display: none; }
+        [hx-indicator] .htmx-request .htmx-indicator { display: inline; }
+        .htmx-request .htmx-indicator { display: inline; }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen flex">
+    <!-- Sidebar -->
+    <nav class="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 min-h-screen p-4 flex flex-col">
+        <div class="mb-8">
+            <h1 class="text-xl font-bold text-green-600 dark:text-green-400">TurfTrack</h1>
+            <p class="text-xs text-gray-500 dark:text-gray-400">Turf Management</p>
+        </div>
+        <div class="flex-1 space-y-1">
+            <a href="/" class="block px-3 py-2 rounded-lg text-sm {{if eq .Page "dashboard"}}bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-medium{{else}}hover:bg-gray-100 dark:hover:bg-gray-700{{end}}">Dashboard</a>
+            <a href="/lawns" class="block px-3 py-2 rounded-lg text-sm {{if eq .Page "lawns"}}bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-medium{{else}}hover:bg-gray-100 dark:hover:bg-gray-700{{end}}">Lawns</a>
+            <a href="/products" class="block px-3 py-2 rounded-lg text-sm {{if eq .Page "products"}}bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-medium{{else}}hover:bg-gray-100 dark:hover:bg-gray-700{{end}}">Products</a>
+            <a href="/applications" class="block px-3 py-2 rounded-lg text-sm {{if eq .Page "applications"}}bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-medium{{else}}hover:bg-gray-100 dark:hover:bg-gray-700{{end}}">Applications</a>
+            <a href="/gdd" class="block px-3 py-2 rounded-lg text-sm {{if eq .Page "gdd"}}bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-medium{{else}}hover:bg-gray-100 dark:hover:bg-gray-700{{end}}">GDD Models</a>
+            <a href="/water" class="block px-3 py-2 rounded-lg text-sm {{if eq .Page "water"}}bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-medium{{else}}hover:bg-gray-100 dark:hover:bg-gray-700{{end}}">Water</a>
+            <a href="/reports" class="block px-3 py-2 rounded-lg text-sm {{if eq .Page "reports"}}bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-medium{{else}}hover:bg-gray-100 dark:hover:bg-gray-700{{end}}">Reports</a>
+            <a href="/admin" class="block px-3 py-2 rounded-lg text-sm {{if eq .Page "admin"}}bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-medium{{else}}hover:bg-gray-100 dark:hover:bg-gray-700{{end}}">Admin</a>
+        </div>
+        <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
+            <button onclick="document.documentElement.classList.toggle('dark')" class="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">Toggle Theme</button>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-6 overflow-auto">
+        {{if eq .Page "dashboard"}}{{template "dashboard.html" .}}{{end}}
+        {{if eq .Page "lawns"}}{{template "lawns.html" .}}{{end}}
+        {{if eq .Page "products"}}{{template "products.html" .}}{{end}}
+        {{if eq .Page "applications"}}{{template "applications.html" .}}{{end}}
+        {{if eq .Page "gdd"}}{{template "gdd.html" .}}{{end}}
+        {{if eq .Page "water"}}{{template "water.html" .}}{{end}}
+        {{if eq .Page "reports"}}{{template "reports.html" .}}{{end}}
+        {{if eq .Page "admin"}}{{template "admin.html" .}}{{end}}
+    </main>
+</body>
+</html>{{end}}
