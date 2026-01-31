@@ -343,7 +343,7 @@ func TestApplicationCRUD(t *testing.T) {
 	}
 
 	// List (all)
-	apps, err := ListApplications(db, nil)
+	apps, err := ListApplications(db, nil, "", "")
 	if err != nil {
 		t.Fatalf("ListApplications (all) failed: %v", err)
 	}
@@ -353,7 +353,7 @@ func TestApplicationCRUD(t *testing.T) {
 
 	// List (filtered by lawn)
 	lawnID := lawn.ID
-	appsFiltered, err := ListApplications(db, &lawnID)
+	appsFiltered, err := ListApplications(db, &lawnID, "", "")
 	if err != nil {
 		t.Fatalf("ListApplications (filtered) failed: %v", err)
 	}
@@ -363,7 +363,7 @@ func TestApplicationCRUD(t *testing.T) {
 
 	// List (filtered by non-existent lawn)
 	noLawn := 99999
-	appsEmpty, err := ListApplications(db, &noLawn)
+	appsEmpty, err := ListApplications(db, &noLawn, "", "")
 	if err != nil {
 		t.Fatalf("ListApplications (empty) failed: %v", err)
 	}
@@ -376,7 +376,7 @@ func TestApplicationCRUD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DeleteApplication failed: %v", err)
 	}
-	appsAfter, err := ListApplications(db, nil)
+	appsAfter, err := ListApplications(db, nil, "", "")
 	if err != nil {
 		t.Fatalf("ListApplications after delete failed: %v", err)
 	}

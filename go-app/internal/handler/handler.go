@@ -307,7 +307,7 @@ func (s *Server) handleApplications(w http.ResponseWriter, r *http.Request) {
 	var products []model.Product
 	var gddModels []model.GDDModel
 	if s.dbAvailable() {
-		apps, _ = dbpkg.ListApplications(s.DB, nil)
+		apps, _ = dbpkg.ListApplications(s.DB, nil, "", "")
 		lawns, _ = dbpkg.ListLawns(s.DB)
 		products, _ = dbpkg.ListProducts(s.DB)
 		gddModels, _ = dbpkg.ListGDDModels(s.DB, nil)
@@ -380,9 +380,11 @@ func (s *Server) handleReports(w http.ResponseWriter, r *http.Request) {
 	var apps []model.Application
 	var products []model.Product
 	lawnID := queryInt(r, "lawn")
+	startDate := r.URL.Query().Get("start_date")
+	endDate := r.URL.Query().Get("end_date")
 	if s.dbAvailable() {
 		lawns, _ = dbpkg.ListLawns(s.DB)
-		apps, _ = dbpkg.ListApplications(s.DB, lawnID)
+		apps, _ = dbpkg.ListApplications(s.DB, lawnID, startDate, endDate)
 		products, _ = dbpkg.ListProducts(s.DB)
 	}
 
@@ -423,6 +425,8 @@ func (s *Server) handleReports(w http.ResponseWriter, r *http.Request) {
 		"ProductMap":   productMap,
 		"LawnMap":      lawnMap,
 		"SelectedID":   lawnID,
+		"StartDate":    startDate,
+		"EndDate":      endDate,
 		"TotalN":       totalN,
 		"TotalP":       totalP,
 		"TotalK":       totalK,

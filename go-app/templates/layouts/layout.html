@@ -8,6 +8,9 @@
     <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.23/dist/full.min.css" rel="stylesheet" type="text/css" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link id="flatpickr-dark" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <style>
         .htmx-indicator { opacity: 0; transition: opacity 0.2s ease; }
         .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }
@@ -39,6 +42,9 @@
         (function() {
             const saved = localStorage.getItem('theme');
             if (saved) document.documentElement.setAttribute('data-theme', saved);
+            // Toggle flatpickr dark theme based on current theme
+            var fpDark = document.getElementById('flatpickr-dark');
+            if (fpDark) fpDark.disabled = (document.documentElement.getAttribute('data-theme') === 'emerald');
         })();
         document.addEventListener('DOMContentLoaded', function() {
             // Theme toggle
@@ -49,6 +55,8 @@
                     var theme = this.checked ? 'emerald' : 'dim';
                     document.documentElement.setAttribute('data-theme', theme);
                     localStorage.setItem('theme', theme);
+                    var fpDark = document.getElementById('flatpickr-dark');
+                    if (fpDark) fpDark.disabled = (theme === 'emerald');
                 });
             }
             // Sidebar toggle

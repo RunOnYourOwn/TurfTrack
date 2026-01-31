@@ -252,15 +252,31 @@ func DeleteProduct(db *sql.DB, id int) error {
 
 // --- Applications ---
 
-func ListApplications(db *sql.DB, lawnID *int) ([]model.Application, error) {
+func ListApplications(db *sql.DB, lawnID *int, startDate, endDate string) ([]model.Application, error) {
 	query := `SELECT id, lawn_id, product_id, application_date, amount_per_area, area_unit, unit, notes, status,
 		tied_gdd_model_id, cost_applied, n_applied, p_applied, k_applied, ca_applied, mg_applied, s_applied,
 		fe_applied, cu_applied, mn_applied, b_applied, zn_applied, created_at, updated_at
 		FROM applications`
+	var conditions []string
 	var args []interface{}
+	argN := 1
 	if lawnID != nil {
-		query += " WHERE lawn_id = $1"
+		conditions = append(conditions, fmt.Sprintf("lawn_id = $%d", argN))
 		args = append(args, *lawnID)
+		argN++
+	}
+	if startDate != "" {
+		conditions = append(conditions, fmt.Sprintf("application_date >= $%d", argN))
+		args = append(args, startDate)
+		argN++
+	}
+	if endDate != "" {
+		conditions = append(conditions, fmt.Sprintf("application_date <= $%d", argN))
+		args = append(args, endDate)
+		argN++
+	}
+	if len(conditions) > 0 {
+		query += " WHERE " + strings.Join(conditions, " AND ")
 	}
 	query += " ORDER BY application_date DESC"
 
