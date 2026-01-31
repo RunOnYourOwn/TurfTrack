@@ -111,6 +111,11 @@ func NewServer(db *sql.DB, templatesDir string) (*Server, error) {
 	return &Server{DB: db, Templates: tmpl}, nil
 }
 
+// dbAvailable reports whether a database connection is present.
+func (s *Server) dbAvailable() bool {
+	return s.DB != nil
+}
+
 // Routes registers all HTTP routes.
 func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
@@ -224,9 +229,12 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	locs, _ := dbpkg.ListLocations(s.DB)
-	lawns, _ := dbpkg.ListLawns(s.DB)
-
+	var locs []model.Location
+	var lawns []model.Lawn
+	if s.dbAvailable() {
+		locs, _ = dbpkg.ListLocations(s.DB)
+		lawns, _ = dbpkg.ListLawns(s.DB)
+	}
 	data := map[string]interface{}{
 		"Page":      "dashboard",
 		"Locations": locs,
@@ -236,8 +244,12 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleLawns(w http.ResponseWriter, r *http.Request) {
-	lawns, _ := dbpkg.ListLawns(s.DB)
-	locs, _ := dbpkg.ListLocations(s.DB)
+	var lawns []model.Lawn
+	var locs []model.Location
+	if s.dbAvailable() {
+		lawns, _ = dbpkg.ListLawns(s.DB)
+		locs, _ = dbpkg.ListLocations(s.DB)
+	}
 	data := map[string]interface{}{
 		"Page":      "lawns",
 		"Lawns":     lawns,
@@ -247,7 +259,10 @@ func (s *Server) handleLawns(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleProducts(w http.ResponseWriter, r *http.Request) {
-	products, _ := dbpkg.ListProducts(s.DB)
+	var products []model.Product
+	if s.dbAvailable() {
+		products, _ = dbpkg.ListProducts(s.DB)
+	}
 	data := map[string]interface{}{
 		"Page":     "products",
 		"Products": products,
@@ -256,12 +271,17 @@ func (s *Server) handleProducts(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleApplications(w http.ResponseWriter, r *http.Request) {
-	apps, _ := dbpkg.ListApplications(s.DB, nil)
-	lawns, _ := dbpkg.ListLawns(s.DB)
-	products, _ := dbpkg.ListProducts(s.DB)
-	gddModels, _ := dbpkg.ListGDDModels(s.DB, nil)
+	var apps []model.Application
+	var lawns []model.Lawn
+	var products []model.Product
+	var gddModels []model.GDDModel
+	if s.dbAvailable() {
+		apps, _ = dbpkg.ListApplications(s.DB, nil)
+		lawns, _ = dbpkg.ListLawns(s.DB)
+		products, _ = dbpkg.ListProducts(s.DB)
+		gddModels, _ = dbpkg.ListGDDModels(s.DB, nil)
+	}
 
-	// Build lookup maps
 	lawnMap := map[int]model.Lawn{}
 	for _, l := range lawns {
 		lawnMap[l.ID] = l
@@ -284,11 +304,14 @@ func (s *Server) handleApplications(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGDD(w http.ResponseWriter, r *http.Request) {
-	locs, _ := dbpkg.ListLocations(s.DB)
+	var locs []model.Location
 	locID := queryInt(r, "location_id")
 	var models []model.GDDModel
-	if locID != nil {
-		models, _ = dbpkg.ListGDDModels(s.DB, locID)
+	if s.dbAvailable() {
+		locs, _ = dbpkg.ListLocations(s.DB)
+		if locID != nil {
+			models, _ = dbpkg.ListGDDModels(s.DB, locID)
+		}
 	}
 	data := map[string]interface{}{
 		"Page":               "gdd",
@@ -300,16 +323,17 @@ func (s *Server) handleGDD(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleWater(w http.ResponseWriter, r *http.Request) {
-	lawns, _ := dbpkg.ListLawns(s.DB)
+	var lawns []model.Lawn
 	lawnID := queryInt(r, "lawn")
-
 	var summaries []model.WeeklyWaterSummary
 	var entries []model.IrrigationEntry
-	if lawnID != nil {
-		summaries, _ = dbpkg.GetWeeklyWaterSummaries(s.DB, *lawnID)
-		entries, _ = dbpkg.ListIrrigationEntries(s.DB, *lawnID, nil, nil)
+	if s.dbAvailable() {
+		lawns, _ = dbpkg.ListLawns(s.DB)
+		if lawnID != nil {
+			summaries, _ = dbpkg.GetWeeklyWaterSummaries(s.DB, *lawnID)
+			entries, _ = dbpkg.ListIrrigationEntries(s.DB, *lawnID, nil, nil)
+		}
 	}
-
 	data := map[string]interface{}{
 		"Page":       "water",
 		"Lawns":      lawns,
@@ -321,9 +345,14 @@ func (s *Server) handleWater(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleReports(w http.ResponseWriter, r *http.Request) {
-	lawns, _ := dbpkg.ListLawns(s.DB)
-	apps, _ := dbpkg.ListApplications(s.DB, nil)
-	products, _ := dbpkg.ListProducts(s.DB)
+	var lawns []model.Lawn
+	var apps []model.Application
+	var products []model.Product
+	if s.dbAvailable() {
+		lawns, _ = dbpkg.ListLawns(s.DB)
+		apps, _ = dbpkg.ListApplications(s.DB, nil)
+		products, _ = dbpkg.ListProducts(s.DB)
+	}
 
 	productMap := map[int]model.Product{}
 	for _, p := range products {
@@ -340,7 +369,10 @@ func (s *Server) handleReports(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAdmin(w http.ResponseWriter, r *http.Request) {
-	tasks, _ := dbpkg.ListTaskStatuses(s.DB, 50)
+	var tasks []model.TaskStatus
+	if s.dbAvailable() {
+		tasks, _ = dbpkg.ListTaskStatuses(s.DB, 50)
+	}
 	data := map[string]interface{}{
 		"Page":  "admin",
 		"Tasks": tasks,
