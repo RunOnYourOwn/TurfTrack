@@ -10,29 +10,29 @@
         <div class="collapse-title font-semibold">+ Log Application</div>
         <div class="collapse-content">
             <form hx-post="/applications" hx-swap="none" hx-indicator="#apps-loading" class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Lawn</span></label>
-                    <select name="lawn_id" required class="select select-bordered">
+                <div>
+                    <label class="label">Lawn</label>
+                    <select name="lawn_id" required class="select">
                         {{range .Lawns}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
                     </select>
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Product</span></label>
-                    <select name="product_id" required class="select select-bordered">
+                <div>
+                    <label class="label">Product</label>
+                    <select name="product_id" required class="select">
                         {{range .Products}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
                     </select>
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Date</span></label>
-                    <input name="application_date" type="date" required class="input input-bordered">
+                <div>
+                    <label class="label">Date</label>
+                    <input name="application_date" type="date" required class="input">
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Amount per Area</span></label>
-                    <input name="amount_per_area" type="number" step="0.01" required class="input input-bordered">
+                <div>
+                    <label class="label">Amount per Area</label>
+                    <input name="amount_per_area" type="number" step="0.01" required class="input">
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Unit</span></label>
-                    <select name="unit" class="select select-bordered">
+                <div>
+                    <label class="label">Unit</label>
+                    <select name="unit" class="select">
                         <option value="lbs">lbs</option>
                         <option value="oz">oz</option>
                         <option value="kg">kg</option>
@@ -43,21 +43,21 @@
                         <option value="mL">mL</option>
                     </select>
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Area Unit (sq ft)</span></label>
-                    <input name="area_unit" type="number" value="1000" class="input input-bordered">
+                <div>
+                    <label class="label">Area Unit (sq ft)</label>
+                    <input name="area_unit" type="number" value="1000" class="input">
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Status</span></label>
-                    <select name="status" class="select select-bordered">
+                <div>
+                    <label class="label">Status</label>
+                    <select name="status" class="select">
                         <option value="completed">Completed</option>
                         <option value="planned">Planned</option>
                         <option value="skipped">Skipped</option>
                     </select>
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Notes</span></label>
-                    <input name="notes" class="input input-bordered">
+                <div>
+                    <label class="label">Notes</label>
+                    <input name="notes" class="input">
                 </div>
                 <div class="md:col-span-3 flex items-center gap-3">
                     <button type="submit" class="btn btn-primary">Log Application</button>
@@ -120,31 +120,31 @@
         <div class="modal-box max-w-2xl">
             <h3 class="text-lg font-bold mb-4">Edit Application</h3>
             <form hx-put="/applications/{{.ID}}" hx-swap="none" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Lawn</span></label>
-                    <select name="lawn_id" required class="select select-bordered">
+                <div>
+                    <label class="label">Lawn</label>
+                    <select name="lawn_id" required class="select">
                         {{$appLawnID := .LawnID}}
                         {{range $.Lawns}}<option value="{{.ID}}" {{if eq .ID $appLawnID}}selected{{end}}>{{.Name}}</option>{{end}}
                     </select>
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Product</span></label>
-                    <select name="product_id" required class="select select-bordered">
+                <div>
+                    <label class="label">Product</label>
+                    <select name="product_id" required class="select">
                         {{$appProdID := .ProductID}}
                         {{range $.Products}}<option value="{{.ID}}" {{if eq .ID $appProdID}}selected{{end}}>{{.Name}}</option>{{end}}
                     </select>
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Date</span></label>
-                    <input name="application_date" type="date" value="{{formatDate .ApplicationDate}}" required class="input input-bordered">
+                <div>
+                    <label class="label">Date</label>
+                    <input name="application_date" type="date" value="{{formatDate .ApplicationDate}}" required class="input">
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Amount per Area</span></label>
-                    <input name="amount_per_area" type="number" step="0.01" value="{{formatFloat .AmountPerArea 2}}" required class="input input-bordered">
+                <div>
+                    <label class="label">Amount per Area</label>
+                    <input name="amount_per_area" type="number" step="0.01" value="{{formatFloat .AmountPerArea 2}}" required class="input">
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Unit</span></label>
-                    <select name="unit" class="select select-bordered">
+                <div>
+                    <label class="label">Unit</label>
+                    <select name="unit" class="select">
                         {{$appUnit := printf "%s" .Unit}}
                         <option value="lbs" {{if eq $appUnit "lbs"}}selected{{end}}>lbs</option>
                         <option value="oz" {{if eq $appUnit "oz"}}selected{{end}}>oz</option>
@@ -156,22 +156,22 @@
                         <option value="mL" {{if eq $appUnit "mL"}}selected{{end}}>mL</option>
                     </select>
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Area Unit (sq ft)</span></label>
-                    <input name="area_unit" type="number" value="{{.AreaUnit}}" class="input input-bordered">
+                <div>
+                    <label class="label">Area Unit (sq ft)</label>
+                    <input name="area_unit" type="number" value="{{.AreaUnit}}" class="input">
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Status</span></label>
-                    <select name="status" class="select select-bordered">
+                <div>
+                    <label class="label">Status</label>
+                    <select name="status" class="select">
                         {{$appStatus := printf "%s" .Status}}
                         <option value="completed" {{if eq $appStatus "completed"}}selected{{end}}>Completed</option>
                         <option value="planned" {{if eq $appStatus "planned"}}selected{{end}}>Planned</option>
                         <option value="skipped" {{if eq $appStatus "skipped"}}selected{{end}}>Skipped</option>
                     </select>
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Notes</span></label>
-                    <input name="notes" value="{{if .Notes.Valid}}{{.Notes.String}}{{end}}" class="input input-bordered">
+                <div>
+                    <label class="label">Notes</label>
+                    <input name="notes" value="{{if .Notes.Valid}}{{.Notes.String}}{{end}}" class="input">
                 </div>
                 <div class="md:col-span-3 flex justify-end gap-2">
                     <button type="button" class="btn" onclick="this.closest('dialog').close()">Cancel</button>

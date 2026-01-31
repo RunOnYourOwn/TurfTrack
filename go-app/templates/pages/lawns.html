@@ -10,50 +10,50 @@
         <div class="collapse-title font-semibold">+ Add Lawn</div>
         <div class="collapse-content">
             <form hx-post="/lawns" hx-swap="none" hx-indicator="#lawns-loading" class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Name</span></label>
-                    <input name="name" required class="input input-bordered">
+                <div>
+                    <label class="label">Name</label>
+                    <input name="name" required class="input">
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Area (sq ft)</span></label>
-                    <input name="area" type="number" step="0.01" min="0" required class="input input-bordered">
+                <div>
+                    <label class="label">Area (sq ft)</label>
+                    <input name="area" type="number" step="0.01" min="0" required class="input">
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Grass Type</span></label>
-                    <select name="grass_type" required class="select select-bordered">
+                <div>
+                    <label class="label">Grass Type</label>
+                    <select name="grass_type" required class="select">
                         <option value="cold_season">Cool Season</option>
                         <option value="warm_season">Warm Season</option>
                     </select>
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Location</span></label>
-                    <select name="location_id" id="location-select" onchange="toggleNewLoc(this.value)" class="select select-bordered">
+                <div>
+                    <label class="label">Location</label>
+                    <select name="location_id" id="location-select" onchange="toggleNewLoc(this.value)" class="select">
                         {{range .Locations}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
                         <option value="new">+ New Location</option>
                     </select>
                 </div>
                 <div id="new-loc-fields" class="{{if .Locations}}hidden {{end}}md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div class="form-control">
-                        <label class="label"><span class="label-text">Location Name</span></label>
-                        <input name="location_name" class="input input-bordered">
+                    <div>
+                        <label class="label">Location Name</label>
+                        <input name="location_name" class="input">
                     </div>
-                    <div class="form-control">
-                        <label class="label"><span class="label-text">Latitude</span></label>
-                        <input name="latitude" type="number" step="0.0001" class="input input-bordered">
+                    <div>
+                        <label class="label">Latitude</label>
+                        <input name="latitude" type="number" step="0.0001" class="input">
                     </div>
-                    <div class="form-control">
-                        <label class="label"><span class="label-text">Longitude</span></label>
-                        <input name="longitude" type="number" step="0.0001" class="input input-bordered">
+                    <div>
+                        <label class="label">Longitude</label>
+                        <input name="longitude" type="number" step="0.0001" class="input">
                     </div>
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Notes</span></label>
-                    <input name="notes" class="input input-bordered">
+                <div>
+                    <label class="label">Notes</label>
+                    <input name="notes" class="input">
                 </div>
-                <div class="form-control">
+                <div>
                     <label class="label cursor-pointer justify-start gap-2">
                         <input name="weather_enabled" type="checkbox" checked class="checkbox checkbox-primary">
-                        <span class="label-text">Enable Weather Fetching</span>
+                        Enable Weather Fetching
                     </label>
                 </div>
                 <div class="md:col-span-2 flex items-center gap-3">
@@ -108,51 +108,51 @@
         <div class="modal-box">
             <h3 class="text-lg font-bold mb-4">Edit Lawn</h3>
             <form hx-put="/lawns/{{.ID}}" hx-swap="none" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Name</span></label>
-                    <input name="name" value="{{.Name}}" required class="input input-bordered">
+                <div>
+                    <label class="label">Name</label>
+                    <input name="name" value="{{.Name}}" required class="input">
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Area (sq ft)</span></label>
-                    <input name="area" type="number" step="0.01" min="0" value="{{formatFloat .Area 2}}" required class="input input-bordered">
+                <div>
+                    <label class="label">Area (sq ft)</label>
+                    <input name="area" type="number" step="0.01" min="0" value="{{formatFloat .Area 2}}" required class="input">
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Grass Type</span></label>
-                    <select name="grass_type" class="select select-bordered">
+                <div>
+                    <label class="label">Grass Type</label>
+                    <select name="grass_type" class="select">
                         <option value="cold_season" {{if eq (printf "%s" .GrassType) "cold_season"}}selected{{end}}>Cool Season</option>
                         <option value="warm_season" {{if eq (printf "%s" .GrassType) "warm_season"}}selected{{end}}>Warm Season</option>
                     </select>
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Location</span></label>
-                    <select name="location_id" onchange="toggleEditLoc(this.value, {{.ID}})" class="select select-bordered">
+                <div>
+                    <label class="label">Location</label>
+                    <select name="location_id" onchange="toggleEditLoc(this.value, {{.ID}})" class="select">
                         {{$locID := .LocationID}}
                         {{range $.Locations}}<option value="{{.ID}}" {{if eq .ID $locID}}selected{{end}}>{{.Name}}</option>{{end}}
                         <option value="new">+ New Location</option>
                     </select>
                 </div>
                 <div id="edit-loc-fields-{{.ID}}" class="hidden md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div class="form-control">
-                        <label class="label"><span class="label-text">Location Name</span></label>
-                        <input name="location_name" class="input input-bordered">
+                    <div>
+                        <label class="label">Location Name</label>
+                        <input name="location_name" class="input">
                     </div>
-                    <div class="form-control">
-                        <label class="label"><span class="label-text">Latitude</span></label>
-                        <input name="latitude" type="number" step="0.0001" class="input input-bordered">
+                    <div>
+                        <label class="label">Latitude</label>
+                        <input name="latitude" type="number" step="0.0001" class="input">
                     </div>
-                    <div class="form-control">
-                        <label class="label"><span class="label-text">Longitude</span></label>
-                        <input name="longitude" type="number" step="0.0001" class="input input-bordered">
+                    <div>
+                        <label class="label">Longitude</label>
+                        <input name="longitude" type="number" step="0.0001" class="input">
                     </div>
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Notes</span></label>
-                    <input name="notes" value="{{if .Notes.Valid}}{{.Notes.String}}{{end}}" class="input input-bordered">
+                <div>
+                    <label class="label">Notes</label>
+                    <input name="notes" value="{{if .Notes.Valid}}{{.Notes.String}}{{end}}" class="input">
                 </div>
-                <div class="form-control">
+                <div>
                     <label class="label cursor-pointer justify-start gap-2">
                         <input name="weather_enabled" type="checkbox" {{if .WeatherEnabled}}checked{{end}} class="checkbox checkbox-primary">
-                        <span class="label-text">Enable Weather Fetching</span>
+                        Enable Weather Fetching
                     </label>
                 </div>
                 <div class="md:col-span-2 flex justify-end gap-2">

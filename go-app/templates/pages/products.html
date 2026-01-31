@@ -11,33 +11,33 @@
         <div class="collapse-content">
             <form hx-post="/products" hx-swap="none" hx-indicator="#products-loading" class="space-y-4 pt-2">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div class="md:col-span-3 form-control">
-                        <label class="label"><span class="label-text">Name</span></label>
-                        <input name="name" required class="input input-bordered">
+                    <div class="md:col-span-3">
+                        <label class="label">Name</label>
+                        <input name="name" required class="input">
                     </div>
-                    <div class="form-control">
-                        <label class="label"><span class="label-text">N %</span></label>
-                        <input name="n_pct" type="number" step="0.01" value="0" class="input input-bordered">
+                    <div>
+                        <label class="label">N %</label>
+                        <input name="n_pct" type="number" step="0.01" value="0" class="input">
                     </div>
-                    <div class="form-control">
-                        <label class="label"><span class="label-text">P %</span></label>
-                        <input name="p_pct" type="number" step="0.01" value="0" class="input input-bordered">
+                    <div>
+                        <label class="label">P %</label>
+                        <input name="p_pct" type="number" step="0.01" value="0" class="input">
                     </div>
-                    <div class="form-control">
-                        <label class="label"><span class="label-text">K %</span></label>
-                        <input name="k_pct" type="number" step="0.01" value="0" class="input input-bordered">
+                    <div>
+                        <label class="label">K %</label>
+                        <input name="k_pct" type="number" step="0.01" value="0" class="input">
                     </div>
-                    <div class="form-control">
-                        <label class="label"><span class="label-text">Fe %</span></label>
-                        <input name="fe_pct" type="number" step="0.01" value="0" class="input input-bordered">
+                    <div>
+                        <label class="label">Fe %</label>
+                        <input name="fe_pct" type="number" step="0.01" value="0" class="input">
                     </div>
-                    <div class="form-control">
-                        <label class="label"><span class="label-text">Weight (lbs)</span></label>
-                        <input name="weight_lbs" type="number" step="0.01" class="input input-bordered">
+                    <div>
+                        <label class="label">Weight (lbs)</label>
+                        <input name="weight_lbs" type="number" step="0.01" class="input">
                     </div>
-                    <div class="form-control">
-                        <label class="label"><span class="label-text">Cost per Bag ($)</span></label>
-                        <input name="cost_per_bag" type="number" step="0.01" class="input input-bordered">
+                    <div>
+                        <label class="label">Cost per Bag ($)</label>
+                        <input name="cost_per_bag" type="number" step="0.01" class="input">
                     </div>
                 </div>
                 <!-- More Nutrients (collapsible) -->
@@ -46,33 +46,33 @@
                     <div class="collapse-title text-sm font-medium">More Nutrients</div>
                     <div class="collapse-content">
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
-                            <div class="form-control">
-                                <label class="label"><span class="label-text">Ca %</span></label>
-                                <input name="ca_pct" type="number" step="0.01" value="0" class="input input-bordered input-sm">
+                            <div>
+                                <label class="label">Ca %</label>
+                                <input name="ca_pct" type="number" step="0.01" value="0" class="input input-sm">
                             </div>
-                            <div class="form-control">
-                                <label class="label"><span class="label-text">Mg %</span></label>
-                                <input name="mg_pct" type="number" step="0.01" value="0" class="input input-bordered input-sm">
+                            <div>
+                                <label class="label">Mg %</label>
+                                <input name="mg_pct" type="number" step="0.01" value="0" class="input input-sm">
                             </div>
-                            <div class="form-control">
-                                <label class="label"><span class="label-text">S %</span></label>
-                                <input name="s_pct" type="number" step="0.01" value="0" class="input input-bordered input-sm">
+                            <div>
+                                <label class="label">S %</label>
+                                <input name="s_pct" type="number" step="0.01" value="0" class="input input-sm">
                             </div>
-                            <div class="form-control">
-                                <label class="label"><span class="label-text">Cu %</span></label>
-                                <input name="cu_pct" type="number" step="0.01" value="0" class="input input-bordered input-sm">
+                            <div>
+                                <label class="label">Cu %</label>
+                                <input name="cu_pct" type="number" step="0.01" value="0" class="input input-sm">
                             </div>
-                            <div class="form-control">
-                                <label class="label"><span class="label-text">Mn %</span></label>
-                                <input name="mn_pct" type="number" step="0.01" value="0" class="input input-bordered input-sm">
+                            <div>
+                                <label class="label">Mn %</label>
+                                <input name="mn_pct" type="number" step="0.01" value="0" class="input input-sm">
                             </div>
-                            <div class="form-control">
-                                <label class="label"><span class="label-text">B %</span></label>
-                                <input name="b_pct" type="number" step="0.01" value="0" class="input input-bordered input-sm">
+                            <div>
+                                <label class="label">B %</label>
+                                <input name="b_pct" type="number" step="0.01" value="0" class="input input-sm">
                             </div>
-                            <div class="form-control">
-                                <label class="label"><span class="label-text">Zn %</span></label>
-                                <input name="zn_pct" type="number" step="0.01" value="0" class="input input-bordered input-sm">
+                            <div>
+                                <label class="label">Zn %</label>
+                                <input name="zn_pct" type="number" step="0.01" value="0" class="input input-sm">
                             </div>
                         </div>
                     </div>
@@ -131,33 +131,33 @@
             <h3 class="text-lg font-bold mb-4">Edit Product</h3>
             <form hx-put="/products/{{.ID}}" hx-swap="none" class="space-y-4">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div class="md:col-span-3 form-control">
-                        <label class="label"><span class="label-text">Name</span></label>
-                        <input name="name" value="{{.Name}}" required class="input input-bordered">
+                    <div class="md:col-span-3">
+                        <label class="label">Name</label>
+                        <input name="name" value="{{.Name}}" required class="input">
                     </div>
-                    <div class="form-control">
-                        <label class="label"><span class="label-text">N %</span></label>
-                        <input name="n_pct" type="number" step="0.01" value="{{formatFloat .NPct 2}}" class="input input-bordered">
+                    <div>
+                        <label class="label">N %</label>
+                        <input name="n_pct" type="number" step="0.01" value="{{formatFloat .NPct 2}}" class="input">
                     </div>
-                    <div class="form-control">
-                        <label class="label"><span class="label-text">P %</span></label>
-                        <input name="p_pct" type="number" step="0.01" value="{{formatFloat .PPct 2}}" class="input input-bordered">
+                    <div>
+                        <label class="label">P %</label>
+                        <input name="p_pct" type="number" step="0.01" value="{{formatFloat .PPct 2}}" class="input">
                     </div>
-                    <div class="form-control">
-                        <label class="label"><span class="label-text">K %</span></label>
-                        <input name="k_pct" type="number" step="0.01" value="{{formatFloat .KPct 2}}" class="input input-bordered">
+                    <div>
+                        <label class="label">K %</label>
+                        <input name="k_pct" type="number" step="0.01" value="{{formatFloat .KPct 2}}" class="input">
                     </div>
-                    <div class="form-control">
-                        <label class="label"><span class="label-text">Fe %</span></label>
-                        <input name="fe_pct" type="number" step="0.01" value="{{formatFloat .FePct 2}}" class="input input-bordered">
+                    <div>
+                        <label class="label">Fe %</label>
+                        <input name="fe_pct" type="number" step="0.01" value="{{formatFloat .FePct 2}}" class="input">
                     </div>
-                    <div class="form-control">
-                        <label class="label"><span class="label-text">Weight (lbs)</span></label>
-                        <input name="weight_lbs" type="number" step="0.01" value="{{formatFloatPtr .WeightLbs 2}}" class="input input-bordered">
+                    <div>
+                        <label class="label">Weight (lbs)</label>
+                        <input name="weight_lbs" type="number" step="0.01" value="{{formatFloatPtr .WeightLbs 2}}" class="input">
                     </div>
-                    <div class="form-control">
-                        <label class="label"><span class="label-text">Cost per Bag ($)</span></label>
-                        <input name="cost_per_bag" type="number" step="0.01" value="{{formatFloatPtr .CostPerBag 2}}" class="input input-bordered">
+                    <div>
+                        <label class="label">Cost per Bag ($)</label>
+                        <input name="cost_per_bag" type="number" step="0.01" value="{{formatFloatPtr .CostPerBag 2}}" class="input">
                     </div>
                 </div>
                 <!-- More Nutrients (collapsible) -->
@@ -166,33 +166,33 @@
                     <div class="collapse-title text-sm font-medium">More Nutrients</div>
                     <div class="collapse-content">
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
-                            <div class="form-control">
-                                <label class="label"><span class="label-text">Ca %</span></label>
-                                <input name="ca_pct" type="number" step="0.01" value="{{formatFloat .CaPct 2}}" class="input input-bordered input-sm">
+                            <div>
+                                <label class="label">Ca %</label>
+                                <input name="ca_pct" type="number" step="0.01" value="{{formatFloat .CaPct 2}}" class="input input-sm">
                             </div>
-                            <div class="form-control">
-                                <label class="label"><span class="label-text">Mg %</span></label>
-                                <input name="mg_pct" type="number" step="0.01" value="{{formatFloat .MgPct 2}}" class="input input-bordered input-sm">
+                            <div>
+                                <label class="label">Mg %</label>
+                                <input name="mg_pct" type="number" step="0.01" value="{{formatFloat .MgPct 2}}" class="input input-sm">
                             </div>
-                            <div class="form-control">
-                                <label class="label"><span class="label-text">S %</span></label>
-                                <input name="s_pct" type="number" step="0.01" value="{{formatFloat .SPct 2}}" class="input input-bordered input-sm">
+                            <div>
+                                <label class="label">S %</label>
+                                <input name="s_pct" type="number" step="0.01" value="{{formatFloat .SPct 2}}" class="input input-sm">
                             </div>
-                            <div class="form-control">
-                                <label class="label"><span class="label-text">Cu %</span></label>
-                                <input name="cu_pct" type="number" step="0.01" value="{{formatFloat .CuPct 2}}" class="input input-bordered input-sm">
+                            <div>
+                                <label class="label">Cu %</label>
+                                <input name="cu_pct" type="number" step="0.01" value="{{formatFloat .CuPct 2}}" class="input input-sm">
                             </div>
-                            <div class="form-control">
-                                <label class="label"><span class="label-text">Mn %</span></label>
-                                <input name="mn_pct" type="number" step="0.01" value="{{formatFloat .MnPct 2}}" class="input input-bordered input-sm">
+                            <div>
+                                <label class="label">Mn %</label>
+                                <input name="mn_pct" type="number" step="0.01" value="{{formatFloat .MnPct 2}}" class="input input-sm">
                             </div>
-                            <div class="form-control">
-                                <label class="label"><span class="label-text">B %</span></label>
-                                <input name="b_pct" type="number" step="0.01" value="{{formatFloat .BPct 2}}" class="input input-bordered input-sm">
+                            <div>
+                                <label class="label">B %</label>
+                                <input name="b_pct" type="number" step="0.01" value="{{formatFloat .BPct 2}}" class="input input-sm">
                             </div>
-                            <div class="form-control">
-                                <label class="label"><span class="label-text">Zn %</span></label>
-                                <input name="zn_pct" type="number" step="0.01" value="{{formatFloat .ZnPct 2}}" class="input input-bordered input-sm">
+                            <div>
+                                <label class="label">Zn %</label>
+                                <input name="zn_pct" type="number" step="0.01" value="{{formatFloat .ZnPct 2}}" class="input input-sm">
                             </div>
                         </div>
                     </div>

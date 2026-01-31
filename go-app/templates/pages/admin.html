@@ -10,28 +10,28 @@
             {{$tz := index .Settings "weather_update_timezone"}}
             {{$histDays := index .Settings "weather_history_days"}}
             <form hx-post="/admin/settings" hx-swap="none" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Update Hour</span></label>
-                    <select name="weather_update_hour" class="select select-bordered">
+                <div>
+                    <label class="label">Update Hour</label>
+                    <select name="weather_update_hour" class="select">
                         {{range $i, $_ := seq 24}}
                         <option value="{{$i}}" {{if eq (printf "%d" $i) $hour}}selected{{end}}>{{printf "%d:00" $i}}{{if eq $i 0}} (midnight){{else if eq $i 12}} (noon){{end}}</option>
                         {{end}}
                     </select>
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Timezone</span></label>
-                    <select name="weather_update_timezone" class="select select-bordered">
+                <div>
+                    <label class="label">Timezone</label>
+                    <select name="weather_update_timezone" class="select">
                         {{range $_, $zone := timezones}}
                         <option value="{{$zone}}" {{if eq $zone $tz}}selected{{end}}>{{$zone}}</option>
                         {{end}}
                     </select>
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">History Depth (days)</span></label>
-                    <input name="weather_history_days" type="number" min="1" max="730" value="{{if $histDays}}{{$histDays}}{{else}}92{{end}}" class="input input-bordered">
-                    <label class="label"><span class="label-text-alt">Default 92. Set higher to use Historical API for older data.</span></label>
+                <div>
+                    <label class="label">History Depth (days)</label>
+                    <input name="weather_history_days" type="number" min="1" max="730" value="{{if $histDays}}{{$histDays}}{{else}}92{{end}}" class="input">
+                    <label class="label"><span class="text-xs text-base-content/60">Default 92. Set higher to use Historical API for older data.</span></label>
                 </div>
-                <div class="form-control justify-end">
+                <div class="justify-end">
                     <button type="submit" class="btn btn-primary">Save</button>
                 </div>
             </form>

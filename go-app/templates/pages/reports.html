@@ -8,15 +8,15 @@
     <div class="card bg-base-100 shadow-sm">
         <div class="card-body py-3">
             <form id="report-filter" method="GET" action="/reports" class="flex items-center gap-4 flex-wrap">
-                <label class="label"><span class="label-text font-medium">Lawn:</span></label>
-                <select name="lawn" onchange="this.form.submit()" class="select select-bordered select-sm">
+                <label class="label"><span class="font-medium">Lawn:</span></label>
+                <select name="lawn" onchange="this.form.submit()" class="select select-sm">
                     <option value="">All Lawns</option>
                     {{range .Lawns}}<option value="{{.ID}}" {{if $.SelectedID}}{{if eq .ID (deref $.SelectedID)}}selected{{end}}{{end}}>{{.Name}}</option>{{end}}
                 </select>
-                <label class="label"><span class="label-text font-medium">Date Range:</span></label>
+                <label class="label"><span class="font-medium">Date Range:</span></label>
                 <input type="hidden" name="start_date" id="start_date" value="{{.StartDate}}">
                 <input type="hidden" name="end_date" id="end_date" value="{{.EndDate}}">
-                <input type="text" id="date-range" class="input input-bordered input-sm w-56" placeholder="All time" readonly>
+                <input type="text" id="date-range" class="input input-sm w-56" placeholder="All time" readonly>
                 <button type="button" id="clear-dates" class="btn btn-ghost btn-sm {{if and (eq .StartDate "") (eq .EndDate "")}}hidden{{end}}">Clear</button>
             </form>
         </div>

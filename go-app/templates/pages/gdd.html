@@ -3,9 +3,9 @@
     <h2 class="text-2xl font-bold">Growing Degree Days</h2>
 
     <div class="flex gap-4 items-end flex-wrap">
-        <div class="form-control">
-            <label class="label"><span class="label-text">Location</span></label>
-            <select id="gdd-loc" onchange="window.location='/gdd?location_id='+this.value" class="select select-bordered">
+        <div>
+            <label class="label">Location</label>
+            <select id="gdd-loc" onchange="window.location='/gdd?location_id='+this.value" class="select">
                 <option value="">Select location...</option>
                 {{range .Locations}}
                 <option value="{{.ID}}" {{if and $.SelectedLocationID (eq .ID (deref $.SelectedLocationID))}}selected{{end}}>{{.Name}}</option>
@@ -22,33 +22,33 @@
         <div class="collapse-content">
             <form hx-post="/gdd-models" hx-swap="none" hx-indicator="#gdd-loading" class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
                 <input type="hidden" name="location_id" value="{{deref .SelectedLocationID}}">
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Name</span></label>
-                    <input name="name" required class="input input-bordered" placeholder="e.g. Crabgrass Preventer">
+                <div>
+                    <label class="label">Name</label>
+                    <input name="name" required class="input" placeholder="e.g. Crabgrass Preventer">
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Base Temp</span></label>
-                    <input name="base_temp" type="number" step="0.1" required class="input input-bordered" value="50">
+                <div>
+                    <label class="label">Base Temp</label>
+                    <input name="base_temp" type="number" step="0.1" required class="input" value="50">
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Unit</span></label>
-                    <select name="unit" class="select select-bordered">
+                <div>
+                    <label class="label">Unit</label>
+                    <select name="unit" class="select">
                         <option value="F">Fahrenheit</option>
                         <option value="C">Celsius</option>
                     </select>
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Start Date</span></label>
-                    <input name="start_date" type="date" required class="input input-bordered" onchange="checkBackfillWarning(this, 'create')">
+                <div>
+                    <label class="label">Start Date</label>
+                    <input name="start_date" type="date" required class="input" onchange="checkBackfillWarning(this, 'create')">
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Threshold</span></label>
-                    <input name="threshold" type="number" step="0.1" value="0" class="input input-bordered">
+                <div>
+                    <label class="label">Threshold</label>
+                    <input name="threshold" type="number" step="0.1" value="0" class="input">
                 </div>
-                <div class="form-control">
+                <div>
                     <label class="label cursor-pointer justify-start gap-2">
                         <input name="reset_on_threshold" type="checkbox" class="checkbox checkbox-primary">
-                        <span class="label-text">Reset on Threshold</span>
+                        Reset on Threshold
                     </label>
                 </div>
                 <div id="backfill-warning-create" class="md:col-span-3 hidden"></div>
@@ -85,9 +85,9 @@
                     <!-- Add Reset Form -->
                     <form hx-post="/gdd-resets" hx-swap="none" class="flex gap-2 items-end mb-3 pt-2">
                         <input type="hidden" name="gdd_model_id" value="{{.ID}}">
-                        <div class="form-control">
-                            <label class="label"><span class="label-text text-xs">Reset Date</span></label>
-                            <input name="reset_date" type="date" required class="input input-bordered input-sm">
+                        <div>
+                            <label class="label"><span class="text-xs">Reset Date</span></label>
+                            <input name="reset_date" type="date" required class="input input-sm">
                         </div>
                         <button type="submit" class="btn btn-sm btn-outline btn-primary">Add Reset</button>
                     </form>
@@ -137,33 +137,33 @@
         <div class="modal-box">
             <h3 class="font-bold text-lg mb-4">Edit GDD Model: {{.Name}}</h3>
             <form hx-put="/gdd-models/{{.ID}}" hx-swap="none" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Name</span></label>
-                    <input name="name" required class="input input-bordered" value="{{.Name}}">
+                <div>
+                    <label class="label">Name</label>
+                    <input name="name" required class="input" value="{{.Name}}">
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Base Temp</span></label>
-                    <input name="base_temp" type="number" step="0.1" required class="input input-bordered" value="{{formatFloat .BaseTemp 1}}">
+                <div>
+                    <label class="label">Base Temp</label>
+                    <input name="base_temp" type="number" step="0.1" required class="input" value="{{formatFloat .BaseTemp 1}}">
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Unit</span></label>
-                    <select name="unit" class="select select-bordered">
+                <div>
+                    <label class="label">Unit</label>
+                    <select name="unit" class="select">
                         <option value="F" {{if eq (printf "%s" .Unit) "F"}}selected{{end}}>Fahrenheit</option>
                         <option value="C" {{if eq (printf "%s" .Unit) "C"}}selected{{end}}>Celsius</option>
                     </select>
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Start Date</span></label>
-                    <input name="start_date" type="date" required class="input input-bordered" value="{{formatDate .StartDate}}" onchange="checkBackfillWarning(this, 'edit-{{.ID}}')">
+                <div>
+                    <label class="label">Start Date</label>
+                    <input name="start_date" type="date" required class="input" value="{{formatDate .StartDate}}" onchange="checkBackfillWarning(this, 'edit-{{.ID}}')">
                 </div>
-                <div class="form-control">
-                    <label class="label"><span class="label-text">Threshold</span></label>
-                    <input name="threshold" type="number" step="0.1" class="input input-bordered" value="{{formatFloat .Threshold 1}}">
+                <div>
+                    <label class="label">Threshold</label>
+                    <input name="threshold" type="number" step="0.1" class="input" value="{{formatFloat .Threshold 1}}">
                 </div>
-                <div class="form-control">
+                <div>
                     <label class="label cursor-pointer justify-start gap-2">
                         <input name="reset_on_threshold" type="checkbox" class="checkbox checkbox-primary" {{if .ResetOnThreshold}}checked{{end}}>
-                        <span class="label-text">Reset on Threshold</span>
+                        Reset on Threshold
                     </label>
                 </div>
                 <div id="backfill-warning-edit-{{.ID}}" class="md:col-span-2 hidden"></div>

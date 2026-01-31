@@ -3,9 +3,9 @@
     <h2 class="text-2xl font-bold">Dashboard</h2>
 
     {{if .Locations}}
-    <div class="form-control w-full max-w-xs">
-        <label class="label"><span class="label-text">Select Location</span></label>
-        <select id="location-select" onchange="loadDashboard(this.value)" class="select select-bordered">
+    <div class="w-full max-w-xs">
+        <label class="label">Select Location</label>
+        <select id="location-select" onchange="loadDashboard(this.value)" class="select">
             <option value="">Choose a location...</option>
             {{range .Locations}}
             <option value="{{.ID}}">{{.Name}} ({{formatFloat .Latitude 4}}, {{formatFloat .Longitude 4}})</option>
