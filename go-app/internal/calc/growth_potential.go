@@ -16,7 +16,8 @@ func GrowthPotentialScore(tempC float64, grassType GrassTypeCalc) float64 {
 	if !ok {
 		return 0
 	}
-	return math.Exp(-0.5 * math.Pow((tempC-p.tOpt)/p.sigma, 2))
+	x := (tempC - p.tOpt) / p.sigma
+	return math.Exp(-0.5 * x * x)
 }
 
 // RollingAverage calculates a rolling average over the given window size.

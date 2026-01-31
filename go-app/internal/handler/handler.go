@@ -191,7 +191,9 @@ func (s *Server) render(w http.ResponseWriter, name string, data interface{}) {
 
 func (s *Server) renderJSON(w http.ResponseWriter, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(data)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		log.Printf("JSON encode error: %v", err)
+	}
 }
 
 func pathID(r *http.Request, param string) (int, error) {
@@ -383,7 +385,7 @@ func (s *Server) handleAdmin(w http.ResponseWriter, r *http.Request) {
 // --- Action Handlers ---
 
 func (s *Server) handleCreateLawn(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
+	_ = r.ParseForm()
 	name := r.FormValue("name")
 	area, _ := strconv.ParseFloat(r.FormValue("area"), 64)
 	grassType := model.GrassType(r.FormValue("grass_type"))
@@ -436,7 +438,7 @@ func (s *Server) handleUpdateLawn(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
 		return
 	}
-	r.ParseForm()
+	_ = r.ParseForm()
 	name := r.FormValue("name")
 	area, _ := strconv.ParseFloat(r.FormValue("area"), 64)
 	grassType := model.GrassType(r.FormValue("grass_type"))
@@ -456,12 +458,12 @@ func (s *Server) handleUpdateLawn(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDeleteLawn(w http.ResponseWriter, r *http.Request) {
 	id, _ := pathID(r, "id")
-	dbpkg.DeleteLawn(s.DB, id)
+	_ = dbpkg.DeleteLawn(s.DB, id)
 	w.Header().Set("HX-Redirect", "/lawns")
 }
 
 func (s *Server) handleCreateProduct(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
+	_ = r.ParseForm()
 	p := &model.Product{
 		Name: r.FormValue("name"),
 	}
@@ -497,12 +499,12 @@ func (s *Server) handleCreateProduct(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDeleteProduct(w http.ResponseWriter, r *http.Request) {
 	id, _ := pathID(r, "id")
-	dbpkg.DeleteProduct(s.DB, id)
+	_ = dbpkg.DeleteProduct(s.DB, id)
 	w.Header().Set("HX-Redirect", "/products")
 }
 
 func (s *Server) handleCreateApplication(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
+	_ = r.ParseForm()
 	a := &model.Application{}
 	a.LawnID, _ = strconv.Atoi(r.FormValue("lawn_id"))
 	a.ProductID, _ = strconv.Atoi(r.FormValue("product_id"))
@@ -560,12 +562,12 @@ func (s *Server) handleCreateApplication(w http.ResponseWriter, r *http.Request)
 
 func (s *Server) handleDeleteApplication(w http.ResponseWriter, r *http.Request) {
 	id, _ := pathID(r, "id")
-	dbpkg.DeleteApplication(s.DB, id)
+	_ = dbpkg.DeleteApplication(s.DB, id)
 	w.Header().Set("HX-Redirect", "/applications")
 }
 
 func (s *Server) handleCreateGDDModel(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
+	_ = r.ParseForm()
 	m := &model.GDDModel{}
 	m.LocationID, _ = strconv.Atoi(r.FormValue("location_id"))
 	m.Name = r.FormValue("name")
@@ -587,12 +589,12 @@ func (s *Server) handleCreateGDDModel(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDeleteGDDModel(w http.ResponseWriter, r *http.Request) {
 	id, _ := pathID(r, "id")
-	dbpkg.DeleteGDDModel(s.DB, id)
+	_ = dbpkg.DeleteGDDModel(s.DB, id)
 	w.Header().Set("HX-Redirect", "/gdd")
 }
 
 func (s *Server) handleCreateIrrigation(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
+	_ = r.ParseForm()
 	e := &model.IrrigationEntry{}
 	e.LawnID, _ = strconv.Atoi(r.FormValue("lawn_id"))
 	date, _ := time.Parse("2006-01-02", r.FormValue("date"))
@@ -615,12 +617,12 @@ func (s *Server) handleCreateIrrigation(w http.ResponseWriter, r *http.Request) 
 
 func (s *Server) handleDeleteIrrigation(w http.ResponseWriter, r *http.Request) {
 	id, _ := pathID(r, "id")
-	dbpkg.DeleteIrrigationEntry(s.DB, id)
+	_ = dbpkg.DeleteIrrigationEntry(s.DB, id)
 	w.Header().Set("HX-Redirect", "/water")
 }
 
 func (s *Server) handleCreateLocation(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
+	_ = r.ParseForm()
 	name := r.FormValue("name")
 	lat, _ := strconv.ParseFloat(r.FormValue("latitude"), 64)
 	lon, _ := strconv.ParseFloat(r.FormValue("longitude"), 64)

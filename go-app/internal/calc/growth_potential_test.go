@@ -54,7 +54,8 @@ func TestGrowthPotentialWarmSeason(t *testing.T) {
 func TestGrowthPotentialFormula(t *testing.T) {
 	// Cold season: GP = exp(-0.5 * ((temp - 20) / 5.5)^2)
 	temp := 15.0
-	expected := math.Exp(-0.5 * math.Pow((temp-20)/5.5, 2))
+	x := (temp - 20) / 5.5
+	expected := math.Exp(-0.5 * x * x)
 	got := GrowthPotentialScore(temp, GrassTypeCold)
 	if math.Abs(got-expected) > 0.0001 {
 		t.Errorf("GrowthPotentialScore(15, cold) = %v, want %v", got, expected)
@@ -62,7 +63,8 @@ func TestGrowthPotentialFormula(t *testing.T) {
 
 	// Warm season: GP = exp(-0.5 * ((temp - 31) / 7)^2)
 	temp = 25.0
-	expected = math.Exp(-0.5 * math.Pow((temp-31)/7, 2))
+	x = (temp - 31) / 7
+	expected = math.Exp(-0.5 * x * x)
 	got = GrowthPotentialScore(temp, GrassTypeWarm)
 	if math.Abs(got-expected) > 0.0001 {
 		t.Errorf("GrowthPotentialScore(25, warm) = %v, want %v", got, expected)

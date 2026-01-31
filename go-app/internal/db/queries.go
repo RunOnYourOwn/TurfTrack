@@ -17,7 +17,7 @@ func ListLocations(db *sql.DB) ([]model.Location, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 
 	var locs []model.Location
 	for rows.Next() {
@@ -76,7 +76,7 @@ func ListLawns(db *sql.DB) ([]model.Lawn, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 
 	var lawns []model.Lawn
 	for rows.Next() {
@@ -169,7 +169,7 @@ func ListProducts(db *sql.DB) ([]model.Product, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 
 	var products []model.Product
 	for rows.Next() {
@@ -242,7 +242,7 @@ func ListApplications(db *sql.DB, lawnID *int) ([]model.Application, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 
 	var apps []model.Application
 	for rows.Next() {
@@ -380,7 +380,7 @@ func GetWeatherForLocation(db *sql.DB, locationID int, start, end *time.Time) ([
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 
 	var results []model.DailyWeather
 	for rows.Next() {
@@ -415,7 +415,7 @@ func ListGDDModels(db *sql.DB, locationID *int) ([]model.GDDModel, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 
 	var models []model.GDDModel
 	for rows.Next() {
@@ -451,7 +451,7 @@ func GetGDDValues(db *sql.DB, modelID int) ([]model.GDDValue, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 
 	var values []model.GDDValue
 	for rows.Next() {
@@ -519,7 +519,7 @@ func GetDiseasePressure(db *sql.DB, locationID int, start, end *time.Time) ([]mo
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 
 	var results []model.DiseasePressure
 	for rows.Next() {
@@ -554,7 +554,7 @@ func GetGrowthPotential(db *sql.DB, locationID int, start, end *time.Time) ([]mo
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 
 	var results []model.GrowthPotential
 	for rows.Next() {
@@ -578,7 +578,7 @@ func GetWeeklyWaterSummaries(db *sql.DB, lawnID int) ([]model.WeeklyWaterSummary
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 
 	var results []model.WeeklyWaterSummary
 	for rows.Next() {
@@ -611,7 +611,7 @@ func ListIrrigationEntries(db *sql.DB, lawnID int, start, end *time.Time) ([]mod
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 
 	var results []model.IrrigationEntry
 	for rows.Next() {
@@ -669,7 +669,7 @@ func GetWeedPressure(db *sql.DB, locationID int, start, end *time.Time) ([]model
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 
 	var results []model.WeedPressure
 	for rows.Next() {
@@ -702,7 +702,7 @@ func ListWeedSpecies(db *sql.DB, activeOnly bool) ([]model.WeedSpecies, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 
 	var results []model.WeedSpecies
 	for rows.Next() {
@@ -727,7 +727,7 @@ func ListTaskStatuses(db *sql.DB, limit int) ([]model.TaskStatus, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 
 	var results []model.TaskStatus
 	for rows.Next() {

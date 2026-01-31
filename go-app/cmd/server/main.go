@@ -19,7 +19,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Database connection failed: %v", err)
 	}
-	defer database.Close()
+	defer database.Close() //nolint:errcheck // best-effort cleanup on shutdown
 	log.Println("Connected to database")
 
 	// Run migrations

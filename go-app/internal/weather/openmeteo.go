@@ -84,7 +84,7 @@ func (c *Client) FetchDailyWeather(lat, lon float64, startDate, endDate time.Tim
 	if err != nil {
 		return nil, fmt.Errorf("open-meteo request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("open-meteo returned status %d", resp.StatusCode)

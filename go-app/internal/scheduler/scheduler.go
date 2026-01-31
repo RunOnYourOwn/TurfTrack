@@ -251,7 +251,7 @@ func calculateWaterSummaries(db *sql.DB, locationID int, start, end time.Time) {
 	if err != nil {
 		return
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 
 	var lawnIDs []int
 	for rows.Next() {
