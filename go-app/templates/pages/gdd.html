@@ -12,16 +12,15 @@
                 {{end}}
             </select>
         </div>
-        {{if .SelectedLocationID}}
-        <button onclick="document.getElementById('gdd-form').classList.toggle('hidden')" class="btn btn-primary btn-sm">+ Add GDD Model</button>
-        {{end}}
     </div>
 
     {{if .SelectedLocationID}}
-    <div id="gdd-form" class="hidden card bg-base-100 shadow-sm">
-        <div class="card-body">
-            <h3 class="card-title">New GDD Model</h3>
-            <form hx-post="/gdd-models" hx-swap="none" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <!-- Add GDD Model Form (collapse) -->
+    <div class="collapse collapse-arrow bg-base-100 shadow-sm">
+        <input type="checkbox" />
+        <div class="collapse-title font-semibold">+ Add GDD Model</div>
+        <div class="collapse-content">
+            <form hx-post="/gdd-models" hx-swap="none" hx-indicator="#gdd-loading" class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
                 <input type="hidden" name="location_id" value="{{deref .SelectedLocationID}}">
                 <div class="form-control">
                     <label class="label"><span class="label-text">Name</span></label>
@@ -52,8 +51,9 @@
                         <span class="label-text">Reset on Threshold</span>
                     </label>
                 </div>
-                <div class="md:col-span-3">
+                <div class="md:col-span-3 flex items-center gap-3">
                     <button type="submit" class="btn btn-primary">Create Model</button>
+                    <span id="gdd-loading" class="loading loading-spinner loading-sm htmx-indicator"></span>
                 </div>
             </form>
         </div>
@@ -67,7 +67,7 @@
                     <h3 class="card-title">{{.Name}}</h3>
                     <p class="text-sm text-base-content/60">Base: {{formatFloat .BaseTemp 1}}{{.Unit}} | Start: {{formatDate .StartDate}} | Threshold: {{formatFloat .Threshold 0}}</p>
                 </div>
-                <button hx-delete="/gdd-models/{{.ID}}" hx-confirm="Delete GDD model '{{.Name}}'?" class="btn btn-ghost btn-xs text-error">Delete</button>
+                <button class="btn btn-ghost btn-xs text-error" onclick="confirmDelete('/gdd-models/{{.ID}}', 'Delete GDD model \'{{.Name}}\'?')">Delete</button>
             </div>
             <canvas id="gdd-chart-{{.ID}}" height="200"></canvas>
         </div>
@@ -99,7 +99,7 @@
     {{end}}
 
     {{if not .GDDModels}}
-    <div class="alert">
+    <div class="alert alert-info">
         <span>No GDD models for this location. Create one above.</span>
     </div>
     {{end}}

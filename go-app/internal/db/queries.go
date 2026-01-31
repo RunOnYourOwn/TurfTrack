@@ -67,8 +67,8 @@ func GetOrCreateLocation(db *sql.DB, lat, lon float64) (*model.Location, error) 
 
 func ListLawns(db *sql.DB) ([]model.Lawn, error) {
 	rows, err := db.Query(`
-		SELECT l.id, l.name, l.area, l.grass_type, l.notes, l.weather_fetch_frequency,
-		       l.timezone, l.weather_enabled, l.location_id, l.created_at, l.updated_at,
+		SELECT l.id, l.name, l.area, l.grass_type, l.notes,
+		       l.weather_enabled, l.location_id, l.created_at, l.updated_at,
 		       loc.id, loc.name, loc.latitude, loc.longitude
 		FROM lawns l
 		JOIN locations loc ON l.location_id = loc.id
@@ -83,7 +83,7 @@ func ListLawns(db *sql.DB) ([]model.Lawn, error) {
 		var l model.Lawn
 		var loc model.Location
 		if err := rows.Scan(&l.ID, &l.Name, &l.Area, &l.GrassType, &l.Notes,
-			&l.WeatherFetchFrequency, &l.Timezone, &l.WeatherEnabled, &l.LocationID,
+			&l.WeatherEnabled, &l.LocationID,
 			&l.CreatedAt, &l.UpdatedAt,
 			&loc.ID, &loc.Name, &loc.Latitude, &loc.Longitude); err != nil {
 			return nil, err
@@ -98,14 +98,14 @@ func GetLawn(db *sql.DB, id int) (*model.Lawn, error) {
 	var l model.Lawn
 	var loc model.Location
 	err := db.QueryRow(`
-		SELECT l.id, l.name, l.area, l.grass_type, l.notes, l.weather_fetch_frequency,
-		       l.timezone, l.weather_enabled, l.location_id, l.created_at, l.updated_at,
+		SELECT l.id, l.name, l.area, l.grass_type, l.notes,
+		       l.weather_enabled, l.location_id, l.created_at, l.updated_at,
 		       loc.id, loc.name, loc.latitude, loc.longitude
 		FROM lawns l
 		JOIN locations loc ON l.location_id = loc.id
 		WHERE l.id = $1`, id).
 		Scan(&l.ID, &l.Name, &l.Area, &l.GrassType, &l.Notes,
-			&l.WeatherFetchFrequency, &l.Timezone, &l.WeatherEnabled, &l.LocationID,
+			&l.WeatherEnabled, &l.LocationID,
 			&l.CreatedAt, &l.UpdatedAt,
 			&loc.ID, &loc.Name, &loc.Latitude, &loc.Longitude)
 	if err == sql.ErrNoRows {
@@ -116,38 +116,38 @@ func GetLawn(db *sql.DB, id int) (*model.Lawn, error) {
 }
 
 func CreateLawn(db *sql.DB, name string, area float64, grassType model.GrassType, notes string,
-	freq model.WeatherFetchFrequency, timezone string, weatherEnabled bool, locationID int) (*model.Lawn, error) {
+	weatherEnabled bool, locationID int) (*model.Lawn, error) {
 	var l model.Lawn
 	var notesVal sql.NullString
 	if notes != "" {
 		notesVal = sql.NullString{String: notes, Valid: true}
 	}
 	err := db.QueryRow(`
-		INSERT INTO lawns (name, area, grass_type, notes, weather_fetch_frequency, timezone, weather_enabled, location_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		RETURNING id, name, area, grass_type, notes, weather_fetch_frequency, timezone, weather_enabled, location_id, created_at, updated_at`,
-		name, area, grassType, notesVal, freq, timezone, weatherEnabled, locationID,
+		INSERT INTO lawns (name, area, grass_type, notes, weather_enabled, location_id)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, name, area, grass_type, notes, weather_enabled, location_id, created_at, updated_at`,
+		name, area, grassType, notesVal, weatherEnabled, locationID,
 	).Scan(&l.ID, &l.Name, &l.Area, &l.GrassType, &l.Notes,
-		&l.WeatherFetchFrequency, &l.Timezone, &l.WeatherEnabled, &l.LocationID,
+		&l.WeatherEnabled, &l.LocationID,
 		&l.CreatedAt, &l.UpdatedAt)
 	return &l, err
 }
 
 func UpdateLawn(db *sql.DB, id int, name string, area float64, grassType model.GrassType, notes string,
-	freq model.WeatherFetchFrequency, timezone string, weatherEnabled bool, locationID int) (*model.Lawn, error) {
+	weatherEnabled bool, locationID int) (*model.Lawn, error) {
 	var l model.Lawn
 	var notesVal sql.NullString
 	if notes != "" {
 		notesVal = sql.NullString{String: notes, Valid: true}
 	}
 	err := db.QueryRow(`
-		UPDATE lawns SET name=$1, area=$2, grass_type=$3, notes=$4, weather_fetch_frequency=$5,
-		       timezone=$6, weather_enabled=$7, location_id=$8, updated_at=NOW()
-		WHERE id=$9
-		RETURNING id, name, area, grass_type, notes, weather_fetch_frequency, timezone, weather_enabled, location_id, created_at, updated_at`,
-		name, area, grassType, notesVal, freq, timezone, weatherEnabled, locationID, id,
+		UPDATE lawns SET name=$1, area=$2, grass_type=$3, notes=$4,
+		       weather_enabled=$5, location_id=$6, updated_at=NOW()
+		WHERE id=$7
+		RETURNING id, name, area, grass_type, notes, weather_enabled, location_id, created_at, updated_at`,
+		name, area, grassType, notesVal, weatherEnabled, locationID, id,
 	).Scan(&l.ID, &l.Name, &l.Area, &l.GrassType, &l.Notes,
-		&l.WeatherFetchFrequency, &l.Timezone, &l.WeatherEnabled, &l.LocationID,
+		&l.WeatherEnabled, &l.LocationID,
 		&l.CreatedAt, &l.UpdatedAt)
 	return &l, err
 }
@@ -155,6 +155,18 @@ func UpdateLawn(db *sql.DB, id int, name string, area float64, grassType model.G
 func DeleteLawn(db *sql.DB, id int) error {
 	_, err := db.Exec("DELETE FROM lawns WHERE id = $1", id)
 	return err
+}
+
+// DeleteOrphanedLocation deletes a location if no lawns reference it.
+// The CASCADE rules on the location will clean up all related weather,
+// disease, growth potential, GDD, and weed pressure data.
+func DeleteOrphanedLocation(db *sql.DB, locationID int) {
+	var count int
+	err := db.QueryRow("SELECT COUNT(*) FROM lawns WHERE location_id = $1", locationID).Scan(&count)
+	if err != nil || count > 0 {
+		return
+	}
+	_, _ = db.Exec("DELETE FROM locations WHERE id = $1", locationID)
 }
 
 // --- Products ---
@@ -219,6 +231,20 @@ func CreateProduct(db *sql.DB, p *model.Product) (*model.Product, error) {
 	return p, err
 }
 
+func UpdateProduct(db *sql.DB, p *model.Product) (*model.Product, error) {
+	err := db.QueryRow(`
+		UPDATE products SET name=$1, n_pct=$2, p_pct=$3, k_pct=$4, ca_pct=$5, mg_pct=$6, s_pct=$7,
+		       fe_pct=$8, cu_pct=$9, mn_pct=$10, b_pct=$11, zn_pct=$12,
+		       weight_lbs=$13, cost_per_bag=$14, updated_at=NOW()
+		WHERE id=$15
+		RETURNING id, cost_per_lb_n, cost_per_lb, created_at, updated_at`,
+		p.Name, p.NPct, p.PPct, p.KPct, p.CaPct, p.MgPct, p.SPct,
+		p.FePct, p.CuPct, p.MnPct, p.BPct, p.ZnPct,
+		p.WeightLbs, p.CostPerBag, p.ID,
+	).Scan(&p.ID, &p.CostPerLbN, &p.CostPerLb, &p.CreatedAt, &p.UpdatedAt)
+	return p, err
+}
+
 func DeleteProduct(db *sql.DB, id int) error {
 	_, err := db.Exec("DELETE FROM products WHERE id = $1", id)
 	return err
@@ -269,6 +295,41 @@ func CreateApplication(db *sql.DB, a *model.Application) (*model.Application, er
 		a.LawnID, a.ProductID, a.ApplicationDate, a.AmountPerArea, a.AreaUnit, a.Unit, a.Notes, a.Status,
 		a.TiedGDDModelID, a.CostApplied, a.NApplied, a.PApplied, a.KApplied, a.CaApplied, a.MgApplied, a.SApplied,
 		a.FeApplied, a.CuApplied, a.MnApplied, a.BApplied, a.ZnApplied,
+	).Scan(&a.ID, &a.CreatedAt, &a.UpdatedAt)
+	return a, err
+}
+
+func GetApplication(db *sql.DB, id int) (*model.Application, error) {
+	var a model.Application
+	err := db.QueryRow(`SELECT id, lawn_id, product_id, application_date, amount_per_area, area_unit, unit, notes, status,
+		tied_gdd_model_id, cost_applied, n_applied, p_applied, k_applied, ca_applied, mg_applied, s_applied,
+		fe_applied, cu_applied, mn_applied, b_applied, zn_applied, created_at, updated_at
+		FROM applications WHERE id = $1`, id).
+		Scan(&a.ID, &a.LawnID, &a.ProductID, &a.ApplicationDate, &a.AmountPerArea,
+			&a.AreaUnit, &a.Unit, &a.Notes, &a.Status, &a.TiedGDDModelID,
+			&a.CostApplied, &a.NApplied, &a.PApplied, &a.KApplied, &a.CaApplied, &a.MgApplied, &a.SApplied,
+			&a.FeApplied, &a.CuApplied, &a.MnApplied, &a.BApplied, &a.ZnApplied,
+			&a.CreatedAt, &a.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return &a, err
+}
+
+func UpdateApplication(db *sql.DB, a *model.Application) (*model.Application, error) {
+	err := db.QueryRow(`
+		UPDATE applications SET lawn_id=$1, product_id=$2, application_date=$3, amount_per_area=$4,
+		       area_unit=$5, unit=$6, notes=$7, status=$8, tied_gdd_model_id=$9,
+		       cost_applied=$10, n_applied=$11, p_applied=$12, k_applied=$13, ca_applied=$14,
+		       mg_applied=$15, s_applied=$16, fe_applied=$17, cu_applied=$18, mn_applied=$19,
+		       b_applied=$20, zn_applied=$21, updated_at=NOW()
+		WHERE id=$22
+		RETURNING id, created_at, updated_at`,
+		a.LawnID, a.ProductID, a.ApplicationDate, a.AmountPerArea,
+		a.AreaUnit, a.Unit, a.Notes, a.Status, a.TiedGDDModelID,
+		a.CostApplied, a.NApplied, a.PApplied, a.KApplied, a.CaApplied,
+		a.MgApplied, a.SApplied, a.FeApplied, a.CuApplied, a.MnApplied,
+		a.BApplied, a.ZnApplied, a.ID,
 	).Scan(&a.ID, &a.CreatedAt, &a.UpdatedAt)
 	return a, err
 }
@@ -755,4 +816,38 @@ func UpdateTaskStatus(db *sql.DB, taskID string, status model.TaskStatusEnum, re
 		WHERE task_id=$4`,
 		status, result, errMsg, taskID)
 	return err
+}
+
+// --- App Settings ---
+
+func GetSetting(db *sql.DB, key string) (string, error) {
+	var val string
+	err := db.QueryRow("SELECT value FROM app_settings WHERE key = $1", key).Scan(&val)
+	return val, err
+}
+
+func SetSetting(db *sql.DB, key, value string) error {
+	_, err := db.Exec(`
+		INSERT INTO app_settings (key, value, updated_at) VALUES ($1, $2, NOW())
+		ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()`,
+		key, value)
+	return err
+}
+
+func GetAllSettings(db *sql.DB) (map[string]string, error) {
+	rows, err := db.Query("SELECT key, value FROM app_settings ORDER BY key")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close() //nolint:errcheck
+
+	settings := make(map[string]string)
+	for rows.Next() {
+		var k, v string
+		if err := rows.Scan(&k, &v); err != nil {
+			return nil, err
+		}
+		settings[k] = v
+	}
+	return settings, rows.Err()
 }

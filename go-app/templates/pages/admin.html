@@ -1,6 +1,40 @@
 {{define "admin.html"}}
 <div class="space-y-6">
-    <h2 class="text-2xl font-bold">Task Monitor</h2>
+    <h2 class="text-2xl font-bold">Admin</h2>
+
+    <!-- Settings -->
+    <div class="card bg-base-100 shadow-sm">
+        <div class="card-body">
+            <h3 class="card-title text-lg">Weather Update Schedule</h3>
+            {{$hour := index .Settings "weather_update_hour"}}
+            {{$tz := index .Settings "weather_update_timezone"}}
+            <form hx-post="/admin/settings" hx-swap="none" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Update Hour</span></label>
+                    <select name="weather_update_hour" class="select select-bordered">
+                        {{range $i, $_ := seq 24}}
+                        <option value="{{$i}}" {{if eq (printf "%d" $i) $hour}}selected{{end}}>{{printf "%d:00" $i}}{{if eq $i 0}} (midnight){{else if eq $i 12}} (noon){{end}}</option>
+                        {{end}}
+                    </select>
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Timezone</span></label>
+                    <select name="weather_update_timezone" class="select select-bordered">
+                        {{range $_, $zone := timezones}}
+                        <option value="{{$zone}}" {{if eq $zone $tz}}selected{{end}}>{{$zone}}</option>
+                        {{end}}
+                    </select>
+                </div>
+                <div class="form-control justify-end">
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+            <p class="text-sm text-base-content/60 mt-2">Weather data is fetched daily at this hour. The scheduler reads this on each cycle, so changes take effect on the next run.</p>
+        </div>
+    </div>
+
+    <!-- Task Monitor -->
+    <h3 class="text-lg font-bold">Task History</h3>
 
     {{if .Tasks}}
     <div class="card bg-base-100 shadow-sm">
@@ -29,8 +63,8 @@
                                 {{else if eq (printf "%s" .Status) "started"}}<span class="badge badge-info badge-sm">started</span>
                                 {{else}}<span class="badge badge-ghost badge-sm">{{.Status}}</span>{{end}}
                             </td>
-                            <td class="text-xs">{{formatDateTime .CreatedAt}}</td>
-                            <td class="text-xs">{{if .FinishedAt}}{{formatDateTime (derefTime .FinishedAt)}}{{else}}-{{end}}</td>
+                            <td class="text-xs">{{localDateTime .CreatedAt $.TZ}}</td>
+                            <td class="text-xs">{{if .FinishedAt}}{{localDateTime (derefTime .FinishedAt) $.TZ}}{{else}}-{{end}}</td>
                             <td class="text-xs max-w-xs truncate">{{if .Result}}{{nullStr .Result}}{{else}}-{{end}}</td>
                             <td class="text-xs max-w-xs truncate text-error">{{if .Error}}{{nullStr .Error}}{{else}}-{{end}}</td>
                         </tr>

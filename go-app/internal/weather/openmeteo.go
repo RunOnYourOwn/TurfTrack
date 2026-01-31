@@ -65,19 +65,19 @@ type openMeteoResponse struct {
 	} `json:"daily"`
 }
 
-// FetchDailyWeather fetches weather data for a location and date range.
-func (c *Client) FetchDailyWeather(lat, lon float64, startDate, endDate time.Time) ([]DailyData, error) {
+// FetchDailyWeather fetches weather data for a location using past_days/forecast_days.
+// This makes a single API call that returns both historical and forecast data,
+// avoiding boundary issues with start_date/end_date.
+func (c *Client) FetchDailyWeather(lat, lon float64, pastDays, forecastDays int) ([]DailyData, error) {
 	url := fmt.Sprintf(
-		"%s?latitude=%.4f&longitude=%.4f&start_date=%s&end_date=%s"+
+		"%s?latitude=%.4f&longitude=%.4f&past_days=%d&forecast_days=%d"+
 			"&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,"+
 			"precipitation_probability_max,windspeed_10m_max,windgusts_10m_max,"+
 			"winddirection_10m_dominant,et0_fao_evapotranspiration,"+
 			"relative_humidity_2m_mean,relative_humidity_2m_max,relative_humidity_2m_min,"+
 			"dew_point_2m_max,dew_point_2m_min,dew_point_2m_mean,sunshine_duration"+
-			"&timezone=UTC",
-		baseURL, lat, lon,
-		startDate.Format("2006-01-02"),
-		endDate.Format("2006-01-02"),
+			"&timezone=auto",
+		baseURL, lat, lon, pastDays, forecastDays,
 	)
 
 	resp, err := c.HTTPClient.Get(url)

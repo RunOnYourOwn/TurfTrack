@@ -15,15 +15,6 @@ const (
 	GrassTypeWarm GrassType = "warm_season"
 )
 
-type WeatherFetchFrequency string
-
-const (
-	Freq4h  WeatherFetchFrequency = "4h"
-	Freq8h  WeatherFetchFrequency = "8h"
-	Freq12h WeatherFetchFrequency = "12h"
-	Freq24h WeatherFetchFrequency = "24h"
-)
-
 type WeatherType string
 
 const (
@@ -116,17 +107,15 @@ type Location struct {
 }
 
 type Lawn struct {
-	ID                    int                   `json:"id" db:"id"`
-	Name                  string                `json:"name" db:"name"`
-	Area                  float64               `json:"area" db:"area"`
-	GrassType             GrassType             `json:"grass_type" db:"grass_type"`
-	Notes                 sql.NullString        `json:"notes" db:"notes"`
-	WeatherFetchFrequency WeatherFetchFrequency `json:"weather_fetch_frequency" db:"weather_fetch_frequency"`
-	Timezone              string                `json:"timezone" db:"timezone"`
-	WeatherEnabled        bool                  `json:"weather_enabled" db:"weather_enabled"`
-	LocationID            int                   `json:"location_id" db:"location_id"`
-	CreatedAt             time.Time             `json:"created_at" db:"created_at"`
-	UpdatedAt             time.Time             `json:"updated_at" db:"updated_at"`
+	ID             int            `json:"id" db:"id"`
+	Name           string         `json:"name" db:"name"`
+	Area           float64        `json:"area" db:"area"`
+	GrassType      GrassType      `json:"grass_type" db:"grass_type"`
+	Notes          sql.NullString `json:"notes" db:"notes"`
+	WeatherEnabled bool           `json:"weather_enabled" db:"weather_enabled"`
+	LocationID     int            `json:"location_id" db:"location_id"`
+	CreatedAt      time.Time      `json:"created_at" db:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at" db:"updated_at"`
 
 	// Joined
 	Location *Location `json:"location,omitempty" db:"-"`

@@ -31,6 +31,12 @@ func NewServer(db *sql.DB, templatesDir string) (*Server, error) {
 	funcMap := template.FuncMap{
 		"formatDate": func(t time.Time) string { return t.Format("2006-01-02") },
 		"formatDateTime": func(t time.Time) string { return t.Format("Jan 02, 2006 3:04 PM") },
+		"localDateTime": func(t time.Time, tzName string) string {
+			if loc, err := time.LoadLocation(tzName); err == nil {
+				t = t.In(loc)
+			}
+			return t.Format("Jan 02, 2006 3:04 PM")
+		},
 		"formatFloat": func(f float64, prec int) string { return strconv.FormatFloat(f, 'f', prec, 64) },
 		"formatFloatPtr": func(f *float64, prec int) string {
 			if f == nil {
@@ -83,6 +89,26 @@ func NewServer(db *sql.DB, templatesDir string) (*Server, error) {
 				s[i] = i
 			}
 			return s
+		},
+		"timezones": func() []string {
+			return []string{
+				"America/New_York",
+				"America/Chicago",
+				"America/Denver",
+				"America/Los_Angeles",
+				"America/Anchorage",
+				"Pacific/Honolulu",
+				"America/Phoenix",
+				"America/Toronto",
+				"America/Vancouver",
+				"Europe/London",
+				"Europe/Paris",
+				"Europe/Berlin",
+				"Asia/Tokyo",
+				"Asia/Shanghai",
+				"Australia/Sydney",
+				"UTC",
+			}
 		},
 	}
 
@@ -143,9 +169,11 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("DELETE /lawns/{id}", s.handleDeleteLawn)
 
 	mux.HandleFunc("POST /products", s.handleCreateProduct)
+	mux.HandleFunc("PUT /products/{id}", s.handleUpdateProduct)
 	mux.HandleFunc("DELETE /products/{id}", s.handleDeleteProduct)
 
 	mux.HandleFunc("POST /applications", s.handleCreateApplication)
+	mux.HandleFunc("PUT /applications/{id}", s.handleUpdateApplication)
 	mux.HandleFunc("DELETE /applications/{id}", s.handleDeleteApplication)
 
 	mux.HandleFunc("POST /gdd-models", s.handleCreateGDDModel)
@@ -155,6 +183,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("DELETE /irrigation/{id}", s.handleDeleteIrrigation)
 
 	mux.HandleFunc("POST /locations", s.handleCreateLocation)
+	mux.HandleFunc("POST /admin/settings", s.handleSaveSettings)
 
 	// JSON API endpoints (for charts)
 	mux.HandleFunc("GET /api/weather/{locationID}", s.apiWeather)
@@ -350,9 +379,10 @@ func (s *Server) handleReports(w http.ResponseWriter, r *http.Request) {
 	var lawns []model.Lawn
 	var apps []model.Application
 	var products []model.Product
+	lawnID := queryInt(r, "lawn")
 	if s.dbAvailable() {
 		lawns, _ = dbpkg.ListLawns(s.DB)
-		apps, _ = dbpkg.ListApplications(s.DB, nil)
+		apps, _ = dbpkg.ListApplications(s.DB, lawnID)
 		products, _ = dbpkg.ListProducts(s.DB)
 	}
 
@@ -361,23 +391,66 @@ func (s *Server) handleReports(w http.ResponseWriter, r *http.Request) {
 		productMap[p.ID] = p
 	}
 
+	lawnMap := map[int]model.Lawn{}
+	for _, l := range lawns {
+		lawnMap[l.ID] = l
+	}
+
+	// Compute totals
+	var totalN, totalP, totalK, totalFe, totalCost float64
+	for _, a := range apps {
+		if a.NApplied != nil {
+			totalN += *a.NApplied
+		}
+		if a.PApplied != nil {
+			totalP += *a.PApplied
+		}
+		if a.KApplied != nil {
+			totalK += *a.KApplied
+		}
+		if a.FeApplied != nil {
+			totalFe += *a.FeApplied
+		}
+		if a.CostApplied != nil {
+			totalCost += *a.CostApplied
+		}
+	}
+
 	data := map[string]interface{}{
 		"Page":         "reports",
 		"Lawns":        lawns,
 		"Applications": apps,
 		"ProductMap":   productMap,
+		"LawnMap":      lawnMap,
+		"SelectedID":   lawnID,
+		"TotalN":       totalN,
+		"TotalP":       totalP,
+		"TotalK":       totalK,
+		"TotalFe":      totalFe,
+		"TotalCost":    totalCost,
 	}
 	s.render(w, "layout.html", data)
 }
 
 func (s *Server) handleAdmin(w http.ResponseWriter, r *http.Request) {
 	var tasks []model.TaskStatus
+	var settings map[string]string
 	if s.dbAvailable() {
 		tasks, _ = dbpkg.ListTaskStatuses(s.DB, 50)
+		settings, _ = dbpkg.GetAllSettings(s.DB)
+	}
+	if settings == nil {
+		settings = map[string]string{}
+	}
+	tz := settings["weather_update_timezone"]
+	if tz == "" {
+		tz = "UTC"
 	}
 	data := map[string]interface{}{
-		"Page":  "admin",
-		"Tasks": tasks,
+		"Page":     "admin",
+		"Tasks":    tasks,
+		"Settings": settings,
+		"TZ":       tz,
 	}
 	s.render(w, "layout.html", data)
 }
@@ -390,14 +463,6 @@ func (s *Server) handleCreateLawn(w http.ResponseWriter, r *http.Request) {
 	area, _ := strconv.ParseFloat(r.FormValue("area"), 64)
 	grassType := model.GrassType(r.FormValue("grass_type"))
 	notes := r.FormValue("notes")
-	freq := model.WeatherFetchFrequency(r.FormValue("weather_fetch_frequency"))
-	if freq == "" {
-		freq = model.Freq24h
-	}
-	tz := r.FormValue("timezone")
-	if tz == "" {
-		tz = "America/Chicago"
-	}
 	weatherEnabled := r.FormValue("weather_enabled") == "on" || r.FormValue("weather_enabled") == "true"
 
 	locIDStr := r.FormValue("location_id")
@@ -422,7 +487,7 @@ func (s *Server) handleCreateLawn(w http.ResponseWriter, r *http.Request) {
 		locationID, _ = strconv.Atoi(locIDStr)
 	}
 
-	_, err := dbpkg.CreateLawn(s.DB, name, area, grassType, notes, freq, tz, weatherEnabled, locationID)
+	_, err := dbpkg.CreateLawn(s.DB, name, area, grassType, notes, weatherEnabled, locationID)
 	if err != nil {
 		http.Error(w, "Failed to create lawn: "+err.Error(), http.StatusBadRequest)
 		return
@@ -438,27 +503,76 @@ func (s *Server) handleUpdateLawn(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
 		return
 	}
+
+	// Get old lawn to detect location changes
+	oldLawn, _ := dbpkg.GetLawn(s.DB, id)
+
 	_ = r.ParseForm()
 	name := r.FormValue("name")
 	area, _ := strconv.ParseFloat(r.FormValue("area"), 64)
 	grassType := model.GrassType(r.FormValue("grass_type"))
 	notes := r.FormValue("notes")
-	freq := model.WeatherFetchFrequency(r.FormValue("weather_fetch_frequency"))
-	tz := r.FormValue("timezone")
 	weatherEnabled := r.FormValue("weather_enabled") == "on"
-	locationID, _ := strconv.Atoi(r.FormValue("location_id"))
 
-	_, err = dbpkg.UpdateLawn(s.DB, id, name, area, grassType, notes, freq, tz, weatherEnabled, locationID)
+	// Handle location: existing or new
+	locIDStr := r.FormValue("location_id")
+	var locationID int
+
+	if locIDStr == "new" {
+		lat, _ := strconv.ParseFloat(r.FormValue("latitude"), 64)
+		lon, _ := strconv.ParseFloat(r.FormValue("longitude"), 64)
+		locName := r.FormValue("location_name")
+		if locName == "" {
+			locName = fmt.Sprintf("Location (%.4f, %.4f)", lat, lon)
+		}
+		loc, err := dbpkg.CreateLocation(s.DB, locName, lat, lon)
+		if err != nil {
+			http.Error(w, "Failed to create location: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		locationID = loc.ID
+		scheduler.FetchWeatherForLocation(s.DB, *loc)
+	} else {
+		locationID, _ = strconv.Atoi(locIDStr)
+	}
+
+	_, err = dbpkg.UpdateLawn(s.DB, id, name, area, grassType, notes, weatherEnabled, locationID)
 	if err != nil {
 		http.Error(w, "Failed to update lawn", http.StatusBadRequest)
 		return
 	}
+
+	// If location changed, clean up orphaned old location and ensure new location has weather data
+	if oldLawn != nil && oldLawn.LocationID != locationID {
+		dbpkg.DeleteOrphanedLocation(s.DB, oldLawn.LocationID)
+
+		// Fetch weather for new location if it doesn't have data yet
+		newLoc, err := dbpkg.GetLocation(s.DB, locationID)
+		if err == nil && newLoc != nil {
+			var count int
+			_ = s.DB.QueryRow("SELECT COUNT(*) FROM daily_weather WHERE location_id = $1", locationID).Scan(&count)
+			if count == 0 {
+				scheduler.FetchWeatherForLocation(s.DB, *newLoc)
+			}
+		}
+	}
+
 	w.Header().Set("HX-Redirect", "/lawns")
 }
 
 func (s *Server) handleDeleteLawn(w http.ResponseWriter, r *http.Request) {
 	id, _ := pathID(r, "id")
+
+	// Get the lawn's location before deleting so we can check for orphans
+	lawn, _ := dbpkg.GetLawn(s.DB, id)
 	_ = dbpkg.DeleteLawn(s.DB, id)
+
+	// If this was the last lawn at the location, clean up the orphaned location
+	// (cascades to weather, disease, growth potential, GDD data)
+	if lawn != nil {
+		dbpkg.DeleteOrphanedLocation(s.DB, lawn.LocationID)
+	}
+
 	w.Header().Set("HX-Redirect", "/lawns")
 }
 
@@ -495,6 +609,47 @@ func (s *Server) handleCreateProduct(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("HX-Redirect", "/products")
 	w.WriteHeader(http.StatusCreated)
+}
+
+func (s *Server) handleUpdateProduct(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r, "id")
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	_ = r.ParseForm()
+	p := &model.Product{
+		ID:   id,
+		Name: r.FormValue("name"),
+	}
+	p.NPct, _ = strconv.ParseFloat(r.FormValue("n_pct"), 64)
+	p.PPct, _ = strconv.ParseFloat(r.FormValue("p_pct"), 64)
+	p.KPct, _ = strconv.ParseFloat(r.FormValue("k_pct"), 64)
+	p.CaPct, _ = strconv.ParseFloat(r.FormValue("ca_pct"), 64)
+	p.MgPct, _ = strconv.ParseFloat(r.FormValue("mg_pct"), 64)
+	p.SPct, _ = strconv.ParseFloat(r.FormValue("s_pct"), 64)
+	p.FePct, _ = strconv.ParseFloat(r.FormValue("fe_pct"), 64)
+	p.CuPct, _ = strconv.ParseFloat(r.FormValue("cu_pct"), 64)
+	p.MnPct, _ = strconv.ParseFloat(r.FormValue("mn_pct"), 64)
+	p.BPct, _ = strconv.ParseFloat(r.FormValue("b_pct"), 64)
+	p.ZnPct, _ = strconv.ParseFloat(r.FormValue("zn_pct"), 64)
+
+	if v := r.FormValue("weight_lbs"); v != "" {
+		f, _ := strconv.ParseFloat(v, 64)
+		p.WeightLbs = &f
+	}
+	if v := r.FormValue("cost_per_bag"); v != "" {
+		f, _ := strconv.ParseFloat(v, 64)
+		p.CostPerBag = &f
+	}
+
+	_, err = dbpkg.UpdateProduct(s.DB, p)
+	if err != nil {
+		http.Error(w, "Failed to update product", http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("HX-Redirect", "/products")
 }
 
 func (s *Server) handleDeleteProduct(w http.ResponseWriter, r *http.Request) {
@@ -558,6 +713,68 @@ func (s *Server) handleCreateApplication(w http.ResponseWriter, r *http.Request)
 	}
 	w.Header().Set("HX-Redirect", "/applications")
 	w.WriteHeader(http.StatusCreated)
+}
+
+func (s *Server) handleUpdateApplication(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r, "id")
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	_ = r.ParseForm()
+	a := &model.Application{ID: id}
+	a.LawnID, _ = strconv.Atoi(r.FormValue("lawn_id"))
+	a.ProductID, _ = strconv.Atoi(r.FormValue("product_id"))
+	date, _ := time.Parse("2006-01-02", r.FormValue("application_date"))
+	a.ApplicationDate = date
+	a.AmountPerArea, _ = strconv.ParseFloat(r.FormValue("amount_per_area"), 64)
+	a.AreaUnit, _ = strconv.Atoi(r.FormValue("area_unit"))
+	if a.AreaUnit == 0 {
+		a.AreaUnit = 1000
+	}
+	a.Unit = model.ApplicationUnit(r.FormValue("unit"))
+	a.Status = model.ApplicationStatus(r.FormValue("status"))
+	if a.Status == "" {
+		a.Status = model.AppPlanned
+	}
+	if v := r.FormValue("notes"); v != "" {
+		a.Notes = sql.NullString{String: v, Valid: true}
+	}
+
+	// Calculate nutrient amounts
+	product, _ := dbpkg.GetProduct(s.DB, a.ProductID)
+	lawn, _ := dbpkg.GetLawn(s.DB, a.LawnID)
+	if product != nil && lawn != nil {
+		baseAmount := calc.ConvertToBaseUnit(a.AmountPerArea, string(a.Unit))
+		setFloat := func(pct float64) *float64 {
+			v := calc.NutrientApplied(baseAmount, pct)
+			return &v
+		}
+		a.NApplied = setFloat(product.NPct)
+		a.PApplied = setFloat(product.PPct)
+		a.KApplied = setFloat(product.KPct)
+		a.CaApplied = setFloat(product.CaPct)
+		a.MgApplied = setFloat(product.MgPct)
+		a.SApplied = setFloat(product.SPct)
+		a.FeApplied = setFloat(product.FePct)
+		a.CuApplied = setFloat(product.CuPct)
+		a.MnApplied = setFloat(product.MnPct)
+		a.BApplied = setFloat(product.BPct)
+		a.ZnApplied = setFloat(product.ZnPct)
+
+		if product.CostPerLb != nil {
+			cost := calc.ApplicationCost(*product.CostPerLb, baseAmount, lawn.Area, float64(a.AreaUnit))
+			a.CostApplied = &cost
+		}
+	}
+
+	_, err = dbpkg.UpdateApplication(s.DB, a)
+	if err != nil {
+		http.Error(w, "Failed to update application", http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("HX-Redirect", "/applications")
 }
 
 func (s *Server) handleDeleteApplication(w http.ResponseWriter, r *http.Request) {
@@ -723,6 +940,17 @@ func envOr(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
+	_ = r.ParseForm()
+	for _, key := range []string{"weather_update_hour", "weather_update_timezone"} {
+		if val := r.FormValue(key); val != "" {
+			_ = dbpkg.SetSetting(s.DB, key, val)
+		}
+	}
+	w.Header().Set("HX-Redirect", "/admin")
+	w.WriteHeader(http.StatusOK)
 }
 
 // Unused import guard

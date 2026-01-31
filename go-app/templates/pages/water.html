@@ -12,16 +12,15 @@
                 {{end}}
             </select>
         </div>
-        {{if .SelectedID}}
-        <button onclick="document.getElementById('irrig-form').classList.toggle('hidden')" class="btn btn-info btn-sm">+ Log Irrigation</button>
-        {{end}}
     </div>
 
     {{if .SelectedID}}
-    <div id="irrig-form" class="hidden card bg-base-100 shadow-sm">
-        <div class="card-body">
-            <h3 class="card-title">Log Irrigation</h3>
-            <form hx-post="/irrigation" hx-swap="none" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <!-- Log Irrigation Form (collapse) -->
+    <div class="collapse collapse-arrow bg-base-100 shadow-sm">
+        <input type="checkbox" />
+        <div class="collapse-title font-semibold">+ Log Irrigation</div>
+        <div class="collapse-content">
+            <form hx-post="/irrigation" hx-swap="none" hx-indicator="#water-loading" class="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
                 <input type="hidden" name="lawn_id" value="{{deref .SelectedID}}">
                 <div class="form-control">
                     <label class="label"><span class="label-text">Date</span></label>
@@ -43,8 +42,9 @@
                         <option value="SCHEDULED">Scheduled</option>
                     </select>
                 </div>
-                <div class="md:col-span-4">
+                <div class="md:col-span-4 flex items-center gap-3">
                     <button type="submit" class="btn btn-info">Log Irrigation</button>
+                    <span id="water-loading" class="loading loading-spinner loading-sm htmx-indicator"></span>
                 </div>
             </form>
         </div>
@@ -109,7 +109,7 @@
                             <td class="text-right">{{formatFloat .Amount 2}}"</td>
                             <td>{{.Duration}} min</td>
                             <td><span class="badge badge-outline badge-sm">{{.Source}}</span></td>
-                            <td><button hx-delete="/irrigation/{{.ID}}" hx-confirm="Delete this entry?" class="btn btn-ghost btn-xs text-error">Delete</button></td>
+                            <td><button class="btn btn-ghost btn-xs text-error" onclick="confirmDelete('/irrigation/{{.ID}}', 'Delete this entry?')">Delete</button></td>
                         </tr>
                         {{end}}
                     </tbody>

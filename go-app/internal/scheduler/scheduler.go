@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/RunOnYourOwn/TurfTrack/go-app/internal/calc"
@@ -19,24 +20,47 @@ func Start(db *sql.DB) {
 	go func() {
 		// Run once on startup after a brief delay
 		time.Sleep(10 * time.Second)
-		runDailyUpdate(db)
+		runDailyUpdate(db, false)
 
-		// Then run at 09:00 UTC daily (same as original Celery schedule)
+		// Then run at the configured hour daily
 		for {
-			now := time.Now().UTC()
-			next := time.Date(now.Year(), now.Month(), now.Day(), 9, 0, 0, 0, time.UTC)
-			if now.After(next) {
-				next = next.Add(24 * time.Hour)
-			}
+			next := nextUpdateTime(db)
 			sleepDur := time.Until(next)
 			log.Printf("[scheduler] Next weather update at %s (in %s)", next.Format(time.RFC3339), sleepDur)
 			time.Sleep(sleepDur)
-			runDailyUpdate(db)
+			runDailyUpdate(db, true)
 		}
 	}()
 }
 
-func runDailyUpdate(db *sql.DB) {
+// nextUpdateTime reads the configured update hour and timezone from app_settings.
+func nextUpdateTime(db *sql.DB) time.Time {
+	hour := 6 // default 6 AM
+	tzName := "America/Chicago"
+
+	if h, err := dbpkg.GetSetting(db, "weather_update_hour"); err == nil {
+		if v, err := strconv.Atoi(h); err == nil && v >= 0 && v <= 23 {
+			hour = v
+		}
+	}
+	if tz, err := dbpkg.GetSetting(db, "weather_update_timezone"); err == nil && tz != "" {
+		tzName = tz
+	}
+
+	loc, err := time.LoadLocation(tzName)
+	if err != nil {
+		loc = time.UTC
+	}
+
+	now := time.Now().In(loc)
+	next := time.Date(now.Year(), now.Month(), now.Day(), hour, 0, 0, 0, loc)
+	if now.After(next) {
+		next = next.Add(24 * time.Hour)
+	}
+	return next
+}
+
+func runDailyUpdate(db *sql.DB, isRecurring bool) {
 	log.Println("[scheduler] Starting daily weather update for all locations")
 
 	locs, err := dbpkg.ListLocations(db)
@@ -47,15 +71,20 @@ func runDailyUpdate(db *sql.DB) {
 
 	client := weather.NewClient()
 	today := time.Now().UTC().Truncate(24 * time.Hour)
-	histStart := today.AddDate(0, 0, -60)
-	forecastEnd := today.AddDate(0, 0, 16)
+
+	// On recurring daily runs, only fetch 2 days back (yesterday's actuals + today)
+	// On startup, fetch 60 days to backfill if needed
+	pastDays := 60
+	if isRecurring {
+		pastDays = 2
+	}
 
 	for _, loc := range locs {
 		taskID := fmt.Sprintf("weather-%d-%s", loc.ID, today.Format("20060102"))
 		locID := loc.ID
 		_ = dbpkg.CreateTaskStatus(db, taskID, "update_weather", &locID)
 
-		if err := fetchAndStoreWeather(db, client, loc, histStart, today, forecastEnd); err != nil {
+		if err := fetchAndStoreWeather(db, client, loc, today, pastDays); err != nil {
 			log.Printf("[scheduler] Weather update failed for location %d: %v", loc.ID, err)
 			errStr := err.Error()
 			_ = dbpkg.UpdateTaskStatus(db, taskID, model.TaskFailure, nil, &errStr)
@@ -73,28 +102,21 @@ func runDailyUpdate(db *sql.DB) {
 	log.Println("[scheduler] Daily update complete")
 }
 
-func fetchAndStoreWeather(db *sql.DB, client *weather.Client, loc model.Location,
-	histStart, today, forecastEnd time.Time) error {
-
-	// Fetch historical data
-	histDays, err := client.FetchDailyWeather(loc.Latitude, loc.Longitude, histStart, today)
+func fetchAndStoreWeather(db *sql.DB, client *weather.Client, loc model.Location, today time.Time, pastDays int) error {
+	// Single API call: pastDays historical + 15 days forecast
+	days, err := client.FetchDailyWeather(loc.Latitude, loc.Longitude, pastDays, 15)
 	if err != nil {
-		return fmt.Errorf("historical fetch: %w", err)
+		return fmt.Errorf("weather fetch: %w", err)
 	}
-	for _, day := range histDays {
-		if err := dbpkg.UpsertDailyWeather(db, loc.ID, day, model.WeatherHistorical); err != nil {
-			log.Printf("[scheduler] Failed to upsert historical weather for %s: %v", day.Date.Format("2006-01-02"), err)
+
+	for _, day := range days {
+		// Determine type based on whether date is in the past or future
+		weatherType := model.WeatherHistorical
+		if day.Date.After(today) {
+			weatherType = model.WeatherForecast
 		}
-	}
-
-	// Fetch forecast data
-	fcDays, err := client.FetchDailyWeather(loc.Latitude, loc.Longitude, today.AddDate(0, 0, 1), forecastEnd)
-	if err != nil {
-		return fmt.Errorf("forecast fetch: %w", err)
-	}
-	for _, day := range fcDays {
-		if err := dbpkg.UpsertDailyWeather(db, loc.ID, day, model.WeatherForecast); err != nil {
-			log.Printf("[scheduler] Failed to upsert forecast weather for %s: %v", day.Date.Format("2006-01-02"), err)
+		if err := dbpkg.UpsertDailyWeather(db, loc.ID, day, weatherType); err != nil {
+			log.Printf("[scheduler] Failed to upsert weather for %s: %v", day.Date.Format("2006-01-02"), err)
 		}
 	}
 
@@ -104,7 +126,7 @@ func fetchAndStoreWeather(db *sql.DB, client *weather.Client, loc model.Location
 func runCalculations(db *sql.DB, loc model.Location) {
 	today := time.Now().UTC().Truncate(24 * time.Hour)
 	start := today.AddDate(0, 0, -60)
-	end := today.AddDate(0, 0, 16)
+	end := today.AddDate(0, 0, 15)
 
 	// Get weather data for calculations
 	weatherData, err := dbpkg.GetWeatherForLocation(db, loc.ID, &start, &end)
@@ -121,6 +143,9 @@ func runCalculations(db *sql.DB, loc model.Location) {
 
 	// Recalculate GDD for all models at this location
 	recalculateGDD(db, loc.ID, weatherData)
+
+	// Calculate weed pressure for all species at this location
+	calculateAndStoreWeedPressure(db, loc.ID, weatherData)
 
 	// Calculate water summaries for all lawns at this location
 	calculateWaterSummaries(db, loc.ID, start, end)
@@ -191,6 +216,123 @@ func calculateAndStoreGrowthPotential(db *sql.DB, locationID int, weatherData []
 			w.Date, locationID, gp, avg3[i], avg5[i], avg7[i])
 		if err != nil {
 			log.Printf("[scheduler] Failed to store growth potential: %v", err)
+		}
+	}
+}
+
+func calculateAndStoreWeedPressure(db *sql.DB, locationID int, weatherData []model.DailyWeather) {
+	species, err := dbpkg.ListWeedSpecies(db, true)
+	if err != nil || len(species) == 0 {
+		return
+	}
+
+	// Get grass type for growth potential (turf stress calculation)
+	var grassType string
+	_ = db.QueryRow("SELECT grass_type FROM lawns WHERE location_id = $1 LIMIT 1", locationID).Scan(&grassType)
+	gt := calc.GrassTypeCold
+	if grassType == "warm_season" {
+		gt = calc.GrassTypeWarm
+	}
+
+	for _, sp := range species {
+		// Accumulate GDD from Jan 1 for this species' base temp
+		gddAccum := 0.0
+
+		for i, w := range weatherData {
+			date := w.Date
+			month := int(date.Month())
+			avgTemp := (w.TemperatureMaxC + w.TemperatureMinC) / 2
+
+			// Reset GDD accumulation at year boundary
+			if i > 0 && weatherData[i-1].Date.Year() != date.Year() {
+				gddAccum = 0.0
+			}
+
+			// Daily GDD for this species' base temp
+			dailyGDD := avgTemp - sp.GDDBaseTempC
+			if dailyGDD < 0 {
+				dailyGDD = 0
+			}
+			gddAccum += dailyGDD
+
+			// Estimate soil temperature
+			soilTemp := calc.EstimateSoilTemp(avgTemp, month)
+
+			// 3-day precipitation sum (current day + 2 prior)
+			precip3d := w.PrecipitationMM
+			for j := 1; j <= 2 && i-j >= 0; j++ {
+				precip3d += weatherData[i-j].PrecipitationMM
+			}
+
+			// 7-day humidity average
+			humCount := 0
+			humSum := 0.0
+			for j := 0; j < 7 && i-j >= 0; j++ {
+				if weatherData[i-j].RelativeHumidityMean != nil {
+					humSum += *weatherData[i-j].RelativeHumidityMean
+					humCount++
+				}
+			}
+			humAvg := 50.0 // default
+			if humCount > 0 {
+				humAvg = humSum / float64(humCount)
+			}
+
+			// Turf stress: drought stress (ET0 - precip) + inverse growth potential
+			et0 := w.ET0MM
+			droughtStress := 0.0
+			if et0 > w.PrecipitationMM {
+				deficit := et0 - w.PrecipitationMM
+				if deficit > 5 {
+					droughtStress = 1.0
+				} else if deficit > 2 {
+					droughtStress = 0.5
+				}
+			}
+			gp := calc.GrowthPotentialScore(avgTemp, gt)
+			gpStress := 1.0 - gp // low GP = high stress
+			turfStress := droughtStress + gpStress
+			if turfStress > 2.0 {
+				turfStress = 2.0
+			}
+
+			// Component scores
+			gddRisk := calc.GDDRisk(gddAccum, sp.GDDThresholdEmergence)
+			soilTempRisk := calc.SoilTempRisk(soilTemp, sp.OptimalSoilTempMinC, sp.OptimalSoilTempMaxC)
+			moistureRisk := calc.MoistureRisk(precip3d, humAvg)
+			seasonalTiming := calc.SeasonalTiming(month, calc.WeedSeasonType(sp.Season))
+			composite := calc.CompositeWeedPressure(gddRisk, soilTempRisk, moistureRisk, turfStress, seasonalTiming)
+
+			isForecast := w.Type == model.WeatherForecast
+
+			_, err := db.Exec(`
+				INSERT INTO weed_pressure (location_id, date, weed_species_id,
+					weed_pressure_score, gdd_risk_score, soil_temp_risk_score,
+					moisture_risk_score, turf_stress_score, seasonal_timing_score,
+					gdd_accumulated, soil_temp_estimate_c, precipitation_3day_mm,
+					humidity_avg, et0_mm, is_forecast)
+				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+				ON CONFLICT (location_id, date, weed_species_id) DO UPDATE SET
+					weed_pressure_score=EXCLUDED.weed_pressure_score,
+					gdd_risk_score=EXCLUDED.gdd_risk_score,
+					soil_temp_risk_score=EXCLUDED.soil_temp_risk_score,
+					moisture_risk_score=EXCLUDED.moisture_risk_score,
+					turf_stress_score=EXCLUDED.turf_stress_score,
+					seasonal_timing_score=EXCLUDED.seasonal_timing_score,
+					gdd_accumulated=EXCLUDED.gdd_accumulated,
+					soil_temp_estimate_c=EXCLUDED.soil_temp_estimate_c,
+					precipitation_3day_mm=EXCLUDED.precipitation_3day_mm,
+					humidity_avg=EXCLUDED.humidity_avg,
+					et0_mm=EXCLUDED.et0_mm,
+					is_forecast=EXCLUDED.is_forecast`,
+				locationID, date, sp.ID,
+				composite, gddRisk, soilTempRisk,
+				moistureRisk, turfStress, seasonalTiming,
+				gddAccum, soilTemp, precip3d,
+				humAvg, et0, isForecast)
+			if err != nil {
+				log.Printf("[scheduler] Failed to store weed pressure for %s/%s: %v", sp.Name, date.Format("2006-01-02"), err)
+			}
 		}
 	}
 }
@@ -323,13 +465,21 @@ func FetchWeatherForLocation(db *sql.DB, loc model.Location) {
 	go func() {
 		client := weather.NewClient()
 		today := time.Now().UTC().Truncate(24 * time.Hour)
-		histStart := today.AddDate(0, 0, -60)
-		forecastEnd := today.AddDate(0, 0, 16)
 
-		if err := fetchAndStoreWeather(db, client, loc, histStart, today, forecastEnd); err != nil {
+		taskID := fmt.Sprintf("weather-%d-%s-ondemand", loc.ID, today.Format("20060102"))
+		locID := loc.ID
+		_ = dbpkg.CreateTaskStatus(db, taskID, "update_weather", &locID)
+
+		if err := fetchAndStoreWeather(db, client, loc, today, 60); err != nil {
 			log.Printf("[scheduler] On-demand weather fetch failed for location %d: %v", loc.ID, err)
+			errStr := err.Error()
+			_ = dbpkg.UpdateTaskStatus(db, taskID, model.TaskFailure, nil, &errStr)
 			return
 		}
 		runCalculations(db, loc)
+
+		result := "On-demand weather fetch and calculations complete"
+		_ = dbpkg.UpdateTaskStatus(db, taskID, model.TaskSuccess, &result, nil)
+		log.Printf("[scheduler] On-demand update complete for location %d (%s)", loc.ID, loc.Name)
 	}()
 }

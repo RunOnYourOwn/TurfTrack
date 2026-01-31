@@ -36,7 +36,7 @@ func createTestLawn(t *testing.T, db *sql.DB) (*model.Location, *model.Lawn) {
 	t.Helper()
 	loc := createTestLocation(t, db)
 	lawn, err := CreateLawn(db, "Test Lawn", 5000, model.GrassTypeCold, "test notes",
-		model.Freq24h, "America/New_York", true, loc.ID)
+		true, loc.ID)
 	if err != nil {
 		t.Fatalf("CreateLawn failed: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestLawnCRUD(t *testing.T) {
 
 	// Create
 	lawn, err := CreateLawn(db, "Front Lawn", 5000, model.GrassTypeCold, "some notes",
-		model.Freq24h, "America/New_York", true, loc.ID)
+		true, loc.ID)
 	if err != nil {
 		t.Fatalf("CreateLawn failed: %v", err)
 	}
@@ -167,7 +167,7 @@ func TestLawnCRUD(t *testing.T) {
 
 	// Create with empty notes
 	lawn2, err := CreateLawn(db, "Back Lawn", 3000, model.GrassTypeWarm, "",
-		model.Freq12h, "America/Chicago", false, loc.ID)
+		false, loc.ID)
 	if err != nil {
 		t.Fatalf("CreateLawn (no notes) failed: %v", err)
 	}
@@ -210,7 +210,7 @@ func TestLawnCRUD(t *testing.T) {
 
 	// Update
 	updated, err := UpdateLawn(db, lawn.ID, "Updated Lawn", 6000, model.GrassTypeWarm, "updated notes",
-		model.Freq8h, "America/Denver", false, loc.ID)
+		false, loc.ID)
 	if err != nil {
 		t.Fatalf("UpdateLawn failed: %v", err)
 	}

@@ -2,13 +2,14 @@
 <div class="space-y-6">
     <div class="flex justify-between items-center">
         <h2 class="text-2xl font-bold">Products</h2>
-        <button onclick="document.getElementById('product-form').classList.toggle('hidden')" class="btn btn-primary btn-sm">+ Add Product</button>
     </div>
 
-    <div id="product-form" class="hidden card bg-base-100 shadow-sm">
-        <div class="card-body">
-            <h3 class="card-title">New Product</h3>
-            <form hx-post="/products" hx-swap="none" class="space-y-4">
+    <!-- Add Product Form (collapse) -->
+    <div class="collapse collapse-arrow bg-base-100 shadow-sm">
+        <input type="checkbox" />
+        <div class="collapse-title font-semibold">+ Add Product</div>
+        <div class="collapse-content">
+            <form hx-post="/products" hx-swap="none" hx-indicator="#products-loading" class="space-y-4 pt-2">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div class="md:col-span-3 form-control">
                         <label class="label"><span class="label-text">Name</span></label>
@@ -39,7 +40,47 @@
                         <input name="cost_per_bag" type="number" step="0.01" class="input input-bordered">
                     </div>
                 </div>
-                <button type="submit" class="btn btn-primary">Create Product</button>
+                <!-- More Nutrients (collapsible) -->
+                <div class="collapse collapse-arrow bg-base-200 rounded-lg">
+                    <input type="checkbox" />
+                    <div class="collapse-title text-sm font-medium">More Nutrients</div>
+                    <div class="collapse-content">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
+                            <div class="form-control">
+                                <label class="label"><span class="label-text">Ca %</span></label>
+                                <input name="ca_pct" type="number" step="0.01" value="0" class="input input-bordered input-sm">
+                            </div>
+                            <div class="form-control">
+                                <label class="label"><span class="label-text">Mg %</span></label>
+                                <input name="mg_pct" type="number" step="0.01" value="0" class="input input-bordered input-sm">
+                            </div>
+                            <div class="form-control">
+                                <label class="label"><span class="label-text">S %</span></label>
+                                <input name="s_pct" type="number" step="0.01" value="0" class="input input-bordered input-sm">
+                            </div>
+                            <div class="form-control">
+                                <label class="label"><span class="label-text">Cu %</span></label>
+                                <input name="cu_pct" type="number" step="0.01" value="0" class="input input-bordered input-sm">
+                            </div>
+                            <div class="form-control">
+                                <label class="label"><span class="label-text">Mn %</span></label>
+                                <input name="mn_pct" type="number" step="0.01" value="0" class="input input-bordered input-sm">
+                            </div>
+                            <div class="form-control">
+                                <label class="label"><span class="label-text">B %</span></label>
+                                <input name="b_pct" type="number" step="0.01" value="0" class="input input-bordered input-sm">
+                            </div>
+                            <div class="form-control">
+                                <label class="label"><span class="label-text">Zn %</span></label>
+                                <input name="zn_pct" type="number" step="0.01" value="0" class="input input-bordered input-sm">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button type="submit" class="btn btn-primary">Create Product</button>
+                    <span id="products-loading" class="loading loading-spinner loading-sm htmx-indicator"></span>
+                </div>
             </form>
         </div>
     </div>
@@ -71,8 +112,9 @@
                             <td class="text-right">{{formatFloatPtr .CostPerBag 2}}</td>
                             <td class="text-right">{{formatFloatPtr .CostPerLbN 2}}</td>
                             <td class="text-right">{{formatFloatPtr .CostPerLb 2}}</td>
-                            <td>
-                                <button hx-delete="/products/{{.ID}}" hx-confirm="Delete product '{{.Name}}'?" class="btn btn-ghost btn-xs text-error">Delete</button>
+                            <td class="flex gap-1">
+                                <button class="btn btn-ghost btn-xs" onclick="document.getElementById('edit-product-{{.ID}}').showModal()">Edit</button>
+                                <button class="btn btn-ghost btn-xs text-error" onclick="confirmDelete('/products/{{.ID}}', 'Delete product \'{{.Name}}\'?')">Delete</button>
                             </td>
                         </tr>
                         {{end}}
@@ -81,9 +123,93 @@
             </div>
         </div>
     </div>
+
+    <!-- Edit Modals (one per product) -->
+    {{range .Products}}
+    <dialog id="edit-product-{{.ID}}" class="modal">
+        <div class="modal-box max-w-2xl">
+            <h3 class="text-lg font-bold mb-4">Edit Product</h3>
+            <form hx-put="/products/{{.ID}}" hx-swap="none" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="md:col-span-3 form-control">
+                        <label class="label"><span class="label-text">Name</span></label>
+                        <input name="name" value="{{.Name}}" required class="input input-bordered">
+                    </div>
+                    <div class="form-control">
+                        <label class="label"><span class="label-text">N %</span></label>
+                        <input name="n_pct" type="number" step="0.01" value="{{formatFloat .NPct 2}}" class="input input-bordered">
+                    </div>
+                    <div class="form-control">
+                        <label class="label"><span class="label-text">P %</span></label>
+                        <input name="p_pct" type="number" step="0.01" value="{{formatFloat .PPct 2}}" class="input input-bordered">
+                    </div>
+                    <div class="form-control">
+                        <label class="label"><span class="label-text">K %</span></label>
+                        <input name="k_pct" type="number" step="0.01" value="{{formatFloat .KPct 2}}" class="input input-bordered">
+                    </div>
+                    <div class="form-control">
+                        <label class="label"><span class="label-text">Fe %</span></label>
+                        <input name="fe_pct" type="number" step="0.01" value="{{formatFloat .FePct 2}}" class="input input-bordered">
+                    </div>
+                    <div class="form-control">
+                        <label class="label"><span class="label-text">Weight (lbs)</span></label>
+                        <input name="weight_lbs" type="number" step="0.01" value="{{formatFloatPtr .WeightLbs 2}}" class="input input-bordered">
+                    </div>
+                    <div class="form-control">
+                        <label class="label"><span class="label-text">Cost per Bag ($)</span></label>
+                        <input name="cost_per_bag" type="number" step="0.01" value="{{formatFloatPtr .CostPerBag 2}}" class="input input-bordered">
+                    </div>
+                </div>
+                <!-- More Nutrients (collapsible) -->
+                <div class="collapse collapse-arrow bg-base-200 rounded-lg">
+                    <input type="checkbox" />
+                    <div class="collapse-title text-sm font-medium">More Nutrients</div>
+                    <div class="collapse-content">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
+                            <div class="form-control">
+                                <label class="label"><span class="label-text">Ca %</span></label>
+                                <input name="ca_pct" type="number" step="0.01" value="{{formatFloat .CaPct 2}}" class="input input-bordered input-sm">
+                            </div>
+                            <div class="form-control">
+                                <label class="label"><span class="label-text">Mg %</span></label>
+                                <input name="mg_pct" type="number" step="0.01" value="{{formatFloat .MgPct 2}}" class="input input-bordered input-sm">
+                            </div>
+                            <div class="form-control">
+                                <label class="label"><span class="label-text">S %</span></label>
+                                <input name="s_pct" type="number" step="0.01" value="{{formatFloat .SPct 2}}" class="input input-bordered input-sm">
+                            </div>
+                            <div class="form-control">
+                                <label class="label"><span class="label-text">Cu %</span></label>
+                                <input name="cu_pct" type="number" step="0.01" value="{{formatFloat .CuPct 2}}" class="input input-bordered input-sm">
+                            </div>
+                            <div class="form-control">
+                                <label class="label"><span class="label-text">Mn %</span></label>
+                                <input name="mn_pct" type="number" step="0.01" value="{{formatFloat .MnPct 2}}" class="input input-bordered input-sm">
+                            </div>
+                            <div class="form-control">
+                                <label class="label"><span class="label-text">B %</span></label>
+                                <input name="b_pct" type="number" step="0.01" value="{{formatFloat .BPct 2}}" class="input input-bordered input-sm">
+                            </div>
+                            <div class="form-control">
+                                <label class="label"><span class="label-text">Zn %</span></label>
+                                <input name="zn_pct" type="number" step="0.01" value="{{formatFloat .ZnPct 2}}" class="input input-bordered input-sm">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button type="button" class="btn" onclick="this.closest('dialog').close()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button>close</button></form>
+    </dialog>
+    {{end}}
+
     {{else}}
-    <div class="alert">
-        <span>No products yet. Click "Add Product" to create one.</span>
+    <div class="alert alert-info">
+        <span>No products yet. Click "+ Add Product" to create one.</span>
     </div>
     {{end}}
 </div>
