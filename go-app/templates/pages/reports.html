@@ -20,7 +20,7 @@
     <div class="card bg-base-100 shadow-sm">
         <div class="card-body">
             <h3 class="card-title text-lg">Nutrient Applications Over Time{{if .SelectedID}}{{$lawn := index .LawnMap (deref .SelectedID)}}{{if $lawn}} - {{$lawn.Name}}{{end}}{{end}}</h3>
-            <canvas id="reports-chart" height="250"></canvas>
+            <div id="reports-chart"></div>
         </div>
     </div>
 
@@ -78,22 +78,27 @@
 
 <script>
 (function() {
-    const apps = {{json .Applications}};
+    var themeMode = document.documentElement.getAttribute('data-theme') === 'emerald' ? 'light' : 'dark';
+    var apps = {{json .Applications}};
     if (!apps || !apps.length) return;
-    const labels = apps.map(a => a.application_date.substring(0,10));
-    new Chart(document.getElementById('reports-chart'), {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [
-                {label:'N',data:apps.map(a=>a.n_applied||0),backgroundColor:'rgba(34,197,94,0.7)'},
-                {label:'P',data:apps.map(a=>a.p_applied||0),backgroundColor:'rgba(59,130,246,0.7)'},
-                {label:'K',data:apps.map(a=>a.k_applied||0),backgroundColor:'rgba(168,85,247,0.7)'},
-                {label:'Fe',data:apps.map(a=>a.fe_applied||0),backgroundColor:'rgba(245,158,11,0.7)'}
-            ]
-        },
-        options: {responsive:true,plugins:{legend:{position:'bottom'}},scales:{x:{stacked:true},y:{stacked:true}}}
+    var categories = apps.map(a => a.application_date.substring(0,10));
+    var chart = new ApexCharts(document.getElementById('reports-chart'), {
+        chart: {type:'bar',height:300,stacked:true,toolbar:{show:false},background:'transparent'},
+        theme: {mode: themeMode},
+        series: [
+            {name:'N',data:apps.map(a=>a.n_applied||0)},
+            {name:'P',data:apps.map(a=>a.p_applied||0)},
+            {name:'K',data:apps.map(a=>a.k_applied||0)},
+            {name:'Fe',data:apps.map(a=>a.fe_applied||0)}
+        ],
+        colors: ['#22c55e','#3b82f6','#a855f7','#f59e0b'],
+        plotOptions: {bar:{columnWidth:'50%'}},
+        xaxis: {categories:categories},
+        yaxis: {title:{text:'lbs/1000 sq ft'}},
+        legend: {position:'bottom'},
+        tooltip: {shared:true,intersect:false}
     });
+    chart.render();
 })();
 </script>
 {{end}}

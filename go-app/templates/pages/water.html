@@ -54,7 +54,7 @@
     <div class="card bg-base-100 shadow-sm">
         <div class="card-body">
             <h3 class="card-title">Weekly Water Balance</h3>
-            <canvas id="water-chart" height="200"></canvas>
+            <div id="water-chart"></div>
         </div>
     </div>
 
@@ -123,23 +123,31 @@
 
 {{if .SelectedID}}
 <script>
-fetch('/api/water-summary/{{deref .SelectedID}}')
-    .then(r => r.json()).then(data => {
-        if (!data || !data.length) return;
-        data.reverse();
-        new Chart(document.getElementById('water-chart'), {
-            type: 'bar',
-            data: {
-                labels: data.map(d => d.week_start.substring(5,10)),
-                datasets: [
-                    {label:'ET0',data:data.map(d=>d.et0_total),backgroundColor:'rgba(239,68,68,0.6)'},
-                    {label:'Precip',data:data.map(d=>d.precipitation_total),backgroundColor:'rgba(59,130,246,0.6)'},
-                    {label:'Irrigation',data:data.map(d=>d.irrigation_applied),backgroundColor:'rgba(34,197,94,0.6)'}
-                ]
-            },
-            options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+(function() {
+    var themeMode = document.documentElement.getAttribute('data-theme') === 'emerald' ? 'light' : 'dark';
+    fetch('/api/water-summary/{{deref .SelectedID}}')
+        .then(r => r.json()).then(data => {
+            if (!data || !data.length) return;
+            data.reverse();
+            var categories = data.map(d => d.week_start.substring(5,10));
+            var chart = new ApexCharts(document.getElementById('water-chart'), {
+                chart: {type:'bar',height:300,toolbar:{show:false},background:'transparent'},
+                theme: {mode: themeMode},
+                series: [
+                    {name:'ET0',data:data.map(d=>d.et0_total)},
+                    {name:'Precip',data:data.map(d=>d.precipitation_total)},
+                    {name:'Irrigation',data:data.map(d=>d.irrigation_applied)}
+                ],
+                colors: ['#ef4444','#3b82f6','#22c55e'],
+                plotOptions: {bar:{columnWidth:'60%'}},
+                xaxis: {categories:categories},
+                yaxis: {title:{text:'Inches'}},
+                legend: {position:'bottom'},
+                tooltip: {shared:true,intersect:false}
+            });
+            chart.render();
         });
-    });
+})();
 </script>
 {{end}}
 {{end}}

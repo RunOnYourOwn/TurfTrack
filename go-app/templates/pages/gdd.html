@@ -69,30 +69,28 @@
                 </div>
                 <button class="btn btn-ghost btn-xs text-error" onclick="confirmDelete('/gdd-models/{{.ID}}', 'Delete GDD model \'{{.Name}}\'?')">Delete</button>
             </div>
-            <canvas id="gdd-chart-{{.ID}}" height="200"></canvas>
+            <div id="gdd-chart-{{.ID}}"></div>
         </div>
     </div>
     <script>
     (function() {
+        var themeMode = document.documentElement.getAttribute('data-theme') === 'emerald' ? 'light' : 'dark';
         fetch('/api/gdd-values/{{.ID}}')
             .then(r => r.json()).then(data => {
                 if (!data || !data.length) return;
-                new Chart(document.getElementById('gdd-chart-{{.ID}}'), {
-                    type: 'line',
-                    data: {
-                        labels: data.map(d => d.date.substring(5,10)),
-                        datasets: [{
-                            label: 'Cumulative GDD',
-                            data: data.map(d => d.cumulative_gdd),
-                            borderColor: '#22c55e',
-                            fill: true,
-                            backgroundColor: 'rgba(34,197,94,0.1)',
-                            tension: 0.3,
-                            pointRadius: 1
-                        }]
-                    },
-                    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+                var chart = new ApexCharts(document.getElementById('gdd-chart-{{.ID}}'), {
+                    chart: {type:'area',height:250,toolbar:{show:true,tools:{download:true,zoom:true,pan:true,reset:true}},background:'transparent'},
+                    theme: {mode: themeMode},
+                    series: [{name:'Cumulative GDD',data:data.map(d=>({x:d.date.substring(0,10),y:d.cumulative_gdd}))}],
+                    colors: ['#22c55e'],
+                    fill: {type:'gradient',gradient:{shadeIntensity:1,opacityFrom:0.4,opacityTo:0.1}},
+                    stroke: {curve:'smooth',width:2},
+                    xaxis: {type:'category',labels:{rotate:-45,rotateAlways:false}},
+                    yaxis: {title:{text:'GDD'}},
+                    legend: {position:'bottom'},
+                    tooltip: {shared:true,intersect:false}
                 });
+                chart.render();
             });
     })();
     </script>

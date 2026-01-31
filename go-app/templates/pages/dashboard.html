@@ -17,25 +17,25 @@
         <div class="card bg-base-100 shadow-sm">
             <div class="card-body">
                 <h3 class="card-title text-lg">Temperature</h3>
-                <canvas id="temp-chart" height="200"></canvas>
+                <div id="temp-chart"></div>
             </div>
         </div>
         <div class="card bg-base-100 shadow-sm">
             <div class="card-body">
                 <h3 class="card-title text-lg">Disease Pressure</h3>
-                <canvas id="disease-chart" height="200"></canvas>
+                <div id="disease-chart"></div>
             </div>
         </div>
         <div class="card bg-base-100 shadow-sm">
             <div class="card-body">
                 <h3 class="card-title text-lg">Growth Potential</h3>
-                <canvas id="gp-chart" height="200"></canvas>
+                <div id="gp-chart"></div>
             </div>
         </div>
         <div class="card bg-base-100 shadow-sm">
             <div class="card-body">
                 <h3 class="card-title text-lg">Weed Pressure</h3>
-                <canvas id="weed-chart" height="200"></canvas>
+                <div id="weed-chart"></div>
             </div>
         </div>
     </div>
@@ -90,40 +90,76 @@ function loadDashboard(locationID) {
     fetch('/api/weather/' + locationID + '?start_date=' + daysAgo(30))
         .then(r => r.json()).then(data => {
             if (!data) return;
-            const labels = data.map(d => d.date.substring(5,10));
-            updateChart('temp-chart', labels, [
-                {label:'Max',data:data.map(d=>d.temperature_max_f),borderColor:'#ef4444',fill:false},
-                {label:'Min',data:data.map(d=>d.temperature_min_f),borderColor:'#3b82f6',fill:false}
-            ]);
+            renderChart('temp-chart', {
+                chart: {type:'line',height:250,toolbar:{show:false},background:'transparent'},
+                theme: {mode: document.documentElement.getAttribute('data-theme') === 'emerald' ? 'light' : 'dark'},
+                series: [
+                    {name:'Max',data:data.map(d=>({x:d.date.substring(0,10),y:d.temperature_max_f}))},
+                    {name:'Min',data:data.map(d=>({x:d.date.substring(0,10),y:d.temperature_min_f}))}
+                ],
+                colors: ['#ef4444','#3b82f6'],
+                stroke: {curve:'smooth',width:2},
+                xaxis: {type:'category',labels:{rotate:-45,rotateAlways:false}},
+                yaxis: {title:{text:'\u00b0F'}},
+                legend: {position:'bottom'},
+                tooltip: {shared:true,intersect:false}
+            });
         });
     fetch('/api/disease/' + locationID + '?start_date=' + daysAgo(30))
         .then(r => r.json()).then(data => {
             if (!data) return;
-            updateChart('disease-chart', data.map(d=>d.date.substring(5,10)),
-                [{label:'Risk Score',data:data.map(d=>d.risk_score),borderColor:'#f59e0b',fill:true,backgroundColor:'rgba(245,158,11,0.1)'}]);
+            renderChart('disease-chart', {
+                chart: {type:'area',height:250,toolbar:{show:false},background:'transparent'},
+                theme: {mode: document.documentElement.getAttribute('data-theme') === 'emerald' ? 'light' : 'dark'},
+                series: [{name:'Risk Score',data:data.map(d=>({x:d.date.substring(0,10),y:d.risk_score}))}],
+                colors: ['#f59e0b'],
+                fill: {type:'gradient',gradient:{shadeIntensity:1,opacityFrom:0.4,opacityTo:0.1}},
+                stroke: {curve:'smooth',width:2},
+                xaxis: {type:'category'},
+                legend: {position:'bottom'},
+                tooltip: {shared:true,intersect:false}
+            });
         });
     fetch('/api/growth-potential/' + locationID + '?start_date=' + daysAgo(30))
         .then(r => r.json()).then(data => {
             if (!data) return;
-            updateChart('gp-chart', data.map(d=>d.date.substring(5,10)),
-                [{label:'GP',data:data.map(d=>d.growth_potential),borderColor:'#22c55e',fill:true,backgroundColor:'rgba(34,197,94,0.1)'}]);
+            renderChart('gp-chart', {
+                chart: {type:'area',height:250,toolbar:{show:false},background:'transparent'},
+                theme: {mode: document.documentElement.getAttribute('data-theme') === 'emerald' ? 'light' : 'dark'},
+                series: [{name:'Growth Potential',data:data.map(d=>({x:d.date.substring(0,10),y:d.growth_potential}))}],
+                colors: ['#22c55e'],
+                fill: {type:'gradient',gradient:{shadeIntensity:1,opacityFrom:0.4,opacityTo:0.1}},
+                stroke: {curve:'smooth',width:2},
+                xaxis: {type:'category'},
+                legend: {position:'bottom'},
+                tooltip: {shared:true,intersect:false}
+            });
         });
     fetch('/api/weed-pressure/' + locationID + '?start_date=' + daysAgo(30))
         .then(r => r.json()).then(data => {
             if (!data) return;
-            updateChart('weed-chart', data.map(d=>d.date.substring(5,10)),
-                [{label:'Weed Pressure',data:data.map(d=>d.weed_pressure_score),borderColor:'#a855f7',fill:true,backgroundColor:'rgba(168,85,247,0.1)'}]);
+            renderChart('weed-chart', {
+                chart: {type:'area',height:250,toolbar:{show:false},background:'transparent'},
+                theme: {mode: document.documentElement.getAttribute('data-theme') === 'emerald' ? 'light' : 'dark'},
+                series: [{name:'Weed Pressure',data:data.map(d=>({x:d.date.substring(0,10),y:d.weed_pressure_score}))}],
+                colors: ['#a855f7'],
+                fill: {type:'gradient',gradient:{shadeIntensity:1,opacityFrom:0.4,opacityTo:0.1}},
+                stroke: {curve:'smooth',width:2},
+                xaxis: {type:'category'},
+                legend: {position:'bottom'},
+                tooltip: {shared:true,intersect:false}
+            });
         });
 }
 function daysAgo(n) {
     const d = new Date(); d.setDate(d.getDate()-n); return d.toISOString().substring(0,10);
 }
-function updateChart(id, labels, datasets) {
+function renderChart(id, options) {
     if (charts[id]) charts[id].destroy();
-    charts[id] = new Chart(document.getElementById(id), {
-        type:'line', data:{labels, datasets:datasets.map(d=>({...d,tension:0.3,pointRadius:1}))},
-        options:{responsive:true,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true}}}
-    });
+    var el = document.getElementById(id);
+    el.innerHTML = '';
+    charts[id] = new ApexCharts(el, options);
+    charts[id].render();
 }
 </script>
 {{end}}
