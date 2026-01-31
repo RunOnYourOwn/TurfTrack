@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/RunOnYourOwn/TurfTrack/go-app/internal/model"
+	"github.com/RunOnYourOwn/TurfTrack/go-app/internal/weather"
 )
 
 // setupTestDB returns a clean database with migrations applied.
@@ -605,5 +606,107 @@ func TestTaskStatusCRUD(t *testing.T) {
 	}
 	if len(limited) != 1 {
 		t.Errorf("expected 1 task status with limit=1, got %d", len(limited))
+	}
+}
+
+func TestWeatherUpsert(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	loc := createTestLocation(t, db)
+
+	testDate := time.Date(2025, 6, 15, 0, 0, 0, 0, time.UTC)
+	humMean := 65.0
+	humMax := 80.0
+	humMin := 50.0
+	dpMax := 18.0
+	dpMin := 12.0
+	dpMean := 15.0
+	sunDur := 36000.0
+
+	// Insert initial weather record
+	day1 := weather.DailyData{
+		Date:                     testDate,
+		TemperatureMaxC:          30.0,
+		TemperatureMinC:          18.0,
+		PrecipitationMM:          5.0,
+		PrecipitationProbability: 40.0,
+		WindSpeedMaxMs:           3.5,
+		WindGustsMaxMs:           7.0,
+		WindDirectionDeg:         180.0,
+		ET0MM:                    4.5,
+		RelativeHumidityMean:     &humMean,
+		RelativeHumidityMax:      &humMax,
+		RelativeHumidityMin:      &humMin,
+		DewPointMaxC:             &dpMax,
+		DewPointMinC:             &dpMin,
+		DewPointMeanC:            &dpMean,
+		SunshineDurationS:        &sunDur,
+	}
+
+	err := UpsertDailyWeather(db, loc.ID, day1, model.WeatherHistorical)
+	if err != nil {
+		t.Fatalf("UpsertDailyWeather (insert) failed: %v", err)
+	}
+
+	// Verify record exists
+	rows, err := GetWeatherForLocation(db, loc.ID, nil, nil)
+	if err != nil {
+		t.Fatalf("GetWeatherForLocation failed: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected 1 weather record, got %d", len(rows))
+	}
+	if rows[0].TemperatureMaxC != 30.0 {
+		t.Errorf("expected temp max 30.0, got %f", rows[0].TemperatureMaxC)
+	}
+
+	// Upsert same day with updated max temp
+	day2 := day1
+	day2.TemperatureMaxC = 35.0
+
+	err = UpsertDailyWeather(db, loc.ID, day2, model.WeatherHistorical)
+	if err != nil {
+		t.Fatalf("UpsertDailyWeather (update) failed: %v", err)
+	}
+
+	// Verify still only 1 record and temp was updated
+	rows, err = GetWeatherForLocation(db, loc.ID, nil, nil)
+	if err != nil {
+		t.Fatalf("GetWeatherForLocation after upsert failed: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Errorf("expected 1 weather record after upsert, got %d", len(rows))
+	}
+	if rows[0].TemperatureMaxC != 35.0 {
+		t.Errorf("expected updated temp max 35.0, got %f", rows[0].TemperatureMaxC)
+	}
+	if rows[0].LocationID != loc.ID {
+		t.Errorf("expected location_id %d, got %d", loc.ID, rows[0].LocationID)
+	}
+	if rows[0].Type != model.WeatherHistorical {
+		t.Errorf("expected type %q, got %q", model.WeatherHistorical, rows[0].Type)
+	}
+
+	// Verify date filtering works
+	before := testDate.AddDate(0, 0, -1)
+	after := testDate.AddDate(0, 0, 1)
+	filtered, err := GetWeatherForLocation(db, loc.ID, &before, &after)
+	if err != nil {
+		t.Fatalf("GetWeatherForLocation (filtered) failed: %v", err)
+	}
+	if len(filtered) != 1 {
+		t.Errorf("expected 1 record in date range, got %d", len(filtered))
+	}
+
+	// Verify filtering excludes records outside range
+	farPast := testDate.AddDate(-1, 0, 0)
+	farPastEnd := testDate.AddDate(0, 0, -1)
+	empty, err := GetWeatherForLocation(db, loc.ID, &farPast, &farPastEnd)
+	if err != nil {
+		t.Fatalf("GetWeatherForLocation (empty range) failed: %v", err)
+	}
+	if len(empty) != 0 {
+		t.Errorf("expected 0 records outside date range, got %d", len(empty))
 	}
 }
