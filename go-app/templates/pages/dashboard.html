@@ -115,14 +115,14 @@ function loadDashboard(locationID) {
                 chart:{type:'area',height:250,toolbar:{show:false},background:'transparent'},
                 theme:{mode:themeMode},
                 dataLabels:{enabled:false},
-                series:[{name:'Risk Score',data:data.map(function(d){return{x:d.date.substring(5,10),y:Math.round((d.risk_score||0)*100)/100}})}],
+                series:[{name:'Risk',data:data.map(function(d){return{x:d.date.substring(5,10),y:Math.round((d.risk_score||0)*10000)/100}})}],
                 colors:['#f59e0b'],
                 fill:{type:'gradient',gradient:{shadeIntensity:1,opacityFrom:0.4,opacityTo:0.1}},
                 stroke:{curve:'smooth',width:2},
                 xaxis:xaxisOpts,
-                yaxis:{labels:{formatter:function(v){return v.toFixed(2)}}},
+                yaxis:{min:0,max:100,labels:{formatter:function(v){return Math.round(v)+'%'}}},
                 legend:{position:'bottom'},
-                tooltip:{shared:true,intersect:false,y:{formatter:function(v){return v.toFixed(2)}}}
+                tooltip:{shared:true,intersect:false,y:{formatter:function(v){return v.toFixed(1)+'%'}}}
             });
         });
     fetch('/api/growth-potential/' + locationID + '?start_date=' + daysAgo(30))
@@ -132,14 +132,14 @@ function loadDashboard(locationID) {
                 chart:{type:'area',height:250,toolbar:{show:false},background:'transparent'},
                 theme:{mode:themeMode},
                 dataLabels:{enabled:false},
-                series:[{name:'Growth Potential',data:data.map(function(d){return{x:d.date.substring(5,10),y:Math.round((d.growth_potential||0)*100)/100}})}],
+                series:[{name:'Growth Potential',data:data.map(function(d){return{x:d.date.substring(5,10),y:Math.round((d.growth_potential||0)*10000)/100}})}],
                 colors:['#22c55e'],
                 fill:{type:'gradient',gradient:{shadeIntensity:1,opacityFrom:0.4,opacityTo:0.1}},
                 stroke:{curve:'smooth',width:2},
                 xaxis:xaxisOpts,
-                yaxis:{min:0,max:1,labels:{formatter:function(v){return v.toFixed(2)}}},
+                yaxis:{min:0,max:100,labels:{formatter:function(v){return Math.round(v)+'%'}}},
                 legend:{position:'bottom'},
-                tooltip:{shared:true,intersect:false,y:{formatter:function(v){return v.toFixed(2)}}}
+                tooltip:{shared:true,intersect:false,y:{formatter:function(v){return v.toFixed(1)+'%'}}}
             });
         });
     fetch('/api/weed-pressure/' + locationID + '?start_date=' + daysAgo(30))
@@ -163,9 +163,9 @@ function loadDashboard(locationID) {
                 fill:{type:'gradient',gradient:{shadeIntensity:1,opacityFrom:0.4,opacityTo:0.1}},
                 stroke:{curve:'smooth',width:2},
                 xaxis:xaxisOpts,
-                yaxis:{labels:{formatter:function(v){return v.toFixed(1)}}},
+                yaxis:{min:0,max:10,labels:{formatter:function(v){return v.toFixed(1)}}},
                 legend:{position:'bottom'},
-                tooltip:{shared:true,intersect:false,y:{formatter:function(v){return v.toFixed(2)}}}
+                tooltip:{shared:true,intersect:false,y:{formatter:function(v){return v.toFixed(1)+'/10'}}}
             });
         });
 }
