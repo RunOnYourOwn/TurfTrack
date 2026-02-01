@@ -106,3 +106,68 @@ func TestCalculateDiseasePressureColdCutoff(t *testing.T) {
 		t.Errorf("expected 0 risk for cold temps, got %v", *results[4])
 	}
 }
+
+func TestCalculateDiseasePressureHotCutoff(t *testing.T) {
+	// All hot days above 35°C - should produce zero risk
+	weather := []DiseaseWeatherDay{
+		{AvgTempC: 40, RelativeHumidity: 90},
+		{AvgTempC: 40, RelativeHumidity: 90},
+		{AvgTempC: 40, RelativeHumidity: 90},
+		{AvgTempC: 40, RelativeHumidity: 90},
+		{AvgTempC: 40, RelativeHumidity: 90},
+	}
+
+	results := CalculateDiseasePressure(weather)
+	if results[4] == nil {
+		t.Fatal("expected non-nil result for day 5")
+	}
+	if *results[4] != 0 {
+		t.Errorf("expected 0 risk for hot temps >35C, got %v", *results[4])
+	}
+}
+
+func TestSmithKernsWithFahrenheitEquivalents(t *testing.T) {
+	// The Smith-Kerns model is calibrated for Celsius. Verify that
+	// Fahrenheit-equivalent temperatures passed directly would give wrong results
+	// (confirming the need for F→C conversion before calling this function).
+	//
+	// 25°C = 77°F, 80% RH
+	// In Celsius (correct): non-zero risk score
+	riskC := SmithKernsRiskScore(25, 80)
+	if riskC <= 0 {
+		t.Errorf("expected positive risk at 25°C/80%%RH, got %v", riskC)
+	}
+
+	// In Fahrenheit (incorrect input): 77°F > 35 cutoff → returns 0
+	riskF := SmithKernsRiskScore(77, 80)
+	if riskF != 0 {
+		t.Errorf("expected 0 risk when passing 77°F (>35 cutoff), got %v", riskF)
+	}
+
+	// This confirms the model must receive Celsius, not Fahrenheit.
+}
+
+func TestSmithKernsRiskScoreExactValues(t *testing.T) {
+	// Verify specific known values from the logit formula
+	tests := []struct {
+		name string
+		temp float64
+		rh   float64
+		want float64
+	}{
+		// logit = -11.4041 + 0.1932*20 + 0.0894*60 = -11.4041 + 3.864 + 5.364 = -2.1761
+		// risk = exp(-2.1761) / (1 + exp(-2.1761)) = 0.1134 / 1.1134 = 0.1018
+		{"20C 60%RH", 20, 60, 0.1018},
+		// logit = -11.4041 + 0.1932*30 + 0.0894*90 = -11.4041 + 5.796 + 8.046 = 2.4379
+		// risk = exp(2.4379) / (1 + exp(2.4379)) = 11.449 / 12.449 = 0.9197
+		{"30C 90%RH", 30, 90, 0.9197},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := SmithKernsRiskScore(tt.temp, tt.rh)
+			if math.Abs(got-tt.want) > 0.001 {
+				t.Errorf("SmithKernsRiskScore(%v, %v) = %v, want %v", tt.temp, tt.rh, got, tt.want)
+			}
+		})
+	}
+}

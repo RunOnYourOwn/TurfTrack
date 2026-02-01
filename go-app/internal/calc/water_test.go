@@ -58,3 +58,29 @@ func TestWaterStatusThresholds(t *testing.T) {
 		t.Errorf("deficit 1.1 should be critical, got %s", s4)
 	}
 }
+
+func TestWaterBalanceDeficitCalculation(t *testing.T) {
+	// Verify the deficit formula: ET0 - precipitation - irrigation
+	tests := []struct {
+		name        string
+		et0         float64
+		precip      float64
+		irrigation  float64
+		wantDeficit float64
+	}{
+		{"all zeros", 0, 0, 0, 0},
+		{"only et0", 2.5, 0, 0, 2.5},
+		{"only precip", 0, 1.5, 0, -1.5},
+		{"only irrigation", 0, 0, 1.0, -1.0},
+		{"realistic week", 1.75, 0.5, 0.75, 0.5},
+		{"heavy rain week", 1.5, 3.0, 0, -1.5},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			deficit, _ := WaterBalance(tt.et0, tt.precip, tt.irrigation)
+			if math.Abs(deficit-tt.wantDeficit) > 0.001 {
+				t.Errorf("WaterBalance deficit = %v, want %v", deficit, tt.wantDeficit)
+			}
+		})
+	}
+}

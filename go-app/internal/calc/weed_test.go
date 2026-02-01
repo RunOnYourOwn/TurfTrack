@@ -128,23 +128,114 @@ func TestCompositeWeedPressure(t *testing.T) {
 
 func TestEstimateSoilTemp(t *testing.T) {
 	tests := []struct {
-		name      string
-		airTemp   float64
-		month     int
-		wantRange [2]float64 // min, max
+		name string
+		airTemp float64
+		month int
+		want float64
 	}{
-		{"spring 20C", 20, 4, [2]float64{14, 18}}, // factor 0.8
-		{"summer 30C", 30, 7, [2]float64{25, 29}},  // factor 0.9
-		{"fall 15C", 15, 10, [2]float64{11, 14}},   // factor 0.85
-		{"winter 5C", 5, 1, [2]float64{3, 6}},      // factor 0.85
+		{"spring 20C", 20, 4, 16.0},   // 20 * 0.8
+		{"summer 30C", 30, 7, 27.0},    // 30 * 0.9
+		{"fall 15C", 15, 10, 12.75},    // 15 * 0.85
+		{"winter 5C", 5, 1, 4.25},      // 5 * 0.85
+		{"spring boundary march", 25, 3, 20.0},  // 25 * 0.8
+		{"spring boundary may", 25, 5, 20.0},    // 25 * 0.8
+		{"summer boundary june", 35, 6, 31.5},   // 35 * 0.9
+		{"summer boundary aug", 35, 8, 31.5},    // 35 * 0.9
+		{"fall boundary sept", 20, 9, 17.0},     // 20 * 0.85
+		{"winter boundary dec", 0, 12, 0.0},     // 0 * 0.85
+		{"negative temp winter", -10, 1, -8.5},  // -10 * 0.85
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := EstimateSoilTemp(tt.airTemp, tt.month)
-			if got < tt.wantRange[0] || got > tt.wantRange[1] {
-				t.Errorf("EstimateSoilTemp(%v, %v) = %v, want between %v and %v",
-					tt.airTemp, tt.month, got, tt.wantRange[0], tt.wantRange[1])
+			if math.Abs(got-tt.want) > 0.001 {
+				t.Errorf("EstimateSoilTemp(%v, %v) = %v, want %v",
+					tt.airTemp, tt.month, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestCompositeWeedPressureExactFormula(t *testing.T) {
+	// Weights: gdd=1.36, soilTemp=0.91, moisture=0.91, turf=0.91, seasonal=0.45
+	tests := []struct {
+		name     string
+		gdd      float64
+		soil     float64
+		moisture float64
+		turf     float64
+		seasonal float64
+		want     float64
+	}{
+		{"all zeros", 0, 0, 0, 0, 0, 0},
+		{"gdd only", 2.0, 0, 0, 0, 0, 2.72},        // 2*1.36
+		{"soil only", 0, 2.0, 0, 0, 0, 1.82},        // 2*0.91
+		{"all max inputs", 3.0, 2.0, 2.0, 2.0, 1.0,
+			math.Min(3.0*1.36+2.0*0.91+2.0*0.91+2.0*0.91+1.0*0.45, 10.0)}, // 9.99
+		{"exceeds cap", 3.0, 2.0, 2.0, 2.0, 1.0, 9.99}, // capped at 10
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := CompositeWeedPressure(tt.gdd, tt.soil, tt.moisture, tt.turf, tt.seasonal)
+			if math.Abs(got-tt.want) > 0.01 {
+				t.Errorf("CompositeWeedPressure = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCompositeWeedPressureCap(t *testing.T) {
+	// Even with extreme inputs, score should never exceed 10
+	score := CompositeWeedPressure(3.0, 2.0, 2.0, 2.0, 1.0)
+	if score > 10.0 {
+		t.Errorf("score should be capped at 10, got %v", score)
+	}
+	// With artificially high inputs
+	extreme := CompositeWeedPressure(10, 10, 10, 10, 10)
+	if extreme > 10.0 {
+		t.Errorf("extreme inputs should still cap at 10, got %v", extreme)
+	}
+}
+
+func TestSeasonalTimingAllMonths(t *testing.T) {
+	// Spring: March-May (3-5)
+	for m := 1; m <= 12; m++ {
+		got := SeasonalTiming(m, SeasonSpringCalc)
+		want := 0.0
+		if m >= 3 && m <= 5 {
+			want = 1.0
+		}
+		if got != want {
+			t.Errorf("SeasonalTiming(%d, spring) = %v, want %v", m, got, want)
+		}
+	}
+	// Summer: June-Aug (6-8)
+	for m := 1; m <= 12; m++ {
+		got := SeasonalTiming(m, SeasonSummerCalc)
+		want := 0.0
+		if m >= 6 && m <= 8 {
+			want = 1.0
+		}
+		if got != want {
+			t.Errorf("SeasonalTiming(%d, summer) = %v, want %v", m, got, want)
+		}
+	}
+	// Fall: Sept-Nov (9-11)
+	for m := 1; m <= 12; m++ {
+		got := SeasonalTiming(m, SeasonFallCalc)
+		want := 0.0
+		if m >= 9 && m <= 11 {
+			want = 1.0
+		}
+		if got != want {
+			t.Errorf("SeasonalTiming(%d, fall) = %v, want %v", m, got, want)
+		}
+	}
+	// Year-round: always 1.0
+	for m := 1; m <= 12; m++ {
+		got := SeasonalTiming(m, SeasonYearRoundCalc)
+		if got != 1.0 {
+			t.Errorf("SeasonalTiming(%d, year_round) = %v, want 1.0", m, got)
+		}
 	}
 }

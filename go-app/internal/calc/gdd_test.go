@@ -14,13 +14,31 @@ func TestDailyGDD(t *testing.T) {
 		baseTemp float64
 		want     float64
 	}{
-		{"normal accumulation", 30, 20, 10, 15},
-		{"no accumulation below base", 8, 2, 10, 0},
-		{"exactly at base", 15, 5, 10, 0},
-		{"partial accumulation", 15, 10, 10, 2.5},
-		{"high temps", 40, 30, 10, 25},
-		{"zero base temp", 20, 10, 0, 15},
-		{"negative temps with positive base", -5, -15, 10, 0},
+		// Celsius test cases
+		{"normal accumulation C", 30, 20, 10, 15},
+		{"no accumulation below base C", 8, 2, 10, 0},
+		{"exactly at base C", 15, 5, 10, 0},
+		{"partial accumulation C", 15, 10, 10, 2.5},
+		{"high temps C", 40, 30, 10, 25},
+		{"zero base temp C", 20, 10, 0, 15},
+		{"negative temps with positive base C", -5, -15, 10, 0},
+
+		// Fahrenheit test cases (DailyGDD is unit-agnostic; same formula applies)
+		// 86°F max, 68°F min, base 50°F → avg 77, daily = 77-50 = 27
+		{"normal accumulation F", 86, 68, 50, 27},
+		// 46°F max, 36°F min, base 50°F → avg 41, daily = max(0, 41-50) = 0
+		{"no accumulation below base F", 46, 36, 50, 0},
+		// 59°F max, 41°F min, base 50°F → avg 50, daily = 0
+		{"exactly at base F", 59, 41, 50, 0},
+		// 80°F max, 60°F min, base 50°F → avg 70, daily = 20
+		{"typical spring day F", 80, 60, 50, 20},
+		// 100°F max, 80°F min, base 50°F → avg 90, daily = 40
+		{"hot summer day F", 100, 80, 50, 40},
+		// Verify C and F produce equivalent results for same physical temperatures
+		// 30°C = 86°F, 20°C = 68°F, base 10°C = 50°F
+		// C: (30+20)/2 - 10 = 15     F: (86+68)/2 - 50 = 27
+		// Ratio: 27/15 = 1.8 (= 9/5, the F/C scaling factor) ✓
+		{"F result scales by 9/5 vs C", 86, 68, 50, 27},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -219,6 +237,102 @@ func TestManualResetOverridesThresholdOnSameDay(t *testing.T) {
 	// Day 4: should continue run 2 (manual reset cleared resetNext)
 	if values[3].Run != 2 {
 		t.Errorf("day 4 run = %d, want 2 (continued after manual reset)", values[3].Run)
+	}
+}
+
+func TestDailyGDDFahrenheitCelsiusEquivalence(t *testing.T) {
+	// Verify that GDD calculated in F and C for the same physical temperatures
+	// differ by exactly the 9/5 scaling factor.
+	// Physical temps: max=30°C (86°F), min=20°C (68°F), base=10°C (50°F)
+	gddC := DailyGDD(30, 20, 10)  // = 15
+	gddF := DailyGDD(86, 68, 50)  // = 27
+	ratio := gddF / gddC          // should be 9/5 = 1.8
+	if math.Abs(ratio-1.8) > 0.001 {
+		t.Errorf("F/C GDD ratio = %v, want 1.8 (9/5)", ratio)
+	}
+
+	// Another check: max=25°C (77°F), min=15°C (59°F), base=10°C (50°F)
+	gddC2 := DailyGDD(25, 15, 10) // avg=20, daily=10
+	gddF2 := DailyGDD(77, 59, 50) // avg=68, daily=18
+	ratio2 := gddF2 / gddC2
+	if math.Abs(ratio2-1.8) > 0.001 {
+		t.Errorf("F/C GDD ratio (case 2) = %v, want 1.8 (9/5)", ratio2)
+	}
+}
+
+func TestCalculateGDDSeriesFahrenheit(t *testing.T) {
+	// Simulate a GDD model with Fahrenheit base temp of 50°F.
+	// Weather stored as Celsius gets converted to F before calling this function
+	// (as the scheduler does in RecalculateGDDForModel).
+	// Day temps in F: max=86°F, min=68°F → daily = (86+68)/2 - 50 = 27
+	weather := []WeatherDay{
+		{TmaxC: 86, TminC: 68}, // Using F values in the struct (as scheduler does)
+		{TmaxC: 86, TminC: 68}, // daily=27, cum=54
+		{TmaxC: 86, TminC: 68}, // daily=27, cum=81
+	}
+	dates := makeDates("2025-06-01", 3)
+
+	values := CalculateGDDSeries(weather, 50, 0, false, dates, nil)
+	if len(values) != 3 {
+		t.Fatalf("expected 3 values, got %d", len(values))
+	}
+	if math.Abs(values[0].DailyGDD-27) > 0.001 {
+		t.Errorf("day 1 daily = %v, want 27", values[0].DailyGDD)
+	}
+	if math.Abs(values[0].CumulativeGDD-27) > 0.001 {
+		t.Errorf("day 1 cumulative = %v, want 27", values[0].CumulativeGDD)
+	}
+	if math.Abs(values[2].CumulativeGDD-81) > 0.001 {
+		t.Errorf("day 3 cumulative = %v, want 81", values[2].CumulativeGDD)
+	}
+}
+
+func TestCalculateGDDSeriesFahrenheitWithThresholdReset(t *testing.T) {
+	// Crabgrass preventer example: base 50°F, threshold 200 GDD-F
+	// Daily GDD at 86°F/68°F = 27 per day
+	// Reaches 200 around day 8 (27*7=189, 27*8=216 >= 200)
+	weather := make([]WeatherDay, 10)
+	for i := range weather {
+		weather[i] = WeatherDay{TmaxC: 86, TminC: 68} // 27 GDD-F/day
+	}
+	dates := makeDates("2025-04-01", 10)
+
+	values := CalculateGDDSeries(weather, 50, 200, true, dates, nil)
+
+	// Day 7: cum = 189 (still run 1)
+	if values[6].Run != 1 {
+		t.Errorf("day 7 run = %d, want 1", values[6].Run)
+	}
+	if math.Abs(values[6].CumulativeGDD-189) > 0.001 {
+		t.Errorf("day 7 cumulative = %v, want 189", values[6].CumulativeGDD)
+	}
+
+	// Day 8: cum = 216 >= 200, triggers reset next
+	if values[7].Run != 1 {
+		t.Errorf("day 8 run = %d, want 1 (reset happens NEXT day)", values[7].Run)
+	}
+	if math.Abs(values[7].CumulativeGDD-216) > 0.001 {
+		t.Errorf("day 8 cumulative = %v, want 216", values[7].CumulativeGDD)
+	}
+
+	// Day 9: reset → run 2, cum = 27
+	if values[8].Run != 2 {
+		t.Errorf("day 9 run = %d, want 2", values[8].Run)
+	}
+	if math.Abs(values[8].CumulativeGDD-27) > 0.001 {
+		t.Errorf("day 9 cumulative = %v, want 27", values[8].CumulativeGDD)
+	}
+}
+
+func TestCalculateGDDSeriesEmptyWeather(t *testing.T) {
+	values := CalculateGDDSeries(nil, 10, 0, false, nil, nil)
+	if len(values) != 0 {
+		t.Errorf("expected 0 values for empty weather, got %d", len(values))
+	}
+
+	values = CalculateGDDSeries([]WeatherDay{}, 10, 0, false, []time.Time{}, nil)
+	if len(values) != 0 {
+		t.Errorf("expected 0 values for empty slice, got %d", len(values))
 	}
 }
 

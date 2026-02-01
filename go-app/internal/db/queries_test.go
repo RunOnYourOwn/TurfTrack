@@ -609,6 +609,294 @@ func TestTaskStatusCRUD(t *testing.T) {
 	}
 }
 
+func TestSettingsCRUD(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	// Get non-existent key
+	_, err := GetSetting(db, "nonexistent")
+	if err == nil {
+		t.Error("expected error for nonexistent setting")
+	}
+
+	// Set a value
+	err = SetSetting(db, "weather_update_hour", "8")
+	if err != nil {
+		t.Fatalf("SetSetting failed: %v", err)
+	}
+
+	// Get it back
+	val, err := GetSetting(db, "weather_update_hour")
+	if err != nil {
+		t.Fatalf("GetSetting failed: %v", err)
+	}
+	if val != "8" {
+		t.Errorf("expected '8', got %q", val)
+	}
+
+	// Update (upsert)
+	err = SetSetting(db, "weather_update_hour", "14")
+	if err != nil {
+		t.Fatalf("SetSetting (update) failed: %v", err)
+	}
+	val, err = GetSetting(db, "weather_update_hour")
+	if err != nil {
+		t.Fatalf("GetSetting after update failed: %v", err)
+	}
+	if val != "14" {
+		t.Errorf("expected '14', got %q", val)
+	}
+
+	// Set multiple values and get all
+	err = SetSetting(db, "weather_update_timezone", "America/New_York")
+	if err != nil {
+		t.Fatalf("SetSetting (timezone) failed: %v", err)
+	}
+
+	all, err := GetAllSettings(db)
+	if err != nil {
+		t.Fatalf("GetAllSettings failed: %v", err)
+	}
+	if len(all) != 2 {
+		t.Errorf("expected 2 settings, got %d", len(all))
+	}
+	if all["weather_update_hour"] != "14" {
+		t.Errorf("expected hour '14', got %q", all["weather_update_hour"])
+	}
+	if all["weather_update_timezone"] != "America/New_York" {
+		t.Errorf("expected timezone 'America/New_York', got %q", all["weather_update_timezone"])
+	}
+}
+
+func TestGDDResetsCRUD(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	loc := createTestLocation(t, db)
+
+	m := &model.GDDModel{
+		LocationID:       loc.ID,
+		Name:             "Crabgrass Preventer",
+		BaseTemp:         50.0,
+		Unit:             model.TempUnitF,
+		StartDate:        time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC),
+		Threshold:        200.0,
+		ResetOnThreshold: true,
+	}
+	created, err := CreateGDDModel(db, m)
+	if err != nil {
+		t.Fatalf("CreateGDDModel failed: %v", err)
+	}
+
+	// Create manual reset
+	r1, err := CreateGDDReset(db, created.ID, time.Date(2025, 5, 1, 0, 0, 0, 0, time.UTC), model.ResetManual)
+	if err != nil {
+		t.Fatalf("CreateGDDReset (manual) failed: %v", err)
+	}
+	if r1.RunNumber != 1 {
+		t.Errorf("expected run_number 1, got %d", r1.RunNumber)
+	}
+	if r1.ResetType != model.ResetManual {
+		t.Errorf("expected type 'manual', got %q", r1.ResetType)
+	}
+
+	// Create threshold reset
+	r2, err := CreateGDDReset(db, created.ID, time.Date(2025, 6, 15, 0, 0, 0, 0, time.UTC), model.ResetThreshold)
+	if err != nil {
+		t.Fatalf("CreateGDDReset (threshold) failed: %v", err)
+	}
+	if r2.RunNumber != 2 {
+		t.Errorf("expected run_number 2, got %d", r2.RunNumber)
+	}
+
+	// List resets
+	resets, err := ListGDDResets(db, created.ID)
+	if err != nil {
+		t.Fatalf("ListGDDResets failed: %v", err)
+	}
+	if len(resets) != 2 {
+		t.Errorf("expected 2 resets, got %d", len(resets))
+	}
+
+	// Delete by type (threshold only)
+	err = DeleteGDDResetsByType(db, created.ID, model.ResetThreshold)
+	if err != nil {
+		t.Fatalf("DeleteGDDResetsByType failed: %v", err)
+	}
+	resetsAfter, err := ListGDDResets(db, created.ID)
+	if err != nil {
+		t.Fatalf("ListGDDResets after delete failed: %v", err)
+	}
+	if len(resetsAfter) != 1 {
+		t.Errorf("expected 1 reset after deleting threshold, got %d", len(resetsAfter))
+	}
+	if resetsAfter[0].ResetType != model.ResetManual {
+		t.Errorf("remaining reset should be manual, got %q", resetsAfter[0].ResetType)
+	}
+
+	// Delete individual reset
+	err = DeleteGDDReset(db, r1.ID)
+	if err != nil {
+		t.Fatalf("DeleteGDDReset failed: %v", err)
+	}
+	resetsEmpty, err := ListGDDResets(db, created.ID)
+	if err != nil {
+		t.Fatalf("ListGDDResets final failed: %v", err)
+	}
+	if len(resetsEmpty) != 0 {
+		t.Errorf("expected 0 resets, got %d", len(resetsEmpty))
+	}
+}
+
+func TestGDDValuesUpsert(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	loc := createTestLocation(t, db)
+
+	m := &model.GDDModel{
+		LocationID: loc.ID,
+		Name:       "Test GDD",
+		BaseTemp:   10.0,
+		Unit:       model.TempUnitC,
+		StartDate:  time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
+	}
+	created, err := CreateGDDModel(db, m)
+	if err != nil {
+		t.Fatalf("CreateGDDModel failed: %v", err)
+	}
+
+	// Insert values
+	values := []struct {
+		Date          time.Time
+		DailyGDD      float64
+		CumulativeGDD float64
+		IsForecast    bool
+		Run           int
+	}{
+		{time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC), 5.0, 5.0, false, 1},
+		{time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC), 7.0, 12.0, false, 1},
+		{time.Date(2025, 1, 3, 0, 0, 0, 0, time.UTC), 6.0, 18.0, true, 1},
+	}
+	err = UpsertGDDValues(db, created.ID, values)
+	if err != nil {
+		t.Fatalf("UpsertGDDValues failed: %v", err)
+	}
+
+	// Read back
+	got, err := GetGDDValues(db, created.ID)
+	if err != nil {
+		t.Fatalf("GetGDDValues failed: %v", err)
+	}
+	if len(got) != 3 {
+		t.Fatalf("expected 3 GDD values, got %d", len(got))
+	}
+	if got[0].DailyGDD != 5.0 {
+		t.Errorf("day 1 daily_gdd = %v, want 5.0", got[0].DailyGDD)
+	}
+	if got[1].CumulativeGDD != 12.0 {
+		t.Errorf("day 2 cumulative_gdd = %v, want 12.0", got[1].CumulativeGDD)
+	}
+	if got[2].IsForecast != true {
+		t.Error("day 3 should be forecast")
+	}
+
+	// Upsert replaces all values
+	values2 := []struct {
+		Date          time.Time
+		DailyGDD      float64
+		CumulativeGDD float64
+		IsForecast    bool
+		Run           int
+	}{
+		{time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC), 10.0, 10.0, false, 1},
+	}
+	err = UpsertGDDValues(db, created.ID, values2)
+	if err != nil {
+		t.Fatalf("UpsertGDDValues (replace) failed: %v", err)
+	}
+	got2, err := GetGDDValues(db, created.ID)
+	if err != nil {
+		t.Fatalf("GetGDDValues after replace failed: %v", err)
+	}
+	if len(got2) != 1 {
+		t.Errorf("expected 1 GDD value after replace, got %d", len(got2))
+	}
+
+	// Empty upsert is a no-op
+	err = UpsertGDDValues(db, created.ID, nil)
+	if err != nil {
+		t.Fatalf("UpsertGDDValues (empty) failed: %v", err)
+	}
+}
+
+func TestGDDModelGetAndUpdate(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	loc := createTestLocation(t, db)
+
+	m := &model.GDDModel{
+		LocationID:       loc.ID,
+		Name:             "Original Name",
+		BaseTemp:         50.0,
+		Unit:             model.TempUnitF,
+		StartDate:        time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC),
+		Threshold:        200.0,
+		ResetOnThreshold: false,
+	}
+	created, err := CreateGDDModel(db, m)
+	if err != nil {
+		t.Fatalf("CreateGDDModel failed: %v", err)
+	}
+
+	// Get
+	got, err := GetGDDModel(db, created.ID)
+	if err != nil {
+		t.Fatalf("GetGDDModel failed: %v", err)
+	}
+	if got.Name != "Original Name" {
+		t.Errorf("expected name 'Original Name', got %q", got.Name)
+	}
+	if got.BaseTemp != 50.0 {
+		t.Errorf("expected base_temp 50, got %v", got.BaseTemp)
+	}
+	if got.Unit != model.TempUnitF {
+		t.Errorf("expected unit F, got %q", got.Unit)
+	}
+
+	// Get non-existent
+	missing, err := GetGDDModel(db, 99999)
+	if err != nil {
+		t.Fatalf("GetGDDModel for missing ID returned error: %v", err)
+	}
+	if missing != nil {
+		t.Error("expected nil for non-existent GDD model")
+	}
+
+	// Update
+	got.Name = "Updated Name"
+	got.BaseTemp = 10.0
+	got.Unit = model.TempUnitC
+	got.ResetOnThreshold = true
+	updated, err := UpdateGDDModel(db, got)
+	if err != nil {
+		t.Fatalf("UpdateGDDModel failed: %v", err)
+	}
+	if updated.Name != "Updated Name" {
+		t.Errorf("expected updated name, got %q", updated.Name)
+	}
+	if updated.BaseTemp != 10.0 {
+		t.Errorf("expected base_temp 10, got %v", updated.BaseTemp)
+	}
+	if updated.Unit != model.TempUnitC {
+		t.Errorf("expected unit C, got %q", updated.Unit)
+	}
+	if !updated.ResetOnThreshold {
+		t.Error("expected reset_on_threshold true")
+	}
+}
+
 func TestWeatherUpsert(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()

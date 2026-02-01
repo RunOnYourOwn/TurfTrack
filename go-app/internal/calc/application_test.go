@@ -60,3 +60,41 @@ func TestCalculateApplicationCost(t *testing.T) {
 		t.Errorf("ApplicationCost = %v, want %v", got, expected)
 	}
 }
+
+func TestApplicationCostZeroAreaUnit(t *testing.T) {
+	// Division by zero protection
+	got := ApplicationCost(1.0, 5.0, 5000.0, 0)
+	if got != 0 {
+		t.Errorf("ApplicationCost with zero areaUnit = %v, want 0", got)
+	}
+}
+
+func TestConvertToBaseUnitUnknown(t *testing.T) {
+	// Unknown unit should return amount unchanged
+	got := ConvertToBaseUnit(42, "bushels")
+	if got != 42 {
+		t.Errorf("ConvertToBaseUnit with unknown unit = %v, want 42", got)
+	}
+}
+
+func TestNutrientAppliedEdgeCases(t *testing.T) {
+	tests := []struct {
+		name string
+		base float64
+		pct  float64
+		want float64
+	}{
+		{"zero pct", 10, 0, 0},
+		{"100 pct", 10, 100, 10},
+		{"fractional pct", 50, 0.5, 0.25},
+		{"zero base", 0, 20, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := NutrientApplied(tt.base, tt.pct)
+			if math.Abs(got-tt.want) > 0.001 {
+				t.Errorf("NutrientApplied(%v, %v) = %v, want %v", tt.base, tt.pct, got, tt.want)
+			}
+		})
+	}
+}

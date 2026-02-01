@@ -71,6 +71,48 @@ func TestGrowthPotentialFormula(t *testing.T) {
 	}
 }
 
+func TestGrowthPotentialInvalidGrassType(t *testing.T) {
+	// Unknown grass type should return 0
+	got := GrowthPotentialScore(25, "bermuda_special")
+	if got != 0 {
+		t.Errorf("GrowthPotentialScore with invalid grass type = %v, want 0", got)
+	}
+}
+
+func TestGrowthPotentialExactFormula(t *testing.T) {
+	// Cold season: tOpt=20°C, sigma=5.5
+	// At 10°C: x = (10-20)/5.5 = -1.8182, GP = exp(-0.5 * 1.8182^2) = exp(-1.6529) = 0.1914
+	got := GrowthPotentialScore(10, GrassTypeCold)
+	want := math.Exp(-0.5 * math.Pow((10-20)/5.5, 2))
+	if math.Abs(got-want) > 0.0001 {
+		t.Errorf("GrowthPotentialScore(10, cold) = %v, want %v", got, want)
+	}
+
+	// Warm season: tOpt=31°C, sigma=7.0
+	// At 20°C: x = (20-31)/7 = -1.5714, GP = exp(-0.5 * 1.5714^2) = exp(-1.2347) = 0.2912
+	got = GrowthPotentialScore(20, GrassTypeWarm)
+	want = math.Exp(-0.5 * math.Pow((20-31)/7.0, 2))
+	if math.Abs(got-want) > 0.0001 {
+		t.Errorf("GrowthPotentialScore(20, warm) = %v, want %v", got, want)
+	}
+}
+
+func TestGrowthPotentialFahrenheitEquivalence(t *testing.T) {
+	// Growth Potential is Celsius-native. Verify that passing Fahrenheit
+	// temperatures without conversion gives incorrect results.
+	// 68°F = 20°C (optimal for cold season) → should give 1.0 in C
+	gpCorrect := GrowthPotentialScore(20, GrassTypeCold)
+	if math.Abs(gpCorrect-1.0) > 0.001 {
+		t.Errorf("GP at optimal 20°C = %v, want 1.0", gpCorrect)
+	}
+
+	// 68°F passed directly → far from 20°C optimal, should give low GP
+	gpWrong := GrowthPotentialScore(68, GrassTypeCold)
+	if gpWrong > 0.01 {
+		t.Errorf("GP at 68 (raw F, not converted) = %v, should be near 0", gpWrong)
+	}
+}
+
 func TestRollingAverage(t *testing.T) {
 	values := []float64{1, 2, 3, 4, 5, 6, 7}
 
