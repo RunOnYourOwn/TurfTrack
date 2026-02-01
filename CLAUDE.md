@@ -238,4 +238,4 @@ Weather data is fetched from the OpenMeteo API by the in-process goroutine sched
 
 ---
 
-**Last Updated**: February 2026 | **Version**: 0.0.22 | **License**: MIT
+**Last Updated**: February 2026 | **Version**: 0.0.23 | **License**: MIT

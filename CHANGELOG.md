@@ -7,11 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.23] - 2026-02-01
+
 ### Added
+
+- Test coverage improvements across all packages (142 tests, 77.8% overall)
+  - internal/db: 62.6% → 83.8% (9 new integration tests)
+  - internal/handler: 67.0% → 74.6% (10 new integration tests)
+  - internal/scheduler: 55.9% → 70.2% (6 new integration tests)
+  - internal/weather: 77.2% → 89.0% (3 new unit tests)
+- BaseURL field on weather Client for mock server testing
+- Version display in sidebar (reads from VERSION file)
+
+### Changed
+
+- Rewrote all documentation for Go/HTMX architecture (CLAUDE.md, README.md, docs/)
+- CD pipeline: retry-loop health check, Trivy scan gates releases, DB connectivity verification, CHANGELOG-based release notes, version tag consistency check
 
 ### Fixed
 
-### Changed
+- VERSION file path resolution for Docker and local dev (fallback paths)
+- Release workflow YAML syntax for inline backticks
+
 ## [0.0.22] - 2025-08-18
 
 ### Added
