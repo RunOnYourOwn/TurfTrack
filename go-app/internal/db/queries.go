@@ -273,7 +273,6 @@ func ListApplications(db *sql.DB, lawnID *int, startDate, endDate string) ([]mod
 	if endDate != "" {
 		conditions = append(conditions, fmt.Sprintf("application_date <= $%d", argN))
 		args = append(args, endDate)
-		argN++
 	}
 	if len(conditions) > 0 {
 		query += " WHERE " + strings.Join(conditions, " AND ")
