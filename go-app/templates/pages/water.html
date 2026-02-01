@@ -1,0 +1,155 @@
+{{define "water.html"}}
+<div class="space-y-6">
+    <h2 class="text-2xl font-bold">Water Management</h2>
+
+    <div class="flex gap-4 items-end flex-wrap">
+        <div>
+            <label class="label">Select Lawn</label>
+            <select onchange="window.location='/water?lawn='+this.value" class="select">
+                <option value="">Choose a lawn...</option>
+                {{range .Lawns}}
+                <option value="{{.ID}}" {{if and $.SelectedID (eq .ID (deref $.SelectedID))}}selected{{end}}>{{.Name}}</option>
+                {{end}}
+            </select>
+        </div>
+    </div>
+
+    {{if .SelectedID}}
+    <!-- Log Irrigation Form (collapse) -->
+    <div class="collapse collapse-arrow bg-base-100 shadow-sm">
+        <input type="checkbox" />
+        <div class="collapse-title font-semibold">+ Log Irrigation</div>
+        <div class="collapse-content">
+            <form hx-post="/irrigation" hx-swap="none" hx-indicator="#water-loading" class="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
+                <input type="hidden" name="lawn_id" value="{{deref .SelectedID}}">
+                <div>
+                    <label class="label">Date</label>
+                    <input name="date" type="date" required class="input">
+                </div>
+                <div>
+                    <label class="label">Amount (inches)</label>
+                    <input name="amount" type="number" step="0.01" required class="input">
+                </div>
+                <div>
+                    <label class="label">Duration (min)</label>
+                    <input name="duration" type="number" value="0" class="input">
+                </div>
+                <div>
+                    <label class="label">Source</label>
+                    <select name="source" class="select">
+                        <option value="MANUAL">Manual</option>
+                        <option value="AUTOMATIC">Automatic</option>
+                        <option value="SCHEDULED">Scheduled</option>
+                    </select>
+                </div>
+                <div class="md:col-span-4 flex items-center gap-3">
+                    <button type="submit" class="btn btn-info">Log Irrigation</button>
+                    <span id="water-loading" class="loading loading-spinner loading-sm htmx-indicator"></span>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Water Chart -->
+    <div class="card bg-base-100 shadow-sm">
+        <div class="card-body">
+            <h3 class="card-title">Weekly Water Balance</h3>
+            <div id="water-chart"></div>
+        </div>
+    </div>
+
+    <!-- Weekly Summaries -->
+    {{if .Summaries}}
+    <div class="card bg-base-100 shadow-sm">
+        <div class="card-body p-0">
+            <div class="overflow-x-auto">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Week</th>
+                            <th class="text-right">ET0</th>
+                            <th class="text-right">Precip</th>
+                            <th class="text-right">Irrigation</th>
+                            <th class="text-right">Deficit</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .Summaries}}
+                        <tr>
+                            <td>{{formatDate .WeekStart}} - {{formatDate .WeekEnd}}</td>
+                            <td class="text-right">{{formatFloat .ET0Total 2}}"</td>
+                            <td class="text-right">{{formatFloat .PrecipitationTotal 2}}"</td>
+                            <td class="text-right">{{formatFloat .IrrigationApplied 2}}"</td>
+                            <td class="text-right">{{formatFloat .WaterDeficit 2}}"</td>
+                            <td>{{statusBadge .Status}}</td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {{end}}
+
+    <!-- Irrigation Entries -->
+    {{if .Irrigation}}
+    <div class="card bg-base-100 shadow-sm">
+        <div class="card-body">
+            <h3 class="card-title text-lg">Irrigation Entries</h3>
+            <div class="overflow-x-auto">
+                <table class="table table-sm">
+                    <thead>
+                        <tr><th>Date</th><th class="text-right">Amount</th><th>Duration</th><th>Source</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        {{range .Irrigation}}
+                        <tr>
+                            <td>{{formatDate .Date}}</td>
+                            <td class="text-right">{{formatFloat .Amount 2}}"</td>
+                            <td>{{.Duration}} min</td>
+                            <td><span class="badge badge-outline badge-sm">{{.Source}}</span></td>
+                            <td><button class="btn btn-ghost btn-xs text-error" onclick="confirmDelete('/irrigation/{{.ID}}', 'Delete this entry?')">Delete</button></td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {{end}}
+    {{end}}
+</div>
+
+{{if .SelectedID}}
+<script>
+(function() {
+    var themeMode = document.documentElement.getAttribute('data-theme') === 'emerald' ? 'light' : 'dark';
+    var fmtIn = function(v) { return v != null ? parseFloat(v).toFixed(2) + '"' : ''; };
+    fetch('/api/water-summary/{{deref .SelectedID}}')
+        .then(r => r.json()).then(data => {
+            if (!data || !data.length) return;
+            data.reverse();
+            var categories = data.map(d => d.week_start.substring(5,10));
+            var chart = new ApexCharts(document.getElementById('water-chart'), {
+                chart: {type:'bar',height:300,toolbar:{show:false},background:'transparent'},
+                theme: {mode: themeMode},
+                dataLabels: {enabled:false},
+                series: [
+                    {name:'ET0',data:data.map(d=>parseFloat(d.et0_total.toFixed(2)))},
+                    {name:'Precip',data:data.map(d=>parseFloat(d.precipitation_total.toFixed(2)))},
+                    {name:'Irrigation',data:data.map(d=>parseFloat(d.irrigation_applied.toFixed(2)))}
+                ],
+                colors: ['#ef4444','#3b82f6','#22c55e'],
+                plotOptions: {bar:{columnWidth:'60%'}},
+                xaxis: {categories:categories},
+                yaxis: {title:{text:'Inches'},labels:{formatter:function(v){return v != null ? parseFloat(v).toFixed(2) : '';}}},
+                legend: {position:'bottom'},
+                tooltip: {shared:true,intersect:false,y:{formatter:fmtIn}}
+            });
+            chart.render();
+        });
+})();
+</script>
+{{end}}
+{{end}}

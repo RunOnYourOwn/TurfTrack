@@ -1,0 +1,140 @@
+{{define "reports.html"}}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h2 class="text-2xl font-bold">Reports</h2>
+    </div>
+
+    <!-- Filters -->
+    <div class="card bg-base-100 shadow-sm">
+        <div class="card-body py-3">
+            <form id="report-filter" method="GET" action="/reports" class="flex items-center gap-4 flex-wrap">
+                <label class="label"><span class="font-medium">Lawn:</span></label>
+                <select name="lawn" onchange="this.form.submit()" class="select select-sm">
+                    <option value="">All Lawns</option>
+                    {{range .Lawns}}<option value="{{.ID}}" {{if $.SelectedID}}{{if eq .ID (deref $.SelectedID)}}selected{{end}}{{end}}>{{.Name}}</option>{{end}}
+                </select>
+                <label class="label"><span class="font-medium">Date Range:</span></label>
+                <input type="hidden" name="start_date" id="start_date" value="{{.StartDate}}">
+                <input type="hidden" name="end_date" id="end_date" value="{{.EndDate}}">
+                <input type="text" id="date-range" class="input input-sm w-56" placeholder="All time" readonly>
+                <button type="button" id="clear-dates" class="btn btn-ghost btn-sm {{if and (eq .StartDate "") (eq .EndDate "")}}hidden{{end}}">Clear</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="card bg-base-100 shadow-sm">
+        <div class="card-body">
+            <h3 class="card-title text-lg">Nutrient Applications Over Time{{if .SelectedID}}{{$lawn := index .LawnMap (deref .SelectedID)}}{{if $lawn}} - {{$lawn.Name}}{{end}}{{end}}</h3>
+            <div id="reports-chart"></div>
+        </div>
+    </div>
+
+    {{if .Applications}}
+    <div class="card bg-base-100 shadow-sm">
+        <div class="card-body p-0">
+            <div class="overflow-x-auto">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Lawn</th>
+                            <th>Product</th>
+                            <th class="text-right">N (lbs)</th>
+                            <th class="text-right">P (lbs)</th>
+                            <th class="text-right">K (lbs)</th>
+                            <th class="text-right">Fe (lbs)</th>
+                            <th class="text-right">Cost</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .Applications}}
+                        <tr>
+                            <td>{{formatDate .ApplicationDate}}</td>
+                            <td>{{$lawn := index $.LawnMap .LawnID}}{{if $lawn}}{{$lawn.Name}}{{end}}</td>
+                            <td>{{$prod := index $.ProductMap .ProductID}}{{if $prod}}{{$prod.Name}}{{end}}</td>
+                            <td class="text-right">{{formatFloatPtr .NApplied 3}}</td>
+                            <td class="text-right">{{formatFloatPtr .PApplied 3}}</td>
+                            <td class="text-right">{{formatFloatPtr .KApplied 3}}</td>
+                            <td class="text-right">{{formatFloatPtr .FeApplied 3}}</td>
+                            <td class="text-right">{{formatFloatPtr .CostApplied 2}}</td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                    <tfoot>
+                        <tr class="font-bold">
+                            <td colspan="3">Totals</td>
+                            <td class="text-right">{{formatFloat .TotalN 3}}</td>
+                            <td class="text-right">{{formatFloat .TotalP 3}}</td>
+                            <td class="text-right">{{formatFloat .TotalK 3}}</td>
+                            <td class="text-right">{{formatFloat .TotalFe 3}}</td>
+                            <td class="text-right">{{formatFloat .TotalCost 2}}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+    {{else}}
+    <div class="alert">
+        <span>No application data to report.{{if .SelectedID}} Try selecting a different lawn or "All Lawns".{{else}} Log applications first.{{end}}</span>
+    </div>
+    {{end}}
+</div>
+
+<script>
+(function() {
+    var themeMode = document.documentElement.getAttribute('data-theme') === 'emerald' ? 'light' : 'dark';
+    var fmtLbs = function(v) { return v != null ? parseFloat(v).toFixed(3) : ''; };
+    var apps = {{json .Applications}};
+    if (apps && apps.length) {
+        var categories = apps.map(a => a.application_date.substring(0,10));
+        var chart = new ApexCharts(document.getElementById('reports-chart'), {
+            chart: {type:'bar',height:300,stacked:true,toolbar:{show:false},background:'transparent'},
+            theme: {mode: themeMode},
+            dataLabels: {enabled:false},
+            series: [
+                {name:'N',data:apps.map(a=>parseFloat((a.n_applied||0).toFixed(3)))},
+                {name:'P',data:apps.map(a=>parseFloat((a.p_applied||0).toFixed(3)))},
+                {name:'K',data:apps.map(a=>parseFloat((a.k_applied||0).toFixed(3)))},
+                {name:'Fe',data:apps.map(a=>parseFloat((a.fe_applied||0).toFixed(3)))}
+            ],
+            colors: ['#22c55e','#3b82f6','#a855f7','#f59e0b'],
+            plotOptions: {bar:{columnWidth:'50%'}},
+            xaxis: {categories:categories},
+            yaxis: {title:{text:'lbs/1000 sq ft'},labels:{formatter:fmtLbs}},
+            legend: {position:'bottom'},
+            tooltip: {shared:true,intersect:false,y:{formatter:fmtLbs}}
+        });
+        chart.render();
+    }
+
+    // Flatpickr date range picker
+    var isDark = themeMode === 'dark';
+    var startVal = document.getElementById('start_date').value;
+    var endVal = document.getElementById('end_date').value;
+    var defaultDates = [];
+    if (startVal && endVal) defaultDates = [startVal, endVal];
+
+    var fp = flatpickr('#date-range', {
+        mode: 'range',
+        dateFormat: 'Y-m-d',
+        defaultDate: defaultDates,
+        onClose: function(selectedDates) {
+            if (selectedDates.length === 2) {
+                var fmt = function(d) { return d.toISOString().substring(0,10); };
+                document.getElementById('start_date').value = fmt(selectedDates[0]);
+                document.getElementById('end_date').value = fmt(selectedDates[1]);
+                document.getElementById('report-filter').submit();
+            }
+        }
+    });
+
+    document.getElementById('clear-dates').addEventListener('click', function() {
+        fp.clear();
+        document.getElementById('start_date').value = '';
+        document.getElementById('end_date').value = '';
+        document.getElementById('report-filter').submit();
+    });
+})();
+</script>
+{{end}}

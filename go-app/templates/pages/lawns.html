@@ -1,0 +1,183 @@
+{{define "lawns.html"}}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h2 class="text-2xl font-bold">Lawns</h2>
+    </div>
+
+    <!-- Add Lawn Form (collapse) -->
+    <div class="collapse collapse-arrow bg-base-100 shadow-sm">
+        <input type="checkbox" />
+        <div class="collapse-title font-semibold">+ Add Lawn</div>
+        <div class="collapse-content">
+            <form hx-post="/lawns" hx-swap="none" hx-indicator="#lawns-loading" class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                <div>
+                    <label class="label">Name</label>
+                    <input name="name" required class="input">
+                </div>
+                <div>
+                    <label class="label">Area (sq ft)</label>
+                    <input name="area" type="number" step="0.01" min="0" required class="input">
+                </div>
+                <div>
+                    <label class="label">Grass Type</label>
+                    <select name="grass_type" required class="select">
+                        <option value="cold_season">Cool Season</option>
+                        <option value="warm_season">Warm Season</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="label">Location</label>
+                    <select name="location_id" id="location-select" onchange="toggleNewLoc(this.value)" class="select">
+                        {{range .Locations}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+                        <option value="new">+ New Location</option>
+                    </select>
+                </div>
+                <div id="new-loc-fields" class="{{if .Locations}}hidden {{end}}md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="label">Location Name</label>
+                        <input name="location_name" class="input">
+                    </div>
+                    <div>
+                        <label class="label">Latitude</label>
+                        <input name="latitude" type="number" step="0.0001" class="input">
+                    </div>
+                    <div>
+                        <label class="label">Longitude</label>
+                        <input name="longitude" type="number" step="0.0001" class="input">
+                    </div>
+                </div>
+                <div>
+                    <label class="label">Notes</label>
+                    <input name="notes" class="input">
+                </div>
+                <div>
+                    <label class="label cursor-pointer justify-start gap-2">
+                        <input name="weather_enabled" type="checkbox" checked class="checkbox checkbox-primary">
+                        Enable Weather Fetching
+                    </label>
+                </div>
+                <div class="md:col-span-2 flex items-center gap-3">
+                    <button type="submit" class="btn btn-primary">Create Lawn</button>
+                    <span id="lawns-loading" class="loading loading-spinner loading-sm htmx-indicator"></span>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lawns Table -->
+    {{if .Lawns}}
+    <div class="card bg-base-100 shadow-sm">
+        <div class="card-body p-0">
+            <div class="overflow-x-auto">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Area</th>
+                            <th>Grass Type</th>
+                            <th>Location</th>
+                            <th>Weather</th>
+                            <th>Created</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .Lawns}}
+                        <tr>
+                            <td class="font-medium">{{.Name}}</td>
+                            <td>{{formatFloat .Area 0}} sq ft</td>
+                            <td><span class="badge badge-outline badge-sm">{{grassType .GrassType}}</span></td>
+                            <td>{{if .Location}}{{.Location.Name}}{{end}}</td>
+                            <td>{{if .WeatherEnabled}}<span class="badge badge-success badge-sm">On</span>{{else}}<span class="badge badge-ghost badge-sm">Off</span>{{end}}</td>
+                            <td>{{formatDate .CreatedAt}}</td>
+                            <td class="flex gap-1">
+                                <button class="btn btn-ghost btn-xs" onclick="document.getElementById('edit-lawn-{{.ID}}').showModal()">Edit</button>
+                                <button class="btn btn-ghost btn-xs text-error" onclick="confirmDelete('/lawns/{{.ID}}', 'Delete lawn \'{{.Name}}\'? This will also delete all related data.')">Delete</button>
+                            </td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modals (one per lawn) -->
+    {{range .Lawns}}
+    <dialog id="edit-lawn-{{.ID}}" class="modal">
+        <div class="modal-box">
+            <h3 class="text-lg font-bold mb-4">Edit Lawn</h3>
+            <form hx-put="/lawns/{{.ID}}" hx-swap="none" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="label">Name</label>
+                    <input name="name" value="{{.Name}}" required class="input">
+                </div>
+                <div>
+                    <label class="label">Area (sq ft)</label>
+                    <input name="area" type="number" step="0.01" min="0" value="{{formatFloat .Area 2}}" required class="input">
+                </div>
+                <div>
+                    <label class="label">Grass Type</label>
+                    <select name="grass_type" class="select">
+                        <option value="cold_season" {{if eq (printf "%s" .GrassType) "cold_season"}}selected{{end}}>Cool Season</option>
+                        <option value="warm_season" {{if eq (printf "%s" .GrassType) "warm_season"}}selected{{end}}>Warm Season</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="label">Location</label>
+                    <select name="location_id" onchange="toggleEditLoc(this.value, {{.ID}})" class="select">
+                        {{$locID := .LocationID}}
+                        {{range $.Locations}}<option value="{{.ID}}" {{if eq .ID $locID}}selected{{end}}>{{.Name}}</option>{{end}}
+                        <option value="new">+ New Location</option>
+                    </select>
+                </div>
+                <div id="edit-loc-fields-{{.ID}}" class="hidden md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="label">Location Name</label>
+                        <input name="location_name" class="input">
+                    </div>
+                    <div>
+                        <label class="label">Latitude</label>
+                        <input name="latitude" type="number" step="0.0001" class="input">
+                    </div>
+                    <div>
+                        <label class="label">Longitude</label>
+                        <input name="longitude" type="number" step="0.0001" class="input">
+                    </div>
+                </div>
+                <div>
+                    <label class="label">Notes</label>
+                    <input name="notes" value="{{if .Notes.Valid}}{{.Notes.String}}{{end}}" class="input">
+                </div>
+                <div>
+                    <label class="label cursor-pointer justify-start gap-2">
+                        <input name="weather_enabled" type="checkbox" {{if .WeatherEnabled}}checked{{end}} class="checkbox checkbox-primary">
+                        Enable Weather Fetching
+                    </label>
+                </div>
+                <div class="md:col-span-2 flex justify-end gap-2">
+                    <button type="button" class="btn" onclick="this.closest('dialog').close()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button>close</button></form>
+    </dialog>
+    {{end}}
+
+    {{else}}
+    <div class="alert alert-info">
+        <span>No lawns yet. Click "+ Add Lawn" to create one.</span>
+    </div>
+    {{end}}
+</div>
+
+<script>
+function toggleNewLoc(val) {
+    document.getElementById('new-loc-fields').classList.toggle('hidden', val !== 'new');
+}
+function toggleEditLoc(val, lawnID) {
+    document.getElementById('edit-loc-fields-' + lawnID).classList.toggle('hidden', val !== 'new');
+}
+</script>
+{{end}}

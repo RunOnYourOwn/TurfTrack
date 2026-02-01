@@ -1,0 +1,89 @@
+{{define "admin.html"}}
+<div class="space-y-6">
+    <h2 class="text-2xl font-bold">Admin</h2>
+
+    <!-- Settings -->
+    <div class="card bg-base-100 shadow-sm">
+        <div class="card-body">
+            <h3 class="card-title text-lg">Weather Update Schedule</h3>
+            {{$hour := index .Settings "weather_update_hour"}}
+            {{$tz := index .Settings "weather_update_timezone"}}
+            {{$histDays := index .Settings "weather_history_days"}}
+            <form hx-post="/admin/settings" hx-swap="none" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                    <label class="label">Update Hour</label>
+                    <select name="weather_update_hour" class="select">
+                        {{range $i, $_ := seq 24}}
+                        <option value="{{$i}}" {{if eq (printf "%d" $i) $hour}}selected{{end}}>{{printf "%d:00" $i}}{{if eq $i 0}} (midnight){{else if eq $i 12}} (noon){{end}}</option>
+                        {{end}}
+                    </select>
+                </div>
+                <div>
+                    <label class="label">Timezone</label>
+                    <select name="weather_update_timezone" class="select">
+                        {{range $_, $zone := timezones}}
+                        <option value="{{$zone}}" {{if eq $zone $tz}}selected{{end}}>{{$zone}}</option>
+                        {{end}}
+                    </select>
+                </div>
+                <div>
+                    <label class="label">History Depth (days)</label>
+                    <input name="weather_history_days" type="number" min="1" max="730" value="{{if $histDays}}{{$histDays}}{{else}}92{{end}}" class="input">
+                    <label class="label"><span class="text-xs text-base-content/60">Default 92. Set higher to use Historical API for older data.</span></label>
+                </div>
+                <div class="justify-end">
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+            <p class="text-sm text-base-content/60 mt-2">Weather data is fetched daily at this hour. The scheduler reads this on each cycle, so changes take effect on the next run.</p>
+        </div>
+    </div>
+
+    <!-- Task Monitor -->
+    <h3 class="text-lg font-bold">Task History</h3>
+
+    {{if .Tasks}}
+    <div class="card bg-base-100 shadow-sm">
+        <div class="card-body p-0">
+            <div class="overflow-x-auto">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Task ID</th>
+                            <th>Name</th>
+                            <th>Status</th>
+                            <th>Started</th>
+                            <th>Finished</th>
+                            <th>Result</th>
+                            <th>Error</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .Tasks}}
+                        <tr>
+                            <td class="font-mono text-xs">{{.TaskID}}</td>
+                            <td>{{.TaskName}}</td>
+                            <td>
+                                {{if eq (printf "%s" .Status) "success"}}<span class="badge badge-success badge-sm">success</span>
+                                {{else if eq (printf "%s" .Status) "failure"}}<span class="badge badge-error badge-sm">failure</span>
+                                {{else if eq (printf "%s" .Status) "started"}}<span class="badge badge-info badge-sm">started</span>
+                                {{else}}<span class="badge badge-ghost badge-sm">{{.Status}}</span>{{end}}
+                            </td>
+                            <td class="text-xs">{{localDateTime .CreatedAt $.TZ}}</td>
+                            <td class="text-xs">{{if .FinishedAt}}{{localDateTime (derefTime .FinishedAt) $.TZ}}{{else}}-{{end}}</td>
+                            <td class="text-xs max-w-xs truncate">{{if .Result}}{{nullStr .Result}}{{else}}-{{end}}</td>
+                            <td class="text-xs max-w-xs truncate text-error">{{if .Error}}{{nullStr .Error}}{{else}}-{{end}}</td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {{else}}
+    <div class="alert">
+        <span>No tasks have been executed yet. Weather tasks run automatically after startup.</span>
+    </div>
+    {{end}}
+</div>
+{{end}}
