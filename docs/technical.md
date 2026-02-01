@@ -2,226 +2,220 @@
 
 ## Technology Stack
 
-### Frontend
+### Application (Go)
 
-- React with TypeScript
-- Vite for build tooling
-- shadcn/ui for component library
-- React Query for data fetching and caching
-- Axios for all API requests (replacing fetch)
-- React Router for navigation
-- Nivo for analytics visualization
-- date-fns for date handling
+- Go 1.24 single binary (HTTP server + background scheduler)
+- net/http stdlib for routing and handlers
+- html/template for server-rendered pages
+- database/sql with PostgreSQL driver (lib/pq)
+- HTMX for interactive form submissions and partial updates
+- In-process goroutine scheduler (replaces Celery + Redis)
 
-### Backend
+### UI
 
-- FastAPI for REST API
-- PostgreSQL for primary database
-- Celery with Redis for task processing
-- Alembic for database migrations
-- OpenMeteo API for weather data
-- SQLAlchemy for ORM
-- Pydantic for data validation
+- DaisyUI v5 component library on Tailwind CSS 4
+- ApexCharts for interactive analytics charts
+- HTMX for form submissions and partial page updates
+- Responsive layout with collapsible sidebar and mobile bottom dock
+- Dark/light theme toggle with localStorage persistence
+
+### Infrastructure
+
+- PostgreSQL 16 database
+- Docker (2 containers: app + postgres)
+- GitHub Actions CI/CD with multi-arch builds
+- GHCR for container registry
+- Trivy for security scanning
+- OpenMeteo API for weather data (free, no API key)
 
 ## Database Schema
 
+All tables use integer auto-increment primary keys. Timestamps use `created_at`/`updated_at` where applicable.
+
 ### Products
 
-- id: UUID (primary key)
+- id: Integer (primary key, auto-increment)
 - name: String
-- type: Enum (fertilizer, pesticide, herbicide, etc.)
+- type: String (fertilizer, pesticide, herbicide, etc.)
 - manufacturer: String
 - application_rate: Float
 - unit: String
 - notes: Text
-- n_pct: Float (Nitrogen %)
-- p_pct: Float (Phosphorus %)
-- k_pct: Float (Potassium %)
-- ca_pct: Float (Calcium %)
-- mg_pct: Float (Magnesium %)
-- s_pct: Float (Sulfur %)
-- fe_pct: Float (Iron %)
-- cu_pct: Float (Copper %)
-- mn_pct: Float (Manganese %)
-- b_pct: Float (Boron %)
-- zn_pct: Float (Zinc %)
+- n_pct, p_pct, k_pct: Float (N-P-K percentages)
+- ca_pct, mg_pct, s_pct: Float (secondary nutrients)
+- fe_pct, cu_pct, mn_pct, b_pct, zn_pct: Float (micronutrients)
 - weight_lbs: Float
 - cost_per_bag: Float
-- cost_per_lb_n: Float
+- cost_per_lb_n: Float (calculated)
 - sgn: Integer (Size Guide Number)
 - product_link: String (URL)
 - label: String
-- sources: String or JSONB (list of sources)
-- urea_nitrogen: Float
-- ammoniacal_nitrogen: Float
-- water_insol_nitrogen: Float
-- created_at: DateTime
-- updated_at: DateTime
-
-### Lawns
-
-- id: UUID (primary key)
-- name: String
-- area: Float
-- grass_type: Enum (cold_season, warm_season)
-- location_id: ForeignKey to Location
-- created_at: DateTime
-- updated_at: DateTime
-- weather_fetch_frequency: Enum (4h, 8h, 12h, 24h)
-- timezone: String (IANA timezone)
-- weather_enabled: Boolean
+- sources: Text
+- urea_nitrogen, ammoniacal_nitrogen, water_insol_nitrogen: Float
+- created_at, updated_at: Timestamp
 
 ### Locations
 
-- id: UUID (primary key)
-- latitude: Float
-- longitude: Float
+- id: Integer (primary key, auto-increment)
+- latitude, longitude: Float
 - name: String (optional)
+
+### Lawns
+
+- id: Integer (primary key, auto-increment)
+- name: String
+- area: Float
+- grass_type: String (cool_season, warm_season)
+- location_id: Integer (foreign key -> locations)
+- timezone: String (IANA timezone)
+- created_at, updated_at: Timestamp
 
 ### Applications
 
-- id: UUID (primary key)
-- lawn_id: UUID (foreign key)
-- product_id: UUID (foreign key)
-- application_date: DateTime
-- amount: Float
+- id: Integer (primary key, auto-increment)
+- lawn_id: Integer (foreign key -> lawns)
+- product_id: Integer (foreign key -> products)
+- application_date: Date
+- amount_per_area: Float
+- area_unit: Float (sq ft applied to)
+- unit: String (lbs, oz, gal, etc.)
+- status: String (planned, completed, cancelled)
 - notes: Text
-- weather_conditions: JSONB
-- status: Enum (planned, applied, cancelled)
-- unit: Enum (lbs, oz, gal, etc.)
-- created_at: DateTime
-- updated_at: DateTime
+- n_applied, p_applied, k_applied: Float (calculated nutrient amounts)
+- cost: Float (calculated)
+- created_at, updated_at: Timestamp
 
-### Weather Data
+### Daily Weather
 
-- id: UUID (primary key)
-- location_id: ForeignKey to Location
-- date: DateTime
-- type: Enum (historical, forecast)
-- temperature_max_c/f: Float
-- temperature_min_c/f: Float
-- precipitation_mm/in: Float
+- id: Integer (primary key, auto-increment)
+- location_id: Integer (foreign key -> locations)
+- date: Date
+- type: String (historical, forecast)
+- temperature_max_c, temperature_min_c: Float
+- precipitation_mm: Float
 - relative_humidity_mean: Float
-- wind_speed_10m_max: Float
-- wind_gusts_10m_max: Float
+- wind_speed_10m_max, wind_gusts_10m_max: Float
 - wind_direction_10m_dominant: Float
 - et0_fao_evapotranspiration: Float
-- relative_humidity_2m_max: Float
-- relative_humidity_2m_min: Float
-- dew_point_2m_max: Float
-- dew_point_2m_min: Float
-- dew_point_2m_mean: Float
+- relative_humidity_2m_max, relative_humidity_2m_min: Float
+- dew_point_2m_max, dew_point_2m_min, dew_point_2m_mean: Float
 - sunshine_duration: Float
-- created_at: DateTime
 - Unique constraint on (date, location_id, type)
 
 ### GDD Models
 
-- id: UUID (primary key)
-- location_id: UUID (foreign key)
-- name: String (user-defined)
-- base_temp_c: Float
-- unit: Enum (C/F)
-- start_date: DateTime
+- id: Integer (primary key, auto-increment)
+- location_id: Integer (foreign key -> locations)
+- name: String
+- base_temp: Float (in configured unit)
+- unit: String (C or F)
+- start_date: Date
 - threshold: Float
-- reset_on_threshold: Boolean
-- created_at: DateTime
-- updated_at: DateTime
+- created_at, updated_at: Timestamp
 
 ### GDD Values
 
-- id: UUID (primary key)
-- gdd_model_id: UUID (foreign key)
-- date: DateTime
+- id: Integer (primary key, auto-increment)
+- gdd_model_id: Integer (foreign key -> gdd_models)
+- date: Date
 - daily_gdd: Float
 - cumulative_gdd: Float
 - is_forecast: Boolean
-- run: Integer (tracks different GDD accumulation periods)
+- run: Integer (accumulation period tracker)
 
 ### GDD Resets
 
-- id: UUID (primary key)
-- gdd_model_id: UUID (foreign key)
-- reset_date: DateTime
-- reset_type: Enum (manual, threshold)
-- reset_value: Float
+- id: Integer (primary key, auto-increment)
+- gdd_model_id: Integer (foreign key -> gdd_models)
+- reset_date: Date
+- reset_type: String (manual, threshold)
+- pre_reset_value: Float
 - notes: Text
-- created_at: DateTime
+- created_at: Timestamp
 
 ### Weed Species
 
-- id: UUID (primary key)
-- name: String
-- scientific_name: String
+- id: Integer (primary key, auto-increment)
+- name: String (scientific name slug)
+- common_name: String
 - gdd_base_temp_c: Float
 - gdd_threshold_emergence: Float
-- optimal_soil_temp_min_c: Float
-- optimal_soil_temp_max_c: Float
-- season: Enum (spring, summer, fall, year_round)
-- moisture_preference: Enum (low, medium, high)
+- optimal_soil_temp_min_c, optimal_soil_temp_max_c: Float
+- moisture_preference: String (low, medium, high)
+- season: String (spring, summer, fall, year_round)
 - is_active: Boolean
-- created_at: DateTime
-- updated_at: DateTime
+- created_at, updated_at: Timestamp
 
 ### Weed Pressure
 
-- id: UUID (primary key)
-- location_id: UUID (foreign key)
-- weed_species_id: UUID (foreign key)
-- date: DateTime
+- id: Integer (primary key, auto-increment)
+- location_id: Integer (foreign key -> locations)
+- weed_species_id: Integer (foreign key -> weed_species)
+- date: Date
 - weed_pressure_score: Float (0-10)
-- gdd_risk_score: Float (0-3)
-- soil_temp_risk_score: Float (0-2)
-- moisture_risk_score: Float (0-2)
-- turf_stress_score: Float (0-2)
-- seasonal_timing_score: Float (0-1)
-- gdd_accumulated: Float
-- soil_temp_estimate_c: Float
-- precipitation_3day_mm: Float
-- humidity_avg: Float
-- et0_mm: Float
+- gdd_risk_score, soil_temp_risk_score, moisture_risk_score: Float
+- turf_stress_score, seasonal_timing_score: Float
+- gdd_accumulated, soil_temp_estimate_c: Float
+- precipitation_3day_mm, humidity_avg, et0_mm: Float
 - is_forecast: Boolean
-- created_at: DateTime
-- updated_at: DateTime
+- created_at, updated_at: Timestamp
 
 ### Disease Pressure
 
-- id: UUID (primary key)
-- location_id: UUID (foreign key)
-- date: DateTime
+- id: Integer (primary key, auto-increment)
+- location_id: Integer (foreign key -> locations)
+- date: Date
 - disease: String (e.g., "dollar_spot")
 - risk_score: Float (0-1)
-- avg_temp_5d: Float
-- avg_humidity_5d: Float
+- avg_temp_5d, avg_humidity_5d: Float
 - is_forecast: Boolean
-- created_at: DateTime
-- updated_at: DateTime
+- created_at, updated_at: Timestamp
 
 ### Growth Potential
 
-- id: UUID (primary key)
-- location_id: UUID (foreign key)
-- date: DateTime
+- id: Integer (primary key, auto-increment)
+- location_id: Integer (foreign key -> locations)
+- date: Date
 - growth_potential: Float (0-1)
-- gp_3d_avg: Float
-- gp_5d_avg: Float
-- gp_7d_avg: Float
-- created_at: DateTime
-- updated_at: DateTime
+- gp_3d_avg, gp_5d_avg, gp_7d_avg: Float
+- created_at, updated_at: Timestamp
+
+### Weekly Water Summaries
+
+- id: Integer (primary key, auto-increment)
+- lawn_id: Integer (foreign key -> lawns)
+- week_start, week_end: Date
+- et0_total, precipitation_total, irrigation_applied: Float
+- water_deficit: Float
+- status: String (adequate, deficit, critical, surplus)
+- is_forecast: Boolean
+
+### Irrigation Entries
+
+- id: Integer (primary key, auto-increment)
+- lawn_id: Integer (foreign key -> lawns)
+- date: Date
+- amount: Float (inches)
+- duration: Integer (minutes)
+- source: String (manual, sprinkler, etc.)
+- notes: Text
+- created_at, updated_at: Timestamp
 
 ### Task Status
 
-- id: UUID (primary key)
-- task_id: String (Celery task ID)
+- id: Integer (primary key, auto-increment)
 - task_name: String
 - related_location_id: Integer (optional)
-- status: Enum (pending, started, success, failure)
-- started_at: DateTime
-- finished_at: DateTime
+- status: String (running, success, failure)
+- started_at, finished_at: Timestamp
 - error: Text
-- result: Text
-- request_id: String (for request correlation)
-- created_at: DateTime
+- created_at: Timestamp
+
+### App Settings
+
+- id: Integer (primary key, auto-increment)
+- key: String (unique)
+- value: Text
 
 ## Calculation Methodologies
 
@@ -230,18 +224,17 @@
 #### Daily Calculation
 
 ```
-GDD = ((Tmax + Tmin) / 2) - Base Temperature
+GDD = max(0, ((Tmax + Tmin) / 2) - Base Temperature)
 ```
 
 Where:
-
 - Tmax = Maximum daily temperature
 - Tmin = Minimum daily temperature
-- Base Temperature = User-defined base temperature (typically 0°C for cool season, 10°C for warm season)
+- Base Temperature = User-defined (typically 0C for cool season, 10C for warm season)
 
 #### Cumulative Tracking
 
-- Accumulated from January 1st of each year
+- Accumulated from model start date
 - Reset handling for manual and threshold-based resets
 - Run-based tracking for multiple accumulation periods
 
@@ -258,7 +251,7 @@ Where:
 Final score (0-10) calculated as weighted sum of 5 factors:
 
 ```
-Final Score = (GDD Risk × 1.36) + (Soil Temp Risk × 0.91) + (Moisture Risk × 0.91) + (Turf Stress × 0.91) + (Seasonal Timing × 0.45)
+Final Score = (GDD Risk * 1.36) + (Soil Temp Risk * 0.91) + (Moisture Risk * 0.91) + (Turf Stress * 0.91) + (Seasonal Timing * 0.45)
 ```
 
 #### GDD Risk (0-3 points)
@@ -270,15 +263,15 @@ Final Score = (GDD Risk × 1.36) + (Soil Temp Risk × 0.91) + (Moisture Risk × 
 
 #### Soil Temperature Risk (0-2 points)
 
-- **Estimation**: `Soil Temp = Air Temp × Seasonal Factor`
+- **Estimation**: `Soil Temp = Air Temp * Seasonal Factor`
   - Spring: 0.8 (soil cooler than air)
   - Summer: 0.9 (soil closer to air temp)
   - Fall/Winter: 0.85 (intermediate)
 - **Scoring**:
   - `< optimal min`: 0 points (too cold)
   - `optimal range`: 2 points (perfect conditions)
-  - `optimal + 5°C`: 1 point (still acceptable)
-  - `> optimal + 5°C`: 0 points (too hot)
+  - `optimal + 5C`: 1 point (still acceptable)
+  - `> optimal + 5C`: 0 points (too hot)
 
 #### Moisture Risk (0-2 points)
 
@@ -323,7 +316,7 @@ risk_score = exp(logit) / (1 + exp(logit))
 #### Calculation Process
 
 1. **5-Day Moving Averages**: Calculate average temperature and humidity over 5 days
-2. **Temperature Validation**: Only calculate if avg_temp is between 10-35°C
+2. **Temperature Validation**: Only calculate if avg_temp is between 10-35C
 3. **Risk Scoring**: Probability-based risk assessment (0-1 scale)
 
 ### Growth Potential
@@ -331,13 +324,13 @@ risk_score = exp(logit) / (1 + exp(logit))
 #### Temperature-Based Model
 
 ```
-GP = exp(-0.5 * ((temp - t_opt) / sigma)²)
+GP = exp(-0.5 * ((temp - t_opt) / sigma)^2)
 ```
 
 #### Grass Type Parameters
 
-- **Cold Season**: t_opt = 20°C, sigma = 5.5
-- **Warm Season**: t_opt = 31°C, sigma = 7.0
+- **Cool Season**: t_opt = 20C, sigma = 5.5
+- **Warm Season**: t_opt = 31C, sigma = 7.0
 
 #### Rolling Averages
 
@@ -345,156 +338,106 @@ GP = exp(-0.5 * ((temp - t_opt) / sigma)²)
 - **5-day average**: Medium-term trend analysis
 - **7-day average**: Long-term trend analysis
 
-## API Endpoints
+### Water Balance
 
-### Products
+#### Weekly ET0 vs Precipitation vs Irrigation
 
-- GET /api/v1/products - List all products
-- POST /api/v1/products - Create new product
-- GET /api/v1/products/{id} - Get product details
-- PUT /api/v1/products/{id} - Update product
-- DELETE /api/v1/products/{id} - Delete product
+- ET0 (reference evapotranspiration) from OpenMeteo
+- Precipitation totals from weather data
+- Irrigation from manual user entries
+- Deficit = ET0 - (Precipitation + Irrigation)
+- Status: adequate (deficit <= 0), deficit (0 < deficit < threshold), critical (deficit >= threshold)
 
-### Lawns
+## Routes
 
-- GET /api/v1/lawns - List all lawns
-- POST /api/v1/lawns - Create new lawn (triggers weather fetch and weed pressure calculation)
-- GET /api/v1/lawns/{id} - Get lawn details
-- PUT /api/v1/lawns/{id} - Update lawn
-- DELETE /api/v1/lawns/{id} - Delete lawn
+### Server-Rendered Pages (HTML)
 
-### Applications
+- `GET /` - Dashboard with charts
+- `GET /lawns` - Lawns list page
+- `POST /lawns` - Create lawn
+- `POST /lawns/{id}` - Update lawn
+- `DELETE /lawns/{id}` - Delete lawn
+- `GET /products` - Products list page
+- `POST /products` - Create product
+- `POST /products/{id}` - Update product
+- `DELETE /products/{id}` - Delete product
+- `GET /applications` - Applications list page
+- `POST /applications` - Create application
+- `POST /applications/{id}` - Update application
+- `DELETE /applications/{id}` - Delete application
+- `GET /gdd` - GDD models page
+- `POST /gdd-models` - Create GDD model
+- `PUT /gdd-models/{id}` - Update GDD model
+- `DELETE /gdd-models/{id}` - Delete GDD model
+- `POST /gdd-models/{id}/reset` - Manual GDD reset
+- `GET /water` - Water management page
+- `POST /irrigation` - Create irrigation entry
+- `DELETE /irrigation/{id}` - Delete irrigation entry
+- `GET /reports` - Reports page
+- `GET /admin` - Admin/settings page
+- `POST /admin/settings` - Update settings
+- `POST /admin/run-task` - Trigger manual task run
 
-- GET /api/v1/applications - List all applications
-- POST /api/v1/applications - Create new application
-- GET /api/v1/applications/{id} - Get application details
-- PUT /api/v1/applications/{id} - Update application
-- DELETE /api/v1/applications/{id} - Delete application
+### JSON API Endpoints (Chart Data)
 
-### GDD
+- `GET /api/weather/{locationID}` - Weather chart data
+- `GET /api/disease/{locationID}` - Disease pressure chart data
+- `GET /api/gdd-values/{modelID}` - GDD values chart data
+- `GET /api/growth-potential/{locationID}` - Growth potential chart data
+- `GET /api/weed-pressure/{locationID}` - Weed pressure chart data
+- `GET /api/water-summary/{lawnID}` - Water summary chart data
 
-- GET /api/v1/gdd_models - List GDD models
-- POST /api/v1/gdd_models - Create GDD model
-- GET /api/v1/gdd_models/{id} - Get GDD model details
-- PUT /api/v1/gdd_models/{id} - Update GDD model
-- DELETE /api/v1/gdd_models/{id} - Delete GDD model
-- GET /api/v1/gdd_models/{id}/values - Get GDD values for model
-- POST /api/v1/gdd_models/{id}/reset - Manual reset
-- GET /api/v1/gdd_models/location/{location_id} - Get models by location
+### System Endpoints
 
-### Weed Pressure
+- `GET /health` - Health check (returns DB connectivity status)
+- `GET /api/v1/version` - Version info (version, environment, go_version)
 
-- GET /api/v1/weed_pressure - Get weed pressure data
-- GET /api/v1/weed_pressure/location/{location_id} - Get by location
-- GET /api/v1/weed_species - List weed species
-- POST /api/v1/weed_species - Create weed species
-- PUT /api/v1/weed_species/{id} - Update weed species
+## Background Scheduler
 
-### Disease Pressure
+The in-process goroutine scheduler replaces the previous Celery + Redis + Beat stack.
 
-- GET /api/v1/disease_pressure - Get disease pressure data
-- GET /api/v1/disease_pressure/location/{location_id} - Get by location
+### Startup Run
 
-### Growth Potential
+- Fetches 60 days of weather data for all locations
+- Runs all calculation engines (GDD, disease, growth potential, weed pressure, water)
+- Configurable backfill depth via `BACKFILL_DAYS` env var
 
-- GET /api/v1/growth_potential - Get growth potential data
-- GET /api/v1/growth_potential/location/{location_id} - Get by location
+### Daily Recurring
 
-### Weather
+- Configurable hour and timezone via app settings (admin page)
+- Optimized 2-day fetch window for daily updates
+- Runs all calculations after weather update
 
-- GET /api/v1/weather - Get weather data
-- GET /api/v1/weather/location/{location_id} - Get by location
+### On-Demand
 
-### Task Status
+- Triggered when creating new lawns/locations
+- Fetches weather and runs calculations for the new location
 
-- GET /api/v1/task_status - List task statuses
-- GET /api/v1/task_status/{task_id} - Get specific task status
+### Task Tracking
 
-### Data Health
-
-- GET /api/v1/data_health - System health check
-- GET /api/v1/data_health/location/{location_id} - Location-specific health
-
-## Background Tasks
-
-### Scheduled Tasks
-
-- **Daily Weather Updates**: 3am Central time, updates all locations
-- **GDD Recalculation**: Triggered after weather updates
-- **Weed Pressure Calculation**: Triggered after weather updates
-- **Disease Pressure Calculation**: Triggered after weather updates
-- **Growth Potential Calculation**: Triggered after weather updates
-
-### On-Demand Tasks
-
-- **Weather Backfill**: Historical data retrieval for date ranges
-- **GDD Backfill**: Recalculate GDD for specific models
-- **Weed Pressure Backfill**: Recalculate weed pressure for date ranges
-- **Disease Pressure Backfill**: Recalculate disease pressure for date ranges
-- **Growth Potential Backfill**: Recalculate growth potential for date ranges
+- Records status (running, success, failure) in `task_status` table
+- Visible on admin page with timestamps and error messages
 
 ## Performance Considerations
 
-### Database Optimization
+### Database
 
-- **Indexes**: Comprehensive indexing on date fields and foreign keys
-- **Query Optimization**: N+1 query prevention with proper joins
-- **Atomic Operations**: Race condition prevention in concurrent updates
-- **Connection Pooling**: Efficient database connection management
+- UPSERT operations for idempotent weather and calculation storage
+- Parameterized queries via database/sql (prevents SQL injection)
+- CASCADE deletes for referential integrity cleanup
+- Indexes on date fields and foreign keys
 
-### Caching Strategy
+### Calculation Efficiency
 
-- **Frontend**: React Query for API response caching
-- **Backend**: Redis for session storage and task broker
-- **Weather Data**: Location-based deduplication prevents duplicate API calls
+- Batch processing for date range calculations
+- Incremental updates (2-day window for daily runs vs 60-day for startup)
+- All calculations run in-process (no serialization overhead)
 
-### Calculation Performance
+## Security
 
-- **Batch Processing**: Date range calculations for efficiency
-- **Incremental Updates**: Only recalculate when weather data changes
-- **Background Processing**: Heavy calculations moved to Celery workers
-- **Performance Monitoring**: Comprehensive logging and metrics
-
-## Security Considerations
-
-### Container Security
-
-- **Non-Root Users**: All containers run as non-root users (UID 1001-1004)
-- **File Permissions**: Proper directory ownership and permissions
-- **Network Security**: Container isolation and secure communication
-
-### API Security
-
-- **Input Validation**: Comprehensive Pydantic schema validation
-- **Rate Limiting**: API rate limiting for external services
-- **Data Sanitization**: Input sanitization and SQL injection prevention
-- **Error Handling**: Secure error messages without information leakage
-
-### Data Security
-
-- **Database Security**: Connection encryption and access controls
-- **Backup Procedures**: Regular automated backups
-- **Audit Trail**: Comprehensive logging of all operations
-
-## Observability
-
-### Logging
-
-- **Centralized Logging**: Loki, Promtail, Grafana stack
-- **Request Tracing**: End-to-end request ID correlation
-- **Structured Logging**: JSON-formatted logs with metadata
-- **Performance Metrics**: API response times and calculation durations
-
-### Monitoring
-
-- **Task Monitoring**: Real-time Celery task status tracking
-- **Health Checks**: Comprehensive system health monitoring
-- **Error Tracking**: Error aggregation and alerting
-- **Performance Dashboards**: Real-time system performance metrics
-
-### Debugging
-
-- **Full-Stack Tracing**: Request ID propagation from API to Celery
-- **Log Search**: Grafana-based log search and filtering
-- **Task Correlation**: Link API requests to background tasks
-- **Error Context**: Comprehensive error context and stack traces
+- Non-root container execution
+- Parameterized SQL queries (no string interpolation)
+- Server-rendered HTML with Go template auto-escaping
+- Security headers (X-Content-Type-Options, X-Frame-Options)
+- Trivy image scanning in CI/CD pipeline
+- No external secrets required (OpenMeteo is free, no API key)
