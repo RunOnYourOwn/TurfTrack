@@ -335,23 +335,29 @@ jobs:
           # Write to file to preserve formatting
           echo "$NOTES" > /tmp/changelog-entry.md
 
+      - name: Build release notes
+        run: |
+          CHANGELOG=$(cat /tmp/changelog-entry.md)
+          {
+            echo '## Docker Image'
+            echo ''
+            echo '```'
+            echo 'docker pull ghcr.io/runonyourown/turftrack:${{ github.ref_name }}'
+            echo '```'
+            echo ''
+            echo '## What'\''s Changed'
+            echo ''
+            echo "$CHANGELOG"
+          } > /tmp/release-notes.md
+
       - name: Create Draft Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          CHANGELOG=$(cat /tmp/changelog-entry.md)
           gh release create ${{ github.ref_name }} \
             --draft \
             --title "Release ${{ github.ref_name }}" \
-            --notes "## Docker Image
-
-\`\`\`
-docker pull ghcr.io/runonyourown/turftrack:${{ github.ref_name }}
-\`\`\`
-
-## What's Changed
-
-${CHANGELOG}"
+            --notes-file /tmp/release-notes.md
 
       - name: Cleanup workspace
         if: always()
