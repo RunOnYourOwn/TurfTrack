@@ -4,6 +4,8 @@ package db
 
 import (
 	"database/sql"
+	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -22,9 +24,15 @@ func setupTestDB(t *testing.T) *sql.DB {
 }
 
 // createTestLocation is a helper that creates a location for use as a foreign key.
+var testLocationCounter int64
+
 func createTestLocation(t *testing.T, db *sql.DB) *model.Location {
 	t.Helper()
-	loc, err := CreateLocation(db, "Test Location", 35.0, -85.0)
+	n := atomic.AddInt64(&testLocationCounter, 1)
+	name := fmt.Sprintf("Test Location %d", n)
+	lat := 35.0 + float64(n)*0.001
+	lon := -85.0 + float64(n)*0.001
+	loc, err := CreateLocation(db, name, lat, lon)
 	if err != nil {
 		t.Fatalf("CreateLocation failed: %v", err)
 	}
@@ -894,6 +902,596 @@ func TestGDDModelGetAndUpdate(t *testing.T) {
 	}
 	if !updated.ResetOnThreshold {
 		t.Error("expected reset_on_threshold true")
+	}
+}
+
+// createTestApplication is a helper that creates an application with a lawn and product.
+func createTestApplication(t *testing.T, db *sql.DB) (*model.Lawn, *model.Product, *model.Application) {
+	t.Helper()
+	_, lawn := createTestLawn(t, db)
+	product := createTestProduct(t, db)
+	app := &model.Application{
+		LawnID:          lawn.ID,
+		ProductID:       product.ID,
+		ApplicationDate: time.Now().Truncate(24 * time.Hour),
+		AmountPerArea:   4.0,
+		AreaUnit:        1000,
+		Unit:            model.UnitLbs,
+		Status:          model.AppCompleted,
+	}
+	created, err := CreateApplication(db, app)
+	if err != nil {
+		t.Fatalf("CreateApplication failed: %v", err)
+	}
+	return lawn, product, created
+}
+
+func TestUpdateProduct(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	// Create a product
+	weight := 50.0
+	cost := 45.99
+	p := &model.Product{
+		Name:       "Original Fertilizer",
+		NPct:       6.0,
+		PPct:       4.0,
+		KPct:       0.0,
+		WeightLbs:  &weight,
+		CostPerBag: &cost,
+	}
+	created, err := CreateProduct(db, p)
+	if err != nil {
+		t.Fatalf("CreateProduct failed: %v", err)
+	}
+
+	// Update fields
+	created.Name = "Updated Fertilizer"
+	created.NPct = 24.0
+	created.PPct = 0.0
+	created.KPct = 4.0
+	newWeight := 40.0
+	newCost := 35.50
+	created.WeightLbs = &newWeight
+	created.CostPerBag = &newCost
+	created.FePct = 2.5
+
+	updated, err := UpdateProduct(db, created)
+	if err != nil {
+		t.Fatalf("UpdateProduct failed: %v", err)
+	}
+	if updated.Name != "Updated Fertilizer" {
+		t.Errorf("expected updated name, got %q", updated.Name)
+	}
+	if updated.NPct != 24.0 {
+		t.Errorf("expected N pct 24.0, got %f", updated.NPct)
+	}
+	if updated.KPct != 4.0 {
+		t.Errorf("expected K pct 4.0, got %f", updated.KPct)
+	}
+	if updated.FePct != 2.5 {
+		t.Errorf("expected Fe pct 2.5, got %f", updated.FePct)
+	}
+
+	// Verify via Get
+	got, err := GetProduct(db, updated.ID)
+	if err != nil {
+		t.Fatalf("GetProduct after update failed: %v", err)
+	}
+	if got.Name != "Updated Fertilizer" {
+		t.Errorf("GetProduct name mismatch after update: %q", got.Name)
+	}
+	if got.NPct != 24.0 {
+		t.Errorf("GetProduct N pct mismatch: %f", got.NPct)
+	}
+	if got.WeightLbs == nil || *got.WeightLbs != 40.0 {
+		t.Errorf("expected weight 40.0, got %v", got.WeightLbs)
+	}
+}
+
+func TestGetApplication(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	lawn, product, created := createTestApplication(t, db)
+
+	// Get the application by ID
+	got, err := GetApplication(db, created.ID)
+	if err != nil {
+		t.Fatalf("GetApplication failed: %v", err)
+	}
+	if got == nil {
+		t.Fatal("GetApplication returned nil")
+	}
+	if got.ID != created.ID {
+		t.Errorf("expected ID %d, got %d", created.ID, got.ID)
+	}
+	if got.LawnID != lawn.ID {
+		t.Errorf("expected lawn_id %d, got %d", lawn.ID, got.LawnID)
+	}
+	if got.ProductID != product.ID {
+		t.Errorf("expected product_id %d, got %d", product.ID, got.ProductID)
+	}
+	if got.AmountPerArea != 4.0 {
+		t.Errorf("expected amount_per_area 4.0, got %f", got.AmountPerArea)
+	}
+	if got.AreaUnit != 1000 {
+		t.Errorf("expected area_unit 1000, got %d", got.AreaUnit)
+	}
+	if got.Unit != model.UnitLbs {
+		t.Errorf("expected unit %q, got %q", model.UnitLbs, got.Unit)
+	}
+	if got.Status != model.AppCompleted {
+		t.Errorf("expected status %q, got %q", model.AppCompleted, got.Status)
+	}
+
+	// Get non-existent
+	missing, err := GetApplication(db, 99999)
+	if err != nil {
+		t.Fatalf("GetApplication for missing ID returned error: %v", err)
+	}
+	if missing != nil {
+		t.Error("expected nil for non-existent application")
+	}
+}
+
+func TestUpdateApplication(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	_, _, created := createTestApplication(t, db)
+
+	// Update fields
+	created.AmountPerArea = 8.0
+	created.AreaUnit = 500
+	created.Unit = model.UnitOz
+	created.Status = model.AppPlanned
+	nApplied := 1.5
+	created.NApplied = &nApplied
+
+	updated, err := UpdateApplication(db, created)
+	if err != nil {
+		t.Fatalf("UpdateApplication failed: %v", err)
+	}
+	if updated.AmountPerArea != 8.0 {
+		t.Errorf("expected amount_per_area 8.0, got %f", updated.AmountPerArea)
+	}
+	if updated.AreaUnit != 500 {
+		t.Errorf("expected area_unit 500, got %d", updated.AreaUnit)
+	}
+	if updated.Unit != model.UnitOz {
+		t.Errorf("expected unit %q, got %q", model.UnitOz, updated.Unit)
+	}
+	if updated.Status != model.AppPlanned {
+		t.Errorf("expected status %q, got %q", model.AppPlanned, updated.Status)
+	}
+
+	// Verify via Get
+	got, err := GetApplication(db, updated.ID)
+	if err != nil {
+		t.Fatalf("GetApplication after update failed: %v", err)
+	}
+	if got.AmountPerArea != 8.0 {
+		t.Errorf("GetApplication amount mismatch: %f", got.AmountPerArea)
+	}
+	if got.NApplied == nil || *got.NApplied != 1.5 {
+		t.Errorf("expected n_applied 1.5, got %v", got.NApplied)
+	}
+}
+
+func TestDeleteOrphanedLocation(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	// Create a location with a lawn (should NOT be deleted)
+	loc1 := createTestLocation(t, db)
+	_, err := CreateLawn(db, "Lawn On Loc1", 3000, model.GrassTypeCold, "", true, loc1.ID)
+	if err != nil {
+		t.Fatalf("CreateLawn failed: %v", err)
+	}
+
+	// Create an orphaned location (no lawns, should be deleted)
+	loc2 := createTestLocation(t, db)
+
+	// Try to delete both
+	DeleteOrphanedLocation(db, loc1.ID)
+	DeleteOrphanedLocation(db, loc2.ID)
+
+	// loc1 should still exist
+	got1, err := GetLocation(db, loc1.ID)
+	if err != nil {
+		t.Fatalf("GetLocation (loc1) failed: %v", err)
+	}
+	if got1 == nil {
+		t.Error("expected loc1 to still exist (has lawn), but it was deleted")
+	}
+
+	// loc2 should be gone
+	got2, err := GetLocation(db, loc2.ID)
+	if err != nil {
+		t.Fatalf("GetLocation (loc2) failed: %v", err)
+	}
+	if got2 != nil {
+		t.Error("expected loc2 to be deleted (no lawns), but it still exists")
+	}
+}
+
+func TestGetDiseasePressure(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	loc := createTestLocation(t, db)
+
+	date1 := time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC)
+	date2 := time.Date(2025, 6, 10, 0, 0, 0, 0, time.UTC)
+	date3 := time.Date(2025, 7, 1, 0, 0, 0, 0, time.UTC)
+
+	// Insert disease pressure records via raw SQL
+	_, err := db.Exec(`INSERT INTO disease_pressure (date, location_id, disease, risk_score) VALUES ($1, $2, $3, $4)`,
+		date1, loc.ID, "dollar_spot", 0.75)
+	if err != nil {
+		t.Fatalf("insert disease_pressure 1 failed: %v", err)
+	}
+	_, err = db.Exec(`INSERT INTO disease_pressure (date, location_id, disease, risk_score) VALUES ($1, $2, $3, $4)`,
+		date2, loc.ID, "brown_patch", 0.50)
+	if err != nil {
+		t.Fatalf("insert disease_pressure 2 failed: %v", err)
+	}
+	_, err = db.Exec(`INSERT INTO disease_pressure (date, location_id, disease, risk_score) VALUES ($1, $2, $3, $4)`,
+		date3, loc.ID, "dollar_spot", 0.90)
+	if err != nil {
+		t.Fatalf("insert disease_pressure 3 failed: %v", err)
+	}
+
+	// Get all
+	results, err := GetDiseasePressure(db, loc.ID, nil, nil)
+	if err != nil {
+		t.Fatalf("GetDiseasePressure (all) failed: %v", err)
+	}
+	if len(results) != 3 {
+		t.Fatalf("expected 3 disease pressure records, got %d", len(results))
+	}
+	if results[0].Disease != "dollar_spot" {
+		t.Errorf("expected first disease 'dollar_spot', got %q", results[0].Disease)
+	}
+	if results[0].RiskScore == nil || *results[0].RiskScore != 0.75 {
+		t.Errorf("expected risk_score 0.75, got %v", results[0].RiskScore)
+	}
+	if results[0].LocationID != loc.ID {
+		t.Errorf("expected location_id %d, got %d", loc.ID, results[0].LocationID)
+	}
+
+	// Get with date range filter
+	start := time.Date(2025, 6, 5, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2025, 6, 15, 0, 0, 0, 0, time.UTC)
+	filtered, err := GetDiseasePressure(db, loc.ID, &start, &end)
+	if err != nil {
+		t.Fatalf("GetDiseasePressure (filtered) failed: %v", err)
+	}
+	if len(filtered) != 1 {
+		t.Errorf("expected 1 disease pressure record in date range, got %d", len(filtered))
+	}
+	if len(filtered) > 0 && filtered[0].Disease != "brown_patch" {
+		t.Errorf("expected 'brown_patch' in filtered results, got %q", filtered[0].Disease)
+	}
+
+	// Get for non-existent location
+	empty, err := GetDiseasePressure(db, 99999, nil, nil)
+	if err != nil {
+		t.Fatalf("GetDiseasePressure (empty) failed: %v", err)
+	}
+	if len(empty) != 0 {
+		t.Errorf("expected 0 records for non-existent location, got %d", len(empty))
+	}
+}
+
+func TestGetGrowthPotential(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	loc := createTestLocation(t, db)
+
+	date1 := time.Date(2025, 5, 1, 0, 0, 0, 0, time.UTC)
+	date2 := time.Date(2025, 5, 15, 0, 0, 0, 0, time.UTC)
+	date3 := time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC)
+
+	// Insert growth potential records via raw SQL
+	_, err := db.Exec(`INSERT INTO growth_potential (date, location_id, growth_potential, gp_3d_avg, gp_5d_avg, gp_7d_avg) VALUES ($1, $2, $3, $4, $5, $6)`,
+		date1, loc.ID, 0.65, 0.60, 0.58, 0.55)
+	if err != nil {
+		t.Fatalf("insert growth_potential 1 failed: %v", err)
+	}
+	_, err = db.Exec(`INSERT INTO growth_potential (date, location_id, growth_potential, gp_3d_avg, gp_5d_avg, gp_7d_avg) VALUES ($1, $2, $3, $4, $5, $6)`,
+		date2, loc.ID, 0.80, 0.75, 0.72, 0.70)
+	if err != nil {
+		t.Fatalf("insert growth_potential 2 failed: %v", err)
+	}
+	_, err = db.Exec(`INSERT INTO growth_potential (date, location_id, growth_potential, gp_3d_avg, gp_5d_avg, gp_7d_avg) VALUES ($1, $2, $3, $4, $5, $6)`,
+		date3, loc.ID, 0.90, 0.85, 0.82, 0.80)
+	if err != nil {
+		t.Fatalf("insert growth_potential 3 failed: %v", err)
+	}
+
+	// Get all
+	results, err := GetGrowthPotential(db, loc.ID, nil, nil)
+	if err != nil {
+		t.Fatalf("GetGrowthPotential (all) failed: %v", err)
+	}
+	if len(results) != 3 {
+		t.Fatalf("expected 3 growth potential records, got %d", len(results))
+	}
+	if results[0].GrowthPotential == nil || *results[0].GrowthPotential != 0.65 {
+		t.Errorf("expected growth_potential 0.65, got %v", results[0].GrowthPotential)
+	}
+	if results[0].GP3dAvg == nil || *results[0].GP3dAvg != 0.60 {
+		t.Errorf("expected gp_3d_avg 0.60, got %v", results[0].GP3dAvg)
+	}
+	if results[0].GP7dAvg == nil || *results[0].GP7dAvg != 0.55 {
+		t.Errorf("expected gp_7d_avg 0.55, got %v", results[0].GP7dAvg)
+	}
+	if results[0].LocationID != loc.ID {
+		t.Errorf("expected location_id %d, got %d", loc.ID, results[0].LocationID)
+	}
+
+	// Get with date range filter
+	start := time.Date(2025, 5, 10, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2025, 5, 20, 0, 0, 0, 0, time.UTC)
+	filtered, err := GetGrowthPotential(db, loc.ID, &start, &end)
+	if err != nil {
+		t.Fatalf("GetGrowthPotential (filtered) failed: %v", err)
+	}
+	if len(filtered) != 1 {
+		t.Errorf("expected 1 growth potential record in date range, got %d", len(filtered))
+	}
+
+	// Get for non-existent location
+	empty, err := GetGrowthPotential(db, 99999, nil, nil)
+	if err != nil {
+		t.Fatalf("GetGrowthPotential (empty) failed: %v", err)
+	}
+	if len(empty) != 0 {
+		t.Errorf("expected 0 records for non-existent location, got %d", len(empty))
+	}
+}
+
+func TestGetWeeklyWaterSummaries(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	_, lawn := createTestLawn(t, db)
+
+	weekStart1 := time.Date(2025, 6, 2, 0, 0, 0, 0, time.UTC)
+	weekEnd1 := time.Date(2025, 6, 8, 0, 0, 0, 0, time.UTC)
+	weekStart2 := time.Date(2025, 6, 9, 0, 0, 0, 0, time.UTC)
+	weekEnd2 := time.Date(2025, 6, 15, 0, 0, 0, 0, time.UTC)
+
+	// Insert weekly water summaries via raw SQL
+	_, err := db.Exec(`INSERT INTO weekly_water_summaries
+		(lawn_id, week_start, week_end, et0_total, precipitation_total, irrigation_applied, water_deficit, status, is_forecast)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		lawn.ID, weekStart1, weekEnd1, 1.5, 0.5, 0.75, 0.25, "deficit", false)
+	if err != nil {
+		t.Fatalf("insert weekly_water_summaries 1 failed: %v", err)
+	}
+	_, err = db.Exec(`INSERT INTO weekly_water_summaries
+		(lawn_id, week_start, week_end, et0_total, precipitation_total, irrigation_applied, water_deficit, status, is_forecast)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		lawn.ID, weekStart2, weekEnd2, 1.2, 1.0, 0.0, -0.2, "surplus", true)
+	if err != nil {
+		t.Fatalf("insert weekly_water_summaries 2 failed: %v", err)
+	}
+
+	// Retrieve
+	results, err := GetWeeklyWaterSummaries(db, lawn.ID)
+	if err != nil {
+		t.Fatalf("GetWeeklyWaterSummaries failed: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 water summaries, got %d", len(results))
+	}
+
+	// Results are ordered by week_start DESC, so the second inserted comes first
+	if results[0].LawnID != lawn.ID {
+		t.Errorf("expected lawn_id %d, got %d", lawn.ID, results[0].LawnID)
+	}
+	if results[0].ET0Total != 1.2 {
+		t.Errorf("expected et0_total 1.2, got %f", results[0].ET0Total)
+	}
+	if results[0].Status != "surplus" {
+		t.Errorf("expected status 'surplus', got %q", results[0].Status)
+	}
+	if !results[0].IsForecast {
+		t.Error("expected is_forecast true for second week")
+	}
+	if results[1].PrecipitationTotal != 0.5 {
+		t.Errorf("expected precipitation_total 0.5, got %f", results[1].PrecipitationTotal)
+	}
+	if results[1].IrrigationApplied != 0.75 {
+		t.Errorf("expected irrigation_applied 0.75, got %f", results[1].IrrigationApplied)
+	}
+	if results[1].WaterDeficit != 0.25 {
+		t.Errorf("expected water_deficit 0.25, got %f", results[1].WaterDeficit)
+	}
+
+	// Empty for non-existent lawn
+	empty, err := GetWeeklyWaterSummaries(db, 99999)
+	if err != nil {
+		t.Fatalf("GetWeeklyWaterSummaries (empty) failed: %v", err)
+	}
+	if len(empty) != 0 {
+		t.Errorf("expected 0 summaries for non-existent lawn, got %d", len(empty))
+	}
+}
+
+func TestListWeedSpecies(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	// The migration 004 seeds 5 active weed species.
+	// Insert one more that is inactive.
+	_, err := db.Exec(`INSERT INTO weed_species
+		(name, common_name, gdd_base_temp_c, gdd_threshold_emergence,
+		 optimal_soil_temp_min_c, optimal_soil_temp_max_c, moisture_preference, season, is_active)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		"test_inactive_weed", "Inactive Weed", 10.0, 100.0, 12.0, 28.0, "low", "spring", false)
+	if err != nil {
+		t.Fatalf("insert inactive weed species failed: %v", err)
+	}
+
+	// List all (including inactive)
+	all, err := ListWeedSpecies(db, false)
+	if err != nil {
+		t.Fatalf("ListWeedSpecies (all) failed: %v", err)
+	}
+	if len(all) != 6 {
+		t.Errorf("expected 6 weed species (5 seeded + 1 inactive), got %d", len(all))
+	}
+
+	// List active only
+	active, err := ListWeedSpecies(db, true)
+	if err != nil {
+		t.Fatalf("ListWeedSpecies (activeOnly) failed: %v", err)
+	}
+	if len(active) != 5 {
+		t.Errorf("expected 5 active weed species, got %d", len(active))
+	}
+	for _, ws := range active {
+		if !ws.IsActive {
+			t.Errorf("expected all active species, but got inactive: %q", ws.Name)
+		}
+	}
+
+	// Verify species fields on one of the seeded ones
+	var found bool
+	for _, ws := range active {
+		if ws.Name == "crabgrass" {
+			found = true
+			if ws.CommonName != "Crabgrass" {
+				t.Errorf("expected common_name 'Crabgrass', got %q", ws.CommonName)
+			}
+			if ws.GDDBaseTempC != 10.0 {
+				t.Errorf("expected gdd_base_temp_c 10.0, got %f", ws.GDDBaseTempC)
+			}
+			if ws.Season != model.SeasonSummer {
+				t.Errorf("expected season 'summer', got %q", ws.Season)
+			}
+			break
+		}
+	}
+	if !found {
+		t.Error("expected to find seeded 'crabgrass' species")
+	}
+}
+
+func TestGetWeedPressure(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	loc := createTestLocation(t, db)
+
+	// Get species IDs from the seeded data
+	var crabgrassID, goosegrassID int
+	err := db.QueryRow("SELECT id FROM weed_species WHERE name = 'crabgrass'").Scan(&crabgrassID)
+	if err != nil {
+		t.Fatalf("could not find crabgrass species: %v", err)
+	}
+	err = db.QueryRow("SELECT id FROM weed_species WHERE name = 'goosegrass'").Scan(&goosegrassID)
+	if err != nil {
+		t.Fatalf("could not find goosegrass species: %v", err)
+	}
+
+	date1 := time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC)
+	date2 := time.Date(2025, 6, 15, 0, 0, 0, 0, time.UTC)
+
+	// Insert weed pressure records via raw SQL
+	_, err = db.Exec(`INSERT INTO weed_pressure
+		(location_id, date, weed_species_id, weed_pressure_score, gdd_risk_score,
+		 soil_temp_risk_score, moisture_risk_score, turf_stress_score, seasonal_timing_score,
+		 gdd_accumulated, soil_temp_estimate_c, precipitation_3day_mm, humidity_avg, et0_mm, is_forecast)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+		loc.ID, date1, crabgrassID, 0.85, 0.80, 0.70, 0.60, 0.50, 0.90,
+		250.0, 22.0, 15.0, 65.0, 4.5, false)
+	if err != nil {
+		t.Fatalf("insert weed_pressure 1 failed: %v", err)
+	}
+
+	_, err = db.Exec(`INSERT INTO weed_pressure
+		(location_id, date, weed_species_id, weed_pressure_score, gdd_risk_score,
+		 soil_temp_risk_score, moisture_risk_score, turf_stress_score, seasonal_timing_score,
+		 gdd_accumulated, soil_temp_estimate_c, precipitation_3day_mm, humidity_avg, et0_mm, is_forecast)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+		loc.ID, date2, goosegrassID, 0.40, 0.35, 0.30, 0.25, 0.20, 0.45,
+		180.0, 20.0, 5.0, 55.0, 3.0, true)
+	if err != nil {
+		t.Fatalf("insert weed_pressure 2 failed: %v", err)
+	}
+
+	// Get all
+	results, err := GetWeedPressure(db, loc.ID, nil, nil)
+	if err != nil {
+		t.Fatalf("GetWeedPressure (all) failed: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 weed pressure records, got %d", len(results))
+	}
+
+	// Verify first record (crabgrass on date1)
+	if results[0].WeedPressureScore != 0.85 {
+		t.Errorf("expected weed_pressure_score 0.85, got %f", results[0].WeedPressureScore)
+	}
+	if results[0].GDDRiskScore != 0.80 {
+		t.Errorf("expected gdd_risk_score 0.80, got %f", results[0].GDDRiskScore)
+	}
+	if results[0].GDDAccumulated != 250.0 {
+		t.Errorf("expected gdd_accumulated 250.0, got %f", results[0].GDDAccumulated)
+	}
+	if results[0].LocationID != loc.ID {
+		t.Errorf("expected location_id %d, got %d", loc.ID, results[0].LocationID)
+	}
+	if results[0].WeedSpeciesID != crabgrassID {
+		t.Errorf("expected weed_species_id %d, got %d", crabgrassID, results[0].WeedSpeciesID)
+	}
+
+	// Verify JOIN populated WeedSpeciesObj
+	if results[0].WeedSpeciesObj == nil {
+		t.Fatal("expected WeedSpeciesObj to be populated via JOIN")
+	}
+	if results[0].WeedSpeciesObj.Name != "crabgrass" {
+		t.Errorf("expected species name 'crabgrass', got %q", results[0].WeedSpeciesObj.Name)
+	}
+	if results[0].WeedSpeciesObj.CommonName != "Crabgrass" {
+		t.Errorf("expected common_name 'Crabgrass', got %q", results[0].WeedSpeciesObj.CommonName)
+	}
+
+	// Verify second record
+	if results[1].WeedSpeciesObj == nil {
+		t.Fatal("expected WeedSpeciesObj on second record")
+	}
+	if results[1].WeedSpeciesObj.Name != "goosegrass" {
+		t.Errorf("expected species name 'goosegrass', got %q", results[1].WeedSpeciesObj.Name)
+	}
+	if !results[1].IsForecast {
+		t.Error("expected is_forecast true on second record")
+	}
+
+	// Get with date filter
+	start := time.Date(2025, 6, 10, 0, 0, 0, 0, time.UTC)
+	filtered, err := GetWeedPressure(db, loc.ID, &start, nil)
+	if err != nil {
+		t.Fatalf("GetWeedPressure (filtered) failed: %v", err)
+	}
+	if len(filtered) != 1 {
+		t.Errorf("expected 1 weed pressure record in date range, got %d", len(filtered))
+	}
+
+	// Get for non-existent location
+	empty, err := GetWeedPressure(db, 99999, nil, nil)
+	if err != nil {
+		t.Fatalf("GetWeedPressure (empty) failed: %v", err)
+	}
+	if len(empty) != 0 {
+		t.Errorf("expected 0 records for non-existent location, got %d", len(empty))
 	}
 }
 

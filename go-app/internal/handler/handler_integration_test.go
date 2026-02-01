@@ -915,3 +915,510 @@ func TestBackfillWeatherIfNeeded_FetchesGap(t *testing.T) {
 		t.Error("backfilled day 2025-06-07 not found in weather data")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// DELETE Handlers Integration Tests
+// ---------------------------------------------------------------------------
+
+func TestDeleteProduct_RemovesProduct(t *testing.T) {
+	db := testDBForHandler(t)
+	defer db.Close()
+	s := newIntegrationServer(t, db)
+	mux := s.Routes()
+
+	prod := seedProduct(t, db)
+
+	// Verify product exists
+	products, _ := dbpkg.ListProducts(db)
+	if len(products) != 1 {
+		t.Fatalf("expected 1 product, got %d", len(products))
+	}
+
+	w := deleteReq(mux, fmt.Sprintf("/products/%d", prod.ID))
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Verify product is gone
+	products, _ = dbpkg.ListProducts(db)
+	if len(products) != 0 {
+		t.Errorf("expected 0 products after delete, got %d", len(products))
+	}
+}
+
+func TestDeleteApplication_RemovesApplication(t *testing.T) {
+	db := testDBForHandler(t)
+	defer db.Close()
+	s := newIntegrationServer(t, db)
+	mux := s.Routes()
+
+	loc := seedLocation(t, db)
+	lawn := seedLawn(t, db, loc.ID)
+	prod := seedProduct(t, db)
+
+	// Create an application
+	a := &model.Application{
+		LawnID:          lawn.ID,
+		ProductID:       prod.ID,
+		ApplicationDate: time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC),
+		AmountPerArea:   4.0,
+		AreaUnit:        1000,
+		Unit:            model.UnitLbs,
+		Status:          model.AppCompleted,
+	}
+	created, err := dbpkg.CreateApplication(db, a)
+	if err != nil {
+		t.Fatalf("CreateApplication: %v", err)
+	}
+
+	// Verify it exists
+	apps, _ := dbpkg.ListApplications(db, nil, "", "")
+	if len(apps) != 1 {
+		t.Fatalf("expected 1 application, got %d", len(apps))
+	}
+
+	w := deleteReq(mux, fmt.Sprintf("/applications/%d", created.ID))
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Verify it's gone
+	apps, _ = dbpkg.ListApplications(db, nil, "", "")
+	if len(apps) != 0 {
+		t.Errorf("expected 0 applications after delete, got %d", len(apps))
+	}
+}
+
+func TestDeleteIrrigation_RemovesEntry(t *testing.T) {
+	db := testDBForHandler(t)
+	defer db.Close()
+	s := newIntegrationServer(t, db)
+	mux := s.Routes()
+
+	loc := seedLocation(t, db)
+	lawn := seedLawn(t, db, loc.ID)
+
+	// Create an irrigation entry
+	e := &model.IrrigationEntry{
+		LawnID:   lawn.ID,
+		Date:     time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC),
+		Amount:   0.5,
+		Duration: 30,
+		Source:   model.IrrigationManual,
+	}
+	created, err := dbpkg.CreateIrrigationEntry(db, e)
+	if err != nil {
+		t.Fatalf("CreateIrrigationEntry: %v", err)
+	}
+
+	// Verify it exists
+	entries, _ := dbpkg.ListIrrigationEntries(db, lawn.ID, nil, nil)
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 irrigation entry, got %d", len(entries))
+	}
+
+	w := deleteReq(mux, fmt.Sprintf("/irrigation/%d", created.ID))
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Verify it's gone
+	entries, _ = dbpkg.ListIrrigationEntries(db, lawn.ID, nil, nil)
+	if len(entries) != 0 {
+		t.Errorf("expected 0 irrigation entries after delete, got %d", len(entries))
+	}
+}
+
+// ---------------------------------------------------------------------------
+// GDD Model Update & Delete Integration Tests
+// ---------------------------------------------------------------------------
+
+func TestUpdateGDDModel_ChangesParameters(t *testing.T) {
+	db := testDBForHandler(t)
+	defer db.Close()
+	s := newIntegrationServer(t, db)
+	mux := s.Routes()
+
+	loc := seedLocation(t, db)
+
+	// Seed weather data so recalculation works
+	day := weather.DailyData{
+		Date:            time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC),
+		TemperatureMaxC: 30.0,
+		TemperatureMinC: 18.0,
+	}
+	if err := dbpkg.UpsertDailyWeather(db, loc.ID, day, model.WeatherHistorical); err != nil {
+		t.Fatalf("UpsertDailyWeather: %v", err)
+	}
+
+	// Create GDD model with base_temp=10
+	createVals := url.Values{
+		"location_id": {fmt.Sprint(loc.ID)},
+		"name":        {"Original Model"},
+		"base_temp":   {"10"},
+		"unit":        {string(model.TempUnitC)},
+		"start_date":  {"2025-06-01"},
+		"threshold":   {"0"},
+	}
+	postForm(mux, "/gdd-models", createVals)
+
+	models, _ := dbpkg.ListGDDModels(db, &loc.ID)
+	if len(models) != 1 {
+		t.Fatalf("expected 1 GDD model, got %d", len(models))
+	}
+	modelID := models[0].ID
+
+	// Update: change name and base_temp to 5
+	updateVals := url.Values{
+		"name":       {"Updated Model"},
+		"base_temp":  {"5"},
+		"unit":       {string(model.TempUnitC)},
+		"start_date": {"2025-06-01"},
+		"threshold":  {"100"},
+	}
+	w := putForm(mux, fmt.Sprintf("/gdd-models/%d", modelID), updateVals)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Verify the model was updated
+	updated, _ := dbpkg.GetGDDModel(db, modelID)
+	if updated == nil {
+		t.Fatal("GDD model not found after update")
+	}
+	if updated.Name != "Updated Model" {
+		t.Errorf("Name = %q, want %q", updated.Name, "Updated Model")
+	}
+	if !floatClose(updated.BaseTemp, 5.0, 0.001) {
+		t.Errorf("BaseTemp = %f, want 5.0", updated.BaseTemp)
+	}
+	if !floatClose(updated.Threshold, 100.0, 0.001) {
+		t.Errorf("Threshold = %f, want 100.0", updated.Threshold)
+	}
+
+	// Verify GDD values were recalculated with new base temp
+	// DailyGDD = max(0, (30+18)/2 - 5) = max(0, 24-5) = 19.0
+	values, _ := dbpkg.GetGDDValues(db, modelID)
+	if len(values) == 0 {
+		t.Fatal("expected GDD values after update")
+	}
+	if !floatClose(values[0].DailyGDD, 19.0, 0.01) {
+		t.Errorf("DailyGDD = %f, want 19.0 (base_temp=5)", values[0].DailyGDD)
+	}
+}
+
+func TestDeleteGDDModel_RemovesModel(t *testing.T) {
+	db := testDBForHandler(t)
+	defer db.Close()
+	s := newIntegrationServer(t, db)
+	mux := s.Routes()
+
+	loc := seedLocation(t, db)
+
+	// Seed weather so creation succeeds
+	day := weather.DailyData{
+		Date:            time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC),
+		TemperatureMaxC: 30.0,
+		TemperatureMinC: 18.0,
+	}
+	dbpkg.UpsertDailyWeather(db, loc.ID, day, model.WeatherHistorical)
+
+	// Create a GDD model
+	createVals := url.Values{
+		"location_id": {fmt.Sprint(loc.ID)},
+		"name":        {"Model To Delete"},
+		"base_temp":   {"10"},
+		"unit":        {string(model.TempUnitC)},
+		"start_date":  {"2025-06-01"},
+		"threshold":   {"0"},
+	}
+	postForm(mux, "/gdd-models", createVals)
+
+	models, _ := dbpkg.ListGDDModels(db, &loc.ID)
+	if len(models) != 1 {
+		t.Fatalf("expected 1 GDD model, got %d", len(models))
+	}
+	modelID := models[0].ID
+
+	w := deleteReq(mux, fmt.Sprintf("/gdd-models/%d", modelID))
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// Verify model is gone
+	models, _ = dbpkg.ListGDDModels(db, &loc.ID)
+	if len(models) != 0 {
+		t.Errorf("expected 0 GDD models after delete, got %d", len(models))
+	}
+
+	// Verify GDD values are also gone (cascade or handler cleanup)
+	values, _ := dbpkg.GetGDDValues(db, modelID)
+	if len(values) != 0 {
+		t.Errorf("expected 0 GDD values after model delete, got %d", len(values))
+	}
+}
+
+// ---------------------------------------------------------------------------
+// JSON API Endpoint Integration Tests
+// ---------------------------------------------------------------------------
+
+func TestAPIDisease_ReturnsJSON(t *testing.T) {
+	db := testDBForHandler(t)
+	defer db.Close()
+	s := newIntegrationServer(t, db)
+	mux := s.Routes()
+
+	loc := seedLocation(t, db)
+
+	// Seed disease pressure data via raw SQL
+	riskScore := 75.5
+	_, err := db.Exec(
+		`INSERT INTO disease_pressure (date, location_id, disease, risk_score)
+		 VALUES ($1, $2, $3, $4)`,
+		time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC), loc.ID, "dollar_spot", riskScore,
+	)
+	if err != nil {
+		t.Fatalf("seed disease pressure: %v", err)
+	}
+
+	w := getJSON(mux, fmt.Sprintf("/api/disease/%d", loc.ID))
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	ct := w.Header().Get("Content-Type")
+	if ct != "application/json" {
+		t.Errorf("Content-Type = %q, want application/json", ct)
+	}
+
+	var results []model.DiseasePressure
+	if err := json.Unmarshal(w.Body.Bytes(), &results); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 disease pressure record, got %d", len(results))
+	}
+	if results[0].Disease != "dollar_spot" {
+		t.Errorf("Disease = %q, want %q", results[0].Disease, "dollar_spot")
+	}
+	if results[0].RiskScore == nil || !floatClose(*results[0].RiskScore, 75.5, 0.01) {
+		t.Errorf("RiskScore = %v, want 75.5", results[0].RiskScore)
+	}
+}
+
+func TestAPIGrowthPotential_ReturnsJSON(t *testing.T) {
+	db := testDBForHandler(t)
+	defer db.Close()
+	s := newIntegrationServer(t, db)
+	mux := s.Routes()
+
+	loc := seedLocation(t, db)
+
+	// Seed growth potential data via raw SQL
+	gp := 0.85
+	_, err := db.Exec(
+		`INSERT INTO growth_potential (date, location_id, growth_potential)
+		 VALUES ($1, $2, $3)`,
+		time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC), loc.ID, gp,
+	)
+	if err != nil {
+		t.Fatalf("seed growth potential: %v", err)
+	}
+
+	w := getJSON(mux, fmt.Sprintf("/api/growth-potential/%d", loc.ID))
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	ct := w.Header().Get("Content-Type")
+	if ct != "application/json" {
+		t.Errorf("Content-Type = %q, want application/json", ct)
+	}
+
+	var results []model.GrowthPotential
+	if err := json.Unmarshal(w.Body.Bytes(), &results); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 growth potential record, got %d", len(results))
+	}
+	if results[0].GrowthPotential == nil || !floatClose(*results[0].GrowthPotential, 0.85, 0.001) {
+		t.Errorf("GrowthPotential = %v, want 0.85", results[0].GrowthPotential)
+	}
+}
+
+func TestAPIGDDValues_ReturnsJSON(t *testing.T) {
+	db := testDBForHandler(t)
+	defer db.Close()
+	s := newIntegrationServer(t, db)
+	mux := s.Routes()
+
+	loc := seedLocation(t, db)
+
+	// Seed weather so GDD model creation works
+	day := weather.DailyData{
+		Date:            time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC),
+		TemperatureMaxC: 30.0,
+		TemperatureMinC: 18.0,
+	}
+	dbpkg.UpsertDailyWeather(db, loc.ID, day, model.WeatherHistorical)
+
+	// Create GDD model (which triggers value calculation)
+	createVals := url.Values{
+		"location_id": {fmt.Sprint(loc.ID)},
+		"name":        {"API Test Model"},
+		"base_temp":   {"10"},
+		"unit":        {string(model.TempUnitC)},
+		"start_date":  {"2025-06-01"},
+		"threshold":   {"0"},
+	}
+	postForm(mux, "/gdd-models", createVals)
+
+	models, _ := dbpkg.ListGDDModels(db, &loc.ID)
+	if len(models) != 1 {
+		t.Fatalf("expected 1 GDD model, got %d", len(models))
+	}
+	modelID := models[0].ID
+
+	w := getJSON(mux, fmt.Sprintf("/api/gdd-values/%d", modelID))
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	ct := w.Header().Get("Content-Type")
+	if ct != "application/json" {
+		t.Errorf("Content-Type = %q, want application/json", ct)
+	}
+
+	var results []model.GDDValue
+	if err := json.Unmarshal(w.Body.Bytes(), &results); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if len(results) == 0 {
+		t.Fatal("expected at least 1 GDD value")
+	}
+	// DailyGDD = max(0, (30+18)/2 - 10) = 14.0
+	if !floatClose(results[0].DailyGDD, 14.0, 0.01) {
+		t.Errorf("DailyGDD = %f, want 14.0", results[0].DailyGDD)
+	}
+}
+
+func TestAPIWaterSummary_ReturnsJSON(t *testing.T) {
+	db := testDBForHandler(t)
+	defer db.Close()
+	s := newIntegrationServer(t, db)
+	mux := s.Routes()
+
+	loc := seedLocation(t, db)
+	lawn := seedLawn(t, db, loc.ID)
+
+	// Seed weekly water summary via raw SQL
+	_, err := db.Exec(
+		`INSERT INTO weekly_water_summaries
+		 (lawn_id, week_start, week_end, et0_total, precipitation_total, irrigation_applied, water_deficit, status, is_forecast)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		lawn.ID,
+		time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC),
+		time.Date(2025, 6, 7, 0, 0, 0, 0, time.UTC),
+		1.5, 0.5, 0.75, 0.25, "warning", false,
+	)
+	if err != nil {
+		t.Fatalf("seed water summary: %v", err)
+	}
+
+	w := getJSON(mux, fmt.Sprintf("/api/water-summary/%d", lawn.ID))
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	ct := w.Header().Get("Content-Type")
+	if ct != "application/json" {
+		t.Errorf("Content-Type = %q, want application/json", ct)
+	}
+
+	var results []model.WeeklyWaterSummary
+	if err := json.Unmarshal(w.Body.Bytes(), &results); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 water summary record, got %d", len(results))
+	}
+	if !floatClose(results[0].ET0Total, 1.5, 0.01) {
+		t.Errorf("ET0Total = %f, want 1.5", results[0].ET0Total)
+	}
+	if !floatClose(results[0].WaterDeficit, 0.25, 0.01) {
+		t.Errorf("WaterDeficit = %f, want 0.25", results[0].WaterDeficit)
+	}
+	if results[0].Status != "warning" {
+		t.Errorf("Status = %q, want %q", results[0].Status, "warning")
+	}
+}
+
+func TestAPIWeedPressure_ReturnsJSON(t *testing.T) {
+	db := testDBForHandler(t)
+	defer db.Close()
+	s := newIntegrationServer(t, db)
+	mux := s.Routes()
+
+	loc := seedLocation(t, db)
+
+	// Seed weed species via raw SQL
+	var speciesID int
+	err := db.QueryRow(
+		`INSERT INTO weed_species
+		 (name, common_name, gdd_base_temp_c, gdd_threshold_emergence,
+		  optimal_soil_temp_min_c, optimal_soil_temp_max_c,
+		  moisture_preference, season, is_active)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		 RETURNING id`,
+		"Digitaria sanguinalis", "Crabgrass", 10.0, 200.0,
+		15.0, 35.0, "medium", "summer", true,
+	).Scan(&speciesID)
+	if err != nil {
+		t.Fatalf("seed weed species: %v", err)
+	}
+
+	// Seed weed pressure data
+	_, err = db.Exec(
+		`INSERT INTO weed_pressure
+		 (location_id, date, weed_species_id, weed_pressure_score,
+		  gdd_risk_score, soil_temp_risk_score, moisture_risk_score,
+		  turf_stress_score, seasonal_timing_score,
+		  gdd_accumulated, soil_temp_estimate_c, precipitation_3day_mm,
+		  humidity_avg, et0_mm, is_forecast)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+		loc.ID, time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC), speciesID,
+		65.0, 50.0, 60.0, 40.0, 30.0, 80.0,
+		150.0, 22.0, 5.0, 65.0, 4.5, false,
+	)
+	if err != nil {
+		t.Fatalf("seed weed pressure: %v", err)
+	}
+
+	w := getJSON(mux, fmt.Sprintf("/api/weed-pressure/%d", loc.ID))
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	ct := w.Header().Get("Content-Type")
+	if ct != "application/json" {
+		t.Errorf("Content-Type = %q, want application/json", ct)
+	}
+
+	var results []model.WeedPressure
+	if err := json.Unmarshal(w.Body.Bytes(), &results); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 weed pressure record, got %d", len(results))
+	}
+	if !floatClose(results[0].WeedPressureScore, 65.0, 0.01) {
+		t.Errorf("WeedPressureScore = %f, want 65.0", results[0].WeedPressureScore)
+	}
+	if results[0].WeedSpeciesObj == nil {
+		t.Fatal("expected WeedSpeciesObj to be joined")
+	}
+	if results[0].WeedSpeciesObj.CommonName != "Crabgrass" {
+		t.Errorf("WeedSpecies.CommonName = %q, want %q", results[0].WeedSpeciesObj.CommonName, "Crabgrass")
+	}
+}

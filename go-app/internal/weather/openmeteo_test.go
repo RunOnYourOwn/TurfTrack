@@ -250,6 +250,104 @@ func TestFetchHistoricalWeatherError(t *testing.T) {
 	}
 }
 
+// --- FetchDailyWeather tests ---
+
+func TestFetchDailyWeatherHappyPath(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := openMeteoResponse{}
+		resp.Daily.Time = []string{"2025-06-01", "2025-06-02", "2025-06-03"}
+		n := 3
+		resp.Daily.Temperature2mMax = []float64{30, 32, 28}
+		resp.Daily.Temperature2mMin = []float64{18, 20, 16}
+		resp.Daily.PrecipitationSum = []float64{0, 5, 2}
+		resp.Daily.PrecipitationProbabilityMax = []float64{10, 80, 40}
+		resp.Daily.Windspeed10mMax = make([]float64, n)
+		resp.Daily.Windgusts10mMax = make([]float64, n)
+		resp.Daily.WinddirectionDominant = make([]float64, n)
+		resp.Daily.ET0Evapotranspiration = []float64{4.0, 3.5, 4.2}
+		resp.Daily.RelativeHumidity2mMean = []float64{70, 75, 65}
+		resp.Daily.RelativeHumidity2mMax = []float64{90, 95, 85}
+		resp.Daily.RelativeHumidity2mMin = []float64{50, 55, 45}
+		resp.Daily.DewPoint2mMax = make([]float64, n)
+		resp.Daily.DewPoint2mMin = make([]float64, n)
+		resp.Daily.DewPoint2mMean = make([]float64, n)
+		resp.Daily.SunshineDuration = make([]float64, n)
+
+		w.Header().Set("Content-Type", "application/json")
+		b, _ := json.Marshal(resp)
+		w.Write(b) //nolint:errcheck
+	}))
+	defer server.Close()
+
+	client := &Client{
+		HTTPClient: server.Client(),
+		BaseURL:    server.URL,
+	}
+
+	data, err := client.FetchDailyWeather(35.0, -85.0, 2, 1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(data) != 3 {
+		t.Fatalf("expected 3 days, got %d", len(data))
+	}
+
+	if data[0].TemperatureMaxC != 30 {
+		t.Errorf("day 1 tmax = %v, want 30", data[0].TemperatureMaxC)
+	}
+	if data[1].PrecipitationMM != 5 {
+		t.Errorf("day 2 precip = %v, want 5", data[1].PrecipitationMM)
+	}
+	if data[2].ET0MM != 4.2 {
+		t.Errorf("day 3 ET0 = %v, want 4.2", data[2].ET0MM)
+	}
+	expectedDate := time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC)
+	if !data[0].Date.Equal(expectedDate) {
+		t.Errorf("day 1 date = %v, want %v", data[0].Date, expectedDate)
+	}
+}
+
+func TestFetchDailyWeatherNon200(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	client := &Client{
+		HTTPClient: server.Client(),
+		BaseURL:    server.URL,
+	}
+
+	_, err := client.FetchDailyWeather(35.0, -85.0, 2, 1)
+	if err == nil {
+		t.Fatal("expected error for non-200 status")
+	}
+	if !strings.Contains(err.Error(), "status 500") {
+		t.Errorf("error should mention status 500, got: %v", err)
+	}
+}
+
+func TestFetchDailyWeatherInvalidJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{invalid json`)) //nolint:errcheck
+	}))
+	defer server.Close()
+
+	client := &Client{
+		HTTPClient: server.Client(),
+		BaseURL:    server.URL,
+	}
+
+	_, err := client.FetchDailyWeather(35.0, -85.0, 2, 1)
+	if err == nil {
+		t.Fatal("expected error for invalid JSON")
+	}
+	if !strings.Contains(err.Error(), "decode") {
+		t.Errorf("error should mention decode failure, got: %v", err)
+	}
+}
+
 func TestParseDailyDataWithNaN(t *testing.T) {
 	resp := openMeteoResponse{}
 	resp.Daily.Time = []string{"2025-06-01"}

@@ -4,7 +4,11 @@ package scheduler
 
 import (
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"math"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
@@ -572,5 +576,309 @@ func TestRunCalculationsStartup(t *testing.T) {
 	gddValues, _ := dbpkg.GetGDDValues(db, m.ID)
 	if len(gddValues) == 0 {
 		t.Error("expected GDD values after runCalculations")
+	}
+}
+
+// --- nextUpdateTime tests ---
+
+func TestNextUpdateTimeDefaultHour(t *testing.T) {
+	db := testDB(t)
+	defer db.Close()
+
+	// No settings → default to 6 AM America/Chicago
+	next := nextUpdateTime(db)
+
+	now := time.Now()
+	if !next.After(now) {
+		t.Errorf("nextUpdateTime should return a future time, got %v (now=%v)", next, now)
+	}
+
+	// Verify it uses hour 6 in America/Chicago
+	loc, _ := time.LoadLocation("America/Chicago")
+	inTZ := next.In(loc)
+	if inTZ.Hour() != 6 {
+		t.Errorf("expected hour 6 in America/Chicago, got %d", inTZ.Hour())
+	}
+	if inTZ.Minute() != 0 || inTZ.Second() != 0 {
+		t.Errorf("expected 0 minutes and 0 seconds, got %d:%d", inTZ.Minute(), inTZ.Second())
+	}
+}
+
+func TestNextUpdateTimeConfiguredHour(t *testing.T) {
+	db := testDB(t)
+	defer db.Close()
+
+	// Set custom hour
+	if err := dbpkg.SetSetting(db, "weather_update_hour", "14"); err != nil {
+		t.Fatalf("SetSetting failed: %v", err)
+	}
+
+	next := nextUpdateTime(db)
+
+	now := time.Now()
+	if !next.After(now) {
+		t.Errorf("nextUpdateTime should return a future time, got %v (now=%v)", next, now)
+	}
+
+	loc, _ := time.LoadLocation("America/Chicago")
+	inTZ := next.In(loc)
+	if inTZ.Hour() != 14 {
+		t.Errorf("expected hour 14, got %d", inTZ.Hour())
+	}
+}
+
+func TestNextUpdateTimeAlreadyPassedToday(t *testing.T) {
+	db := testDB(t)
+	defer db.Close()
+
+	// Use the current hour minus 1 to guarantee the time has passed
+	loc, _ := time.LoadLocation("America/Chicago")
+	currentHour := time.Now().In(loc).Hour()
+	pastHour := currentHour - 1
+	if pastHour < 0 {
+		pastHour = 0
+	}
+
+	if err := dbpkg.SetSetting(db, "weather_update_hour", fmt.Sprintf("%d", pastHour)); err != nil {
+		t.Fatalf("SetSetting failed: %v", err)
+	}
+
+	// If the hour already passed and it's not the same minute, next should be tomorrow
+	// (unless currentHour == 0 and pastHour == 0, which might be the same)
+	next := nextUpdateTime(db)
+	now := time.Now()
+
+	if !next.After(now) {
+		t.Errorf("nextUpdateTime should return a future time when hour has passed, got %v (now=%v)", next, now)
+	}
+
+	inTZ := next.In(loc)
+	today := now.In(loc)
+
+	// If past hour < current hour, next should be tomorrow
+	if pastHour < currentHour {
+		if inTZ.Day() == today.Day() && inTZ.Month() == today.Month() {
+			t.Errorf("expected tomorrow when hour has passed, got same day")
+		}
+	}
+}
+
+func TestNextUpdateTimeCustomTimezone(t *testing.T) {
+	db := testDB(t)
+	defer db.Close()
+
+	if err := dbpkg.SetSetting(db, "weather_update_hour", "12"); err != nil {
+		t.Fatalf("SetSetting failed: %v", err)
+	}
+	if err := dbpkg.SetSetting(db, "weather_update_timezone", "America/New_York"); err != nil {
+		t.Fatalf("SetSetting failed: %v", err)
+	}
+
+	next := nextUpdateTime(db)
+
+	now := time.Now()
+	if !next.After(now) {
+		t.Errorf("nextUpdateTime should return a future time, got %v (now=%v)", next, now)
+	}
+
+	loc, _ := time.LoadLocation("America/New_York")
+	inTZ := next.In(loc)
+	if inTZ.Hour() != 12 {
+		t.Errorf("expected hour 12 in America/New_York, got %d", inTZ.Hour())
+	}
+}
+
+// --- runCalculations isRecurring=true test ---
+
+func TestRunCalculationsRecurring(t *testing.T) {
+	db := testDB(t)
+	defer db.Close()
+
+	loc := createTestLocation(t, db)
+	_ = createTestLawn(t, db, loc.ID, model.GrassTypeCold)
+
+	today := time.Now().UTC().Truncate(24 * time.Hour)
+	startDate := today.AddDate(0, 0, -30)
+
+	// Create GDD model
+	m := &model.GDDModel{
+		LocationID: loc.ID,
+		Name:       "Recurring Test",
+		BaseTemp:   10.0,
+		Unit:       model.TempUnitC,
+		StartDate:  startDate,
+	}
+	_, err := dbpkg.CreateGDDModel(db, m)
+	if err != nil {
+		t.Fatalf("CreateGDDModel failed: %v", err)
+	}
+
+	// Insert weather data covering the full range needed by recurring calculations
+	// Recurring mode uses different windows: -10 days for disease/GP, Jan 1 for weed, -14 for water
+	jan1 := time.Date(today.Year(), 1, 1, 0, 0, 0, 0, time.UTC)
+	dayCount := int(today.Sub(jan1).Hours()/24) + 16 // Jan 1 through today + 15 forecast days
+	_ = insertTestWeather(t, db, loc.ID, jan1, dayCount, 28.0, 18.0)
+
+	// Run recurring calculations (isRecurring=true → optimized windows branch)
+	runCalculations(db, *loc, true)
+
+	// Verify disease pressure was calculated
+	diseaseResults, _ := dbpkg.GetDiseasePressure(db, loc.ID, nil, nil)
+	if len(diseaseResults) == 0 {
+		t.Error("expected disease pressure results after recurring runCalculations")
+	}
+
+	// Verify growth potential was calculated
+	gpResults, _ := dbpkg.GetGrowthPotential(db, loc.ID, nil, nil)
+	if len(gpResults) == 0 {
+		t.Error("expected growth potential results after recurring runCalculations")
+	}
+
+	// Verify GDD was calculated
+	gddValues, _ := dbpkg.GetGDDValues(db, m.ID)
+	if len(gddValues) == 0 {
+		t.Error("expected GDD values after recurring runCalculations")
+	}
+}
+
+// --- fetchAndStoreWeather test with mock HTTP server ---
+
+// makeOpenMeteoForecastResponse builds a valid OpenMeteo forecast JSON response for the given dates.
+func makeOpenMeteoForecastResponse(dates []string) []byte {
+	type dailyBlock struct {
+		Time                        []string  `json:"time"`
+		Temperature2mMax            []float64 `json:"temperature_2m_max"`
+		Temperature2mMin            []float64 `json:"temperature_2m_min"`
+		PrecipitationSum            []float64 `json:"precipitation_sum"`
+		PrecipitationProbabilityMax []float64 `json:"precipitation_probability_max"`
+		Windspeed10mMax             []float64 `json:"windspeed_10m_max"`
+		Windgusts10mMax             []float64 `json:"windgusts_10m_max"`
+		WinddirectionDominant       []float64 `json:"winddirection_10m_dominant"`
+		ET0Evapotranspiration       []float64 `json:"et0_fao_evapotranspiration"`
+		RelativeHumidity2mMean      []float64 `json:"relative_humidity_2m_mean"`
+		RelativeHumidity2mMax       []float64 `json:"relative_humidity_2m_max"`
+		RelativeHumidity2mMin       []float64 `json:"relative_humidity_2m_min"`
+		DewPoint2mMax               []float64 `json:"dew_point_2m_max"`
+		DewPoint2mMin               []float64 `json:"dew_point_2m_min"`
+		DewPoint2mMean              []float64 `json:"dew_point_2m_mean"`
+		SunshineDuration            []float64 `json:"sunshine_duration"`
+	}
+	type resp struct {
+		Daily dailyBlock `json:"daily"`
+	}
+
+	n := len(dates)
+	r := resp{}
+	r.Daily.Time = dates
+	r.Daily.Temperature2mMax = make([]float64, n)
+	r.Daily.Temperature2mMin = make([]float64, n)
+	r.Daily.PrecipitationSum = make([]float64, n)
+	r.Daily.PrecipitationProbabilityMax = make([]float64, n)
+	r.Daily.Windspeed10mMax = make([]float64, n)
+	r.Daily.Windgusts10mMax = make([]float64, n)
+	r.Daily.WinddirectionDominant = make([]float64, n)
+	r.Daily.ET0Evapotranspiration = make([]float64, n)
+	r.Daily.RelativeHumidity2mMean = make([]float64, n)
+	r.Daily.RelativeHumidity2mMax = make([]float64, n)
+	r.Daily.RelativeHumidity2mMin = make([]float64, n)
+	r.Daily.DewPoint2mMax = make([]float64, n)
+	r.Daily.DewPoint2mMin = make([]float64, n)
+	r.Daily.DewPoint2mMean = make([]float64, n)
+	r.Daily.SunshineDuration = make([]float64, n)
+
+	for i := range dates {
+		r.Daily.Temperature2mMax[i] = 30.0
+		r.Daily.Temperature2mMin[i] = 20.0
+		r.Daily.PrecipitationSum[i] = 2.0
+		r.Daily.Windspeed10mMax[i] = 3.0
+		r.Daily.Windgusts10mMax[i] = 6.0
+		r.Daily.WinddirectionDominant[i] = 180.0
+		r.Daily.ET0Evapotranspiration[i] = 4.0
+		r.Daily.RelativeHumidity2mMean[i] = 70.0
+		r.Daily.RelativeHumidity2mMax[i] = 85.0
+		r.Daily.RelativeHumidity2mMin[i] = 55.0
+	}
+
+	b, _ := json.Marshal(r)
+	return b
+}
+
+func TestFetchAndStoreWeather(t *testing.T) {
+	db := testDB(t)
+	defer db.Close()
+
+	loc := createTestLocation(t, db)
+
+	today := time.Now().UTC().Truncate(24 * time.Hour)
+	pastDays := 5
+	forecastDays := 15
+
+	// Generate date strings for the mock response
+	var dates []string
+	startDate := today.AddDate(0, 0, -pastDays)
+	totalDays := pastDays + forecastDays
+	for i := 0; i < totalDays; i++ {
+		d := startDate.AddDate(0, 0, i)
+		dates = append(dates, d.Format("2006-01-02"))
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(makeOpenMeteoForecastResponse(dates)) //nolint:errcheck
+	}))
+	defer server.Close()
+
+	client := &weather.Client{
+		HTTPClient: server.Client(),
+		BaseURL:    server.URL,
+	}
+
+	err := fetchAndStoreWeather(db, client, *loc, today, pastDays)
+	if err != nil {
+		t.Fatalf("fetchAndStoreWeather failed: %v", err)
+	}
+
+	// Verify weather data was stored in the database
+	s := startDate
+	e := today.AddDate(0, 0, forecastDays)
+	storedWeather, err := dbpkg.GetWeatherForLocation(db, loc.ID, &s, &e)
+	if err != nil {
+		t.Fatalf("GetWeatherForLocation failed: %v", err)
+	}
+
+	if len(storedWeather) == 0 {
+		t.Fatal("expected weather data to be stored in DB, got 0 rows")
+	}
+
+	// Verify at least some data matches what we sent
+	if len(storedWeather) < pastDays {
+		t.Errorf("expected at least %d weather rows, got %d", pastDays, len(storedWeather))
+	}
+
+	// Verify temperature values are correct
+	for _, w := range storedWeather {
+		if math.Abs(w.TemperatureMaxC-30.0) > 0.01 {
+			t.Errorf("expected tmax=30.0, got %v for date %s", w.TemperatureMaxC, w.Date.Format("2006-01-02"))
+			break
+		}
+		if math.Abs(w.TemperatureMinC-20.0) > 0.01 {
+			t.Errorf("expected tmin=20.0, got %v for date %s", w.TemperatureMinC, w.Date.Format("2006-01-02"))
+			break
+		}
+	}
+
+	// Verify historical vs forecast type assignment
+	for _, w := range storedWeather {
+		if w.Date.After(today) {
+			if w.Type != model.WeatherForecast {
+				t.Errorf("expected forecast type for future date %s, got %s", w.Date.Format("2006-01-02"), w.Type)
+				break
+			}
+		} else {
+			if w.Type != model.WeatherHistorical {
+				t.Errorf("expected historical type for past date %s, got %s", w.Date.Format("2006-01-02"), w.Type)
+				break
+			}
+		}
 	}
 }

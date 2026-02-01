@@ -26,6 +26,7 @@ const maxChunkDays = 45
 // Client fetches weather data from Open-Meteo.
 type Client struct {
 	HTTPClient     *http.Client
+	BaseURL        string // empty = use default baseURL; settable for testing
 	ArchiveBaseURL string // empty = use defaultArchiveBaseURL; settable for testing
 }
 
@@ -82,6 +83,10 @@ type openMeteoResponse struct {
 // This makes a single API call that returns both historical and forecast data,
 // avoiding boundary issues with start_date/end_date.
 func (c *Client) FetchDailyWeather(lat, lon float64, pastDays, forecastDays int) ([]DailyData, error) {
+	forecastURL := c.BaseURL
+	if forecastURL == "" {
+		forecastURL = baseURL
+	}
 	url := fmt.Sprintf(
 		"%s?latitude=%.4f&longitude=%.4f&past_days=%d&forecast_days=%d"+
 			"&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,"+
@@ -90,7 +95,7 @@ func (c *Client) FetchDailyWeather(lat, lon float64, pastDays, forecastDays int)
 			"relative_humidity_2m_mean,relative_humidity_2m_max,relative_humidity_2m_min,"+
 			"dew_point_2m_max,dew_point_2m_min,dew_point_2m_mean,sunshine_duration"+
 			"&timezone=auto",
-		baseURL, lat, lon, pastDays, forecastDays,
+		forecastURL, lat, lon, pastDays, forecastDays,
 	)
 
 	resp, err := c.HTTPClient.Get(url)
