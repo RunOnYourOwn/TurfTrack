@@ -352,13 +352,14 @@ jobs:
           } > /tmp/release-notes.md
 
       - name: Create Draft Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "Release ${{ github.ref_name }}"
+          body_path: /tmp/release-notes.md
+          draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create ${{ github.ref_name }} \
-            --draft \
-            --title "Release ${{ github.ref_name }}" \
-            --notes-file /tmp/release-notes.md
 
       - name: Cleanup workspace
         if: always()
