@@ -2,7 +2,7 @@
 <html lang="en" data-theme="dim">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>TurfTrack</title>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5/daisyui.css" rel="stylesheet" type="text/css" />
@@ -124,7 +124,7 @@
 </head>
 <body class="min-h-screen bg-base-200 flex">
     <!-- Sidebar -->
-    <aside id="sidebar" class="w-48 bg-base-100 h-screen sticky top-0 flex flex-col overflow-y-auto">
+    <aside id="sidebar" class="hidden md:flex w-48 bg-base-100 h-screen sticky top-0 flex-col overflow-y-auto">
         <!-- Brand -->
         <div class="brand-area p-3 flex items-center justify-between">
             <!-- Expanded: full brand + close button -->
@@ -188,7 +188,7 @@
     </aside>
 
     <!-- Main Content -->
-    <main class="flex-1 p-6 overflow-auto">
+    <main class="flex-1 p-4 md:p-6 pb-20 md:pb-6 overflow-auto">
         {{if eq .Page "dashboard"}}{{template "dashboard.html" .}}{{end}}
         {{if eq .Page "lawns"}}{{template "lawns.html" .}}{{end}}
         {{if eq .Page "products"}}{{template "products.html" .}}{{end}}
@@ -213,6 +213,71 @@
         </div>
         <form method="dialog" class="modal-backdrop"><button>close</button></form>
     </dialog>
+
+    <!-- Mobile Dock (bottom nav) -->
+    <div class="dock md:hidden dock-sm bg-base-100">
+        <a href="/" class="{{if eq .Page "dashboard"}}dock-active{{end}}">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+            <span class="dock-label">Home</span>
+        </a>
+        <a href="/lawns" class="{{if eq .Page "lawns"}}dock-active{{end}}">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>
+            <span class="dock-label">Lawns</span>
+        </a>
+        <a href="/gdd" class="{{if eq .Page "gdd"}}dock-active{{end}}">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+            <span class="dock-label">GDD</span>
+        </a>
+        <a href="/water" class="{{if eq .Page "water"}}dock-active{{end}}">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707" /></svg>
+            <span class="dock-label">Water</span>
+        </a>
+        <button onclick="document.getElementById('mobile-more-menu').classList.toggle('hidden')" class="{{if or (eq .Page "products") (eq .Page "applications") (eq .Page "reports") (eq .Page "admin")}}dock-active{{end}}">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" /></svg>
+            <span class="dock-label">More</span>
+        </button>
+    </div>
+
+    <!-- Mobile "More" menu (slides up from dock) -->
+    <div id="mobile-more-menu" class="hidden fixed bottom-16 left-0 right-0 z-50 md:hidden">
+        <div class="bg-base-100 border-t border-base-300 shadow-lg">
+            <ul class="menu menu-sm p-2">
+                <li><a href="/products" class="{{if eq .Page "products"}}menu-active{{end}}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                    Products
+                </a></li>
+                <li><a href="/applications" class="{{if eq .Page "applications"}}menu-active{{end}}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                    Applications
+                </a></li>
+                <li><a href="/reports" class="{{if eq .Page "reports"}}menu-active{{end}}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    Reports
+                </a></li>
+                <li><a href="/admin" class="{{if eq .Page "admin"}}menu-active{{end}}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    Admin
+                </a></li>
+                <li class="mt-1 border-t border-base-300 pt-1"><div class="flex justify-center">
+                    <label class="swap swap-rotate">
+                        <input type="checkbox" class="theme-controller" value="emerald" onchange="document.getElementById('theme-toggle').checked=this.checked;document.getElementById('theme-toggle').dispatchEvent(new Event('change'));" />
+                        <svg class="swap-off h-5 w-5 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5.64,17l-.71.71a1,1,0,0,0,0,1.41,1,1,0,0,0,1.41,0l.71-.71A1,1,0,0,0,5.64,17ZM5,12a1,1,0,0,0-1-1H3a1,1,0,0,0,0,2H4A1,1,0,0,0,5,12Zm7-7a1,1,0,0,0,1-1V3a1,1,0,0,0-2,0V4A1,1,0,0,0,12,5ZM5.64,7.05a1,1,0,0,0,.7.29,1,1,0,0,0,.71-.29,1,1,0,0,0,0-1.41l-.71-.71A1,1,0,0,0,4.93,6.34Zm12,.29a1,1,0,0,0,.7-.29l.71-.71a1,1,0,1,0-1.41-1.41L17,5.64a1,1,0,0,0,0,1.41A1,1,0,0,0,17.66,7.34ZM21,11H20a1,1,0,0,0,0,2h1a1,1,0,0,0,0-2Zm-9,8a1,1,0,0,0-1,1v1a1,1,0,0,0,2,0V20A1,1,0,0,0,12,19ZM18.36,17A1,1,0,0,0,17,18.36l.71.71a1,1,0,0,0,1.41,0,1,1,0,0,0,0-1.41ZM12,6.5A5.5,5.5,0,1,0,17.5,12,5.51,5.51,0,0,0,12,6.5Zm0,9A3.5,3.5,0,1,1,15.5,12,3.5,3.5,0,0,1,12,15.5Z"/></svg>
+                        <svg class="swap-on h-5 w-5 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21.64,13a1,1,0,0,0-1.05-.14,8.05,8.05,0,0,1-3.37.73A8.15,8.15,0,0,1,9.08,5.49a8.59,8.59,0,0,1,.25-2A1,1,0,0,0,8,2.36,10.14,10.14,0,1,0,22,14.05,1,1,0,0,0,21.64,13Zm-9.5,6.69A8.14,8.14,0,0,1,7.08,5.22v.27A10.15,10.15,0,0,0,17.22,15.63a9.79,9.79,0,0,0,2.1-.22A8.11,8.11,0,0,1,12.14,19.73Z"/></svg>
+                    </label>
+                </div></li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+    // Close mobile more menu when clicking outside
+    document.addEventListener('click', function(e) {
+        var menu = document.getElementById('mobile-more-menu');
+        if (menu && !menu.classList.contains('hidden') && !e.target.closest('#mobile-more-menu') && !e.target.closest('.dock button')) {
+            menu.classList.add('hidden');
+        }
+    });
+    </script>
 
     <script>
     function confirmDelete(url, msg) {
