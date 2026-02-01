@@ -27,6 +27,7 @@ WORKDIR /app
 COPY --from=build /server /app/server
 COPY --from=build /app/migrations /app/migrations
 COPY --from=build /app/templates /app/templates
+COPY VERSION /app/VERSION
 
 # Environment defaults
 ENV PORT=8080

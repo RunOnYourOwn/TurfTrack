@@ -148,8 +148,11 @@ func NewServer(db *sql.DB, templatesDir string) (*Server, error) {
 	}
 
 	version := "dev"
-	if b, err := os.ReadFile("VERSION"); err == nil {
-		version = strings.TrimSpace(string(b))
+	for _, p := range []string{"VERSION", "../VERSION"} {
+		if b, err := os.ReadFile(p); err == nil {
+			version = strings.TrimSpace(string(b))
+			break
+		}
 	}
 
 	return &Server{DB: db, Templates: tmpl, Version: version}, nil
