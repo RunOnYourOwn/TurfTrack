@@ -62,6 +62,16 @@ func NewServer(db *sql.DB, templatesDir string) (*Server, error) {
 			cls := colors[s]
 			return template.HTML(fmt.Sprintf(`<span class="badge %s badge-sm">%s</span>`, cls, s))
 		},
+		"grassType": func(gt model.GrassType) string {
+			switch gt {
+			case model.GrassTypeCold:
+				return "Cool Season"
+			case model.GrassTypeWarm:
+				return "Warm Season"
+			default:
+				return string(gt)
+			}
+		},
 		"json": func(v interface{}) template.JS {
 			b, _ := json.Marshal(v)
 			return template.JS(b)

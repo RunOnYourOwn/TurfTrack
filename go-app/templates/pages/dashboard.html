@@ -55,7 +55,7 @@
                         <thead><tr><th>Name</th><th>Area</th><th>Type</th><th>Location</th></tr></thead>
                         <tbody>
                         {{range .Lawns}}
-                        <tr><td>{{.Name}}</td><td>{{formatFloat .Area 0}} sq ft</td><td>{{.GrassType}}</td><td>{{if .Location}}{{.Location.Name}}{{end}}</td></tr>
+                        <tr><td>{{.Name}}</td><td>{{formatFloat .Area 0}} sq ft</td><td>{{grassType .GrassType}}</td><td>{{if .Location}}{{.Location.Name}}{{end}}</td></tr>
                         {{end}}
                         </tbody>
                     </table>

@@ -86,7 +86,7 @@
                         <tr>
                             <td class="font-medium">{{.Name}}</td>
                             <td>{{formatFloat .Area 0}} sq ft</td>
-                            <td><span class="badge badge-outline badge-sm">{{.GrassType}}</span></td>
+                            <td><span class="badge badge-outline badge-sm">{{grassType .GrassType}}</span></td>
                             <td>{{if .Location}}{{.Location.Name}}{{end}}</td>
                             <td>{{if .WeatherEnabled}}<span class="badge badge-success badge-sm">On</span>{{else}}<span class="badge badge-ghost badge-sm">Off</span>{{end}}</td>
                             <td>{{formatDate .CreatedAt}}</td>
