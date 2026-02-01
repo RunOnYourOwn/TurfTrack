@@ -533,21 +533,24 @@ func TestRunCalculationsStartup(t *testing.T) {
 	loc := createTestLocation(t, db)
 	_ = createTestLawn(t, db, loc.ID, model.GrassTypeCold)
 
+	// Use dates relative to now so they fall within the 60-day calculation window
+	today := time.Now().UTC().Truncate(24 * time.Hour)
+	startDate := today.AddDate(0, 0, -30)
+
 	// Create GDD model
 	m := &model.GDDModel{
 		LocationID: loc.ID,
 		Name:       "Integration Test",
 		BaseTemp:   10.0,
 		Unit:       model.TempUnitC,
-		StartDate:  time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC),
+		StartDate:  startDate,
 	}
 	_, err := dbpkg.CreateGDDModel(db, m)
 	if err != nil {
 		t.Fatalf("CreateGDDModel failed: %v", err)
 	}
 
-	// Insert weather data
-	startDate := time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC)
+	// Insert weather data within the 60-day window
 	_ = insertTestWeather(t, db, loc.ID, startDate, 30, 28.0, 18.0)
 
 	// Run startup calculations (isRecurring=false)
