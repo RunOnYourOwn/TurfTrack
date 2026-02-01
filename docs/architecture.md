@@ -1,130 +1,127 @@
 # System Architecture
 
-Here is a diagram of the TurfTrack system architecture.
+## Overview
+
+TurfTrack runs as a single Go binary with an embedded HTTP server and background scheduler. It replaces the previous Python/React/Celery stack with a simpler deployment model.
 
 ```mermaid
 graph TD
-    A[Frontend<br/>React/Vite/TypeScript] --> B[Backend<br/>FastAPI]
+    A[Browser<br/>HTMX + ApexCharts] --> B[Go HTTP Server<br/>net/http + html/template]
     B --> C[PostgreSQL<br/>Database]
-    B --> D[Redis<br/>Cache/Broker]
 
-    E[Celery Beat<br/>Scheduler] --> D
-    F[Celery Worker<br/>Background Tasks] --> D
-    F --> G[OpenMeteo<br/>Weather API]
-    F --> C
+    D[Background Scheduler<br/>goroutine] --> E[OpenMeteo<br/>Weather API]
+    D --> C
 
-    H[GDD Calculator] --> C
-    I[Weed Pressure<br/>Calculator] --> C
-    J[Disease Pressure<br/>Calculator] --> C
-    K[Growth Potential<br/>Calculator] --> C
+    F[GDD Calculator] --> C
+    G[Weed Pressure<br/>Calculator] --> C
+    H[Disease Pressure<br/>Calculator] --> C
+    I[Growth Potential<br/>Calculator] --> C
 
-    F --> H
-    F --> I
-    F --> J
-    F --> K
+    D --> F
+    D --> G
+    D --> H
+    D --> I
 
     style A fill:#D6EAF8
     style B fill:#D1F2EB
     style C fill:#E8DAEF
-    style D fill:#FEF9E7
-    style E fill:#FDEDEC
-    style F fill:#FDEDEC
-    style G fill:#FADBD8
-    style H fill:#E8F8F5
-    style I fill:#FEF9E7
-    style J fill:#FDEDEC
-    style K fill:#E8F8F5
+    style D fill:#FDEDEC
+    style E fill:#FADBD8
+    style F fill:#E8F8F5
+    style G fill:#FEF9E7
+    style H fill:#FDEDEC
+    style I fill:#E8F8F5
 ```
 
 ## System Components
 
-### Frontend (React/Vite/TypeScript)
+### HTTP Server (Go net/http)
 
-- **Dashboard**: Real-time analytics with GDD, weed pressure, disease pressure, and growth potential charts
-- **Lawns Management**: CRUD operations for lawn tracking with location-based weather
-- **Products Management**: Comprehensive product database with nutrient analysis
-- **Applications Tracking**: Record and monitor product applications
-- **GDD Models**: User-defined growing degree day models with reset handling
-- **Task Monitor**: Real-time background task monitoring and management
-- **Reports**: Historical data analysis and reporting
+- **Server-rendered pages**: HTML templates with HTMX for interactive forms
+- **JSON API endpoints**: Chart data for ApexCharts (weather, disease, GDD, growth potential, weed pressure, water)
+- **CRUD handlers**: Form submissions for lawns, products, applications, GDD models, irrigation
+- **Static file serving**: CSS, JS, images
+- **Middleware**: Request logging, security headers
 
-### Backend (FastAPI)
+### Background Scheduler (goroutine)
 
-- **RESTful API**: Comprehensive endpoints for all data models
-- **Async Support**: Full async/await support for high performance
-- **Request Tracing**: End-to-end request ID correlation
-- **Data Validation**: Pydantic schemas for all data models
-- **Error Handling**: Comprehensive error handling and logging
-
-### Background Processing (Celery)
-
-- **Scheduled Tasks**: Daily weather updates, GDD recalculations
-- **On-Demand Tasks**: Manual backfills, recalculations
-- **Task Monitoring**: Real-time task status tracking
-- **Error Recovery**: Automatic retries and error handling
+- **Startup run**: Full 60-day weather fetch + all calculations
+- **Daily recurring**: Configurable hour/timezone, 2-day optimized window
+- **On-demand fetch**: Triggered when creating lawns/locations
+- **Task status tracking**: Records success/failure in database
+- **No external dependencies**: Replaces Celery + Redis + Beat
 
 ### Database (PostgreSQL)
 
-- **Relational Design**: Normalized schema with proper relationships
-- **Performance**: Optimized indexes for date range queries
-- **Data Integrity**: Foreign key constraints and cascading deletes
-- **Audit Trail**: Created/updated timestamps on all records
+- **SQL migrations**: Applied on startup via `internal/db`
+- **Parameterized queries**: SQL injection prevention via `database/sql`
+- **UPSERT operations**: Idempotent weather and calculation storage
+- **CASCADE deletes**: Location deletion cleans up all related data
+- **App settings table**: Runtime configuration for scheduler
 
-### Caching (Redis)
+### UI (DaisyUI + HTMX)
 
-- **Task Broker**: Celery task queue management
-- **Session Storage**: User session management
-- **Data Caching**: Frequently accessed data caching
+- **DaisyUI v5**: Component library on Tailwind CSS 4
+- **HTMX**: Form submissions, partial page updates
+- **ApexCharts**: Interactive charts for analytics
+- **Responsive**: Collapsible sidebar + mobile bottom dock
+- **Dark/Light themes**: Toggle with localStorage persistence
 
 ## Calculation Engines
 
+All calculation logic lives in `internal/calc/` as pure functions with no database dependencies:
+
 ### GDD (Growing Degree Days)
+- Daily: `GDD = ((Tmax + Tmin) / 2) - Base Temperature`
+- Cumulative tracking with manual and threshold reset handling
+- Multi-run support for tracking accumulation periods
 
-- **Daily Calculation**: `GDD = ((Tmax + Tmin) / 2) - Base Temperature`
-- **Cumulative Tracking**: Accumulated GDD with reset handling
-- **Run Management**: Multiple GDD accumulation periods
-- **Forecast Integration**: Future GDD predictions
-
-### Weed Pressure
-
-- **Multi-Factor Model**: 5 environmental factors weighted scoring
-- **Species Specific**: Different thresholds for each weed species
-- **Seasonal Timing**: Emergence season considerations
-- **Real-time Updates**: Automatic calculation on weather changes
-
-### Disease Pressure
-
-- **Smith-Kerns Model**: Scientific dollar spot prediction model
-- **Moving Averages**: 5-day temperature and humidity averages
-- **Risk Scoring**: Probability-based risk assessment
-- **Forecast Integration**: Future disease pressure predictions
+### Disease Pressure (Smith-Kerns)
+- Dollar spot prediction: `logit = b0 + b1*avg_temp + b2*avg_rh`
+- 5-day moving averages for temperature and humidity
+- Valid range: 10-35C
 
 ### Growth Potential
+- Gaussian curve: `GP = exp(-0.5 * ((temp - t_opt) / sigma)^2)`
+- Cool season: optimal 20C, sigma 5.5
+- Warm season: optimal 31C, sigma 7.0
+- 3/5/7-day rolling averages
 
-- **Temperature Based**: Optimal temperature curves for grass types
-- **Grass Specific**: Different curves for warm/cool season grasses
-- **Rolling Averages**: 3, 5, and 7-day smoothing
-- **Real-time Updates**: Automatic calculation on weather changes
+### Weed Pressure
+- 5-factor weighted model (max 10.0): GDD risk, soil temp, moisture, turf stress, seasonal timing
+- Species-specific thresholds
+- Year-to-date GDD accumulation
+
+### Water Balance
+- Weekly ET0 vs precipitation vs irrigation
+- Deficit calculation with status (adequate/deficit/critical)
 
 ## Data Flow
 
-1. **Weather Data Ingestion**: OpenMeteo API → PostgreSQL (deduplicated by location)
-2. **Calculation Triggers**: Weather updates → Automatic recalculation of all models
-3. **User Interactions**: Frontend → API → Database → Background tasks
-4. **Task Monitoring**: Celery tasks → Task status tracking → Frontend display
-5. **Data Analytics**: Historical data → Calculation engines → Charts and reports
+1. **Weather ingestion**: Scheduler fetches OpenMeteo API -> upserts into `daily_weather`
+2. **Cascade calculations**: Weather -> disease, growth potential, GDD, weed pressure, water summaries
+3. **User interactions**: Browser -> HTMX form POST -> handler -> database -> redirect
+4. **Chart data**: Browser -> JSON API GET -> handler queries DB -> JSON response -> ApexCharts renders
 
-## Observability
+## Docker Deployment
 
-- **Centralized Logging**: Loki, Promtail, Grafana stack
-- **Request Tracing**: End-to-end request ID correlation
-- **Task Monitoring**: Real-time Celery task status
-- **Performance Metrics**: API response times and calculation durations
-- **Error Tracking**: Comprehensive error logging and alerting
+```
+Docker containers:
+  - go-app: Single binary (HTTP server + scheduler)
+  - postgres: PostgreSQL 16
+
+Previous stack (removed):
+  - backend (FastAPI + gunicorn)
+  - frontend (Node.js / Vite)
+  - redis (message queue)
+  - celery-worker
+  - celery-beat
+```
 
 ## Security
 
-- **Non-Root Containers**: All services run as non-root users
-- **Input Validation**: Comprehensive data validation at API layer
-- **Rate Limiting**: API rate limiting for external services
-- **Data Sanitization**: Input sanitization and SQL injection prevention
+- Non-root container execution
+- Parameterized SQL queries (no string interpolation)
+- Server-rendered HTML (no XSS via React auto-escaping equivalent)
+- Security headers (X-Content-Type-Options, X-Frame-Options)
+- Trivy image scanning in CI/CD

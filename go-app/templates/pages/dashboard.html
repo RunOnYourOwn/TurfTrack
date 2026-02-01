@@ -1,0 +1,187 @@
+{{define "dashboard.html"}}
+<div class="space-y-6">
+    <h2 class="text-2xl font-bold">Dashboard</h2>
+
+    {{if .Locations}}
+    <div class="w-full max-w-xs">
+        <label class="label">Select Location</label>
+        <select id="location-select" onchange="loadDashboard(this.value)" class="select">
+            <option value="">Choose a location...</option>
+            {{range .Locations}}
+            <option value="{{.ID}}">{{.Name}} ({{formatFloat .Latitude 4}}, {{formatFloat .Longitude 4}})</option>
+            {{end}}
+        </select>
+    </div>
+
+    <div id="dashboard-content" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="card bg-base-100 shadow-sm">
+            <div class="card-body">
+                <h3 class="card-title text-lg">Temperature</h3>
+                <div id="temp-chart"></div>
+            </div>
+        </div>
+        <div class="card bg-base-100 shadow-sm">
+            <div class="card-body">
+                <h3 class="card-title text-lg">Disease Pressure</h3>
+                <div id="disease-chart"></div>
+            </div>
+        </div>
+        <div class="card bg-base-100 shadow-sm">
+            <div class="card-body">
+                <h3 class="card-title text-lg">Growth Potential</h3>
+                <div id="gp-chart"></div>
+            </div>
+        </div>
+        <div class="card bg-base-100 shadow-sm">
+            <div class="card-body">
+                <h3 class="card-title text-lg">Weed Pressure</h3>
+                <div id="weed-chart"></div>
+            </div>
+        </div>
+    </div>
+    {{else}}
+    <div class="alert alert-info">
+        <span>No locations yet. Add a lawn to get started.</span>
+    </div>
+    {{end}}
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="card bg-base-100 shadow-sm">
+            <div class="card-body">
+                <h3 class="card-title text-lg">Lawns</h3>
+                {{if .Lawns}}
+                <div class="overflow-x-auto">
+                    <table class="table table-sm">
+                        <thead><tr><th>Name</th><th>Area</th><th>Type</th><th>Location</th></tr></thead>
+                        <tbody>
+                        {{range .Lawns}}
+                        <tr><td>{{.Name}}</td><td>{{formatFloat .Area 0}} sq ft</td><td>{{grassType .GrassType}}</td><td>{{if .Location}}{{.Location.Name}}{{end}}</td></tr>
+                        {{end}}
+                        </tbody>
+                    </table>
+                </div>
+                {{else}}<p class="text-base-content/60">No lawns yet.</p>{{end}}
+            </div>
+        </div>
+        <div class="card bg-base-100 shadow-sm">
+            <div class="card-body">
+                <h3 class="card-title text-lg">Locations</h3>
+                {{if .Locations}}
+                <div class="overflow-x-auto">
+                    <table class="table table-sm">
+                        <thead><tr><th>Name</th><th>Latitude</th><th>Longitude</th></tr></thead>
+                        <tbody>
+                        {{range .Locations}}
+                        <tr><td>{{.Name}}</td><td>{{formatFloat .Latitude 4}}</td><td>{{formatFloat .Longitude 4}}</td></tr>
+                        {{end}}
+                        </tbody>
+                    </table>
+                </div>
+                {{else}}<p class="text-base-content/60">No locations yet.</p>{{end}}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let charts = {};
+var themeMode = document.documentElement.getAttribute('data-theme') === 'emerald' ? 'light' : 'dark';
+var xaxisOpts = {type:'category',labels:{rotate:-45,rotateAlways:false,hideOverlappingLabels:true,maxHeight:60},tickAmount:10};
+function loadDashboard(locationID) {
+    if (!locationID) return;
+    fetch('/api/weather/' + locationID + '?start_date=' + daysAgo(30))
+        .then(function(r){return r.json()}).then(function(data) {
+            if (!data) return;
+            renderChart('temp-chart', {
+                chart:{type:'line',height:250,toolbar:{show:false},background:'transparent'},
+                theme:{mode:themeMode},
+                dataLabels:{enabled:false},
+                series:[
+                    {name:'Max',data:data.map(function(d){return{x:d.date.substring(5,10),y:Math.round(d.temperature_max_f*10)/10}})},
+                    {name:'Min',data:data.map(function(d){return{x:d.date.substring(5,10),y:Math.round(d.temperature_min_f*10)/10}})}
+                ],
+                colors:['#ef4444','#3b82f6'],
+                stroke:{curve:'smooth',width:2},
+                xaxis:xaxisOpts,
+                yaxis:{title:{text:'\u00b0F'},labels:{formatter:function(v){return Math.round(v)}}},
+                legend:{position:'bottom'},
+                tooltip:{shared:true,intersect:false,y:{formatter:function(v){return v.toFixed(1)+'\u00b0F'}}}
+            });
+        });
+    fetch('/api/disease/' + locationID + '?start_date=' + daysAgo(30))
+        .then(function(r){return r.json()}).then(function(data) {
+            if (!data) return;
+            renderChart('disease-chart', {
+                chart:{type:'area',height:250,toolbar:{show:false},background:'transparent'},
+                theme:{mode:themeMode},
+                dataLabels:{enabled:false},
+                series:[{name:'Risk',data:data.map(function(d){return{x:d.date.substring(5,10),y:Math.round((d.risk_score||0)*10000)/100}})}],
+                colors:['#f59e0b'],
+                fill:{type:'gradient',gradient:{shadeIntensity:1,opacityFrom:0.4,opacityTo:0.1}},
+                stroke:{curve:'smooth',width:2},
+                xaxis:xaxisOpts,
+                yaxis:{min:0,max:100,labels:{formatter:function(v){return Math.round(v)+'%'}}},
+                legend:{position:'bottom'},
+                tooltip:{shared:true,intersect:false,y:{formatter:function(v){return v.toFixed(1)+'%'}}}
+            });
+        });
+    fetch('/api/growth-potential/' + locationID + '?start_date=' + daysAgo(30))
+        .then(function(r){return r.json()}).then(function(data) {
+            if (!data) return;
+            renderChart('gp-chart', {
+                chart:{type:'area',height:250,toolbar:{show:false},background:'transparent'},
+                theme:{mode:themeMode},
+                dataLabels:{enabled:false},
+                series:[{name:'Growth Potential',data:data.map(function(d){return{x:d.date.substring(5,10),y:Math.round((d.growth_potential||0)*10000)/100}})}],
+                colors:['#22c55e'],
+                fill:{type:'gradient',gradient:{shadeIntensity:1,opacityFrom:0.4,opacityTo:0.1}},
+                stroke:{curve:'smooth',width:2},
+                xaxis:xaxisOpts,
+                yaxis:{min:0,max:100,labels:{formatter:function(v){return Math.round(v)+'%'}}},
+                legend:{position:'bottom'},
+                tooltip:{shared:true,intersect:false,y:{formatter:function(v){return v.toFixed(1)+'%'}}}
+            });
+        });
+    fetch('/api/weed-pressure/' + locationID + '?start_date=' + daysAgo(30))
+        .then(function(r){return r.json()}).then(function(data) {
+            if (!data) return;
+            // Group by species, one series per weed species
+            var speciesMap = {};
+            var dateSet = {};
+            data.forEach(function(d) {
+                var dt = d.date.substring(5,10);
+                var name = d.weed_species ? d.weed_species.common_name : ('Species ' + d.weed_species_id);
+                dateSet[dt] = true;
+                if (!speciesMap[name]) speciesMap[name] = {};
+                speciesMap[name][dt] = Math.round((d.weed_pressure_score||0)*100)/100;
+            });
+            var dates = Object.keys(dateSet).sort();
+            var series = Object.keys(speciesMap).sort().map(function(name) {
+                return {name:name, data:dates.map(function(dt){return{x:dt,y:speciesMap[name][dt]||0}})};
+            });
+            renderChart('weed-chart', {
+                chart:{type:'line',height:250,toolbar:{show:false},background:'transparent'},
+                theme:{mode:themeMode},
+                dataLabels:{enabled:false},
+                series:series,
+                colors:['#a855f7','#f59e0b','#ef4444','#3b82f6','#22c55e'],
+                stroke:{curve:'smooth',width:2},
+                xaxis:xaxisOpts,
+                yaxis:{min:0,max:10,labels:{formatter:function(v){return v.toFixed(1)}}},
+                legend:{position:'bottom',fontSize:'11px'},
+                tooltip:{shared:true,intersect:false,y:{formatter:function(v){return v.toFixed(1)+'/10'}}}
+            });
+        });
+}
+function daysAgo(n) {
+    var d = new Date(); d.setDate(d.getDate()-n); return d.toISOString().substring(0,10);
+}
+function renderChart(id, options) {
+    if (charts[id]) charts[id].destroy();
+    var el = document.getElementById(id);
+    el.innerHTML = '';
+    charts[id] = new ApexCharts(el, options);
+    charts[id].render();
+}
+</script>
+{{end}}

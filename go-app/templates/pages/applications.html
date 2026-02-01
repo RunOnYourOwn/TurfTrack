@@ -1,0 +1,192 @@
+{{define "applications.html"}}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h2 class="text-2xl font-bold">Applications</h2>
+    </div>
+
+    <!-- Log Application Form (collapse) -->
+    <div class="collapse collapse-arrow bg-base-100 shadow-sm">
+        <input type="checkbox" />
+        <div class="collapse-title font-semibold">+ Log Application</div>
+        <div class="collapse-content">
+            <form hx-post="/applications" hx-swap="none" hx-indicator="#apps-loading" class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                <div>
+                    <label class="label">Lawn</label>
+                    <select name="lawn_id" required class="select">
+                        {{range .Lawns}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+                    </select>
+                </div>
+                <div>
+                    <label class="label">Product</label>
+                    <select name="product_id" required class="select">
+                        {{range .Products}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+                    </select>
+                </div>
+                <div>
+                    <label class="label">Date</label>
+                    <input name="application_date" type="date" required class="input">
+                </div>
+                <div>
+                    <label class="label">Amount per Area</label>
+                    <input name="amount_per_area" type="number" step="0.01" required class="input">
+                </div>
+                <div>
+                    <label class="label">Unit</label>
+                    <select name="unit" class="select">
+                        <option value="lbs">lbs</option>
+                        <option value="oz">oz</option>
+                        <option value="kg">kg</option>
+                        <option value="g">g</option>
+                        <option value="gal">gal</option>
+                        <option value="fl_oz">fl oz</option>
+                        <option value="L">L</option>
+                        <option value="mL">mL</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="label">Area Unit (sq ft)</label>
+                    <input name="area_unit" type="number" value="1000" class="input">
+                </div>
+                <div>
+                    <label class="label">Status</label>
+                    <select name="status" class="select">
+                        <option value="completed">Completed</option>
+                        <option value="planned">Planned</option>
+                        <option value="skipped">Skipped</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="label">Notes</label>
+                    <input name="notes" class="input">
+                </div>
+                <div class="md:col-span-3 flex items-center gap-3">
+                    <button type="submit" class="btn btn-primary">Log Application</button>
+                    <span id="apps-loading" class="loading loading-spinner loading-sm htmx-indicator"></span>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {{if .Applications}}
+    <div class="card bg-base-100 shadow-sm">
+        <div class="card-body p-0">
+            <div class="overflow-x-auto">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Lawn</th>
+                            <th>Product</th>
+                            <th class="text-right">Amount</th>
+                            <th>Status</th>
+                            <th class="text-right">N</th>
+                            <th class="text-right">P</th>
+                            <th class="text-right">K</th>
+                            <th class="text-right">Cost</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .Applications}}
+                        <tr>
+                            <td>{{formatDate .ApplicationDate}}</td>
+                            <td>{{$lawn := index $.LawnMap .LawnID}}{{if $lawn}}{{$lawn.Name}}{{end}}</td>
+                            <td>{{$prod := index $.ProductMap .ProductID}}{{if $prod}}{{$prod.Name}}{{end}}</td>
+                            <td class="text-right">{{formatFloat .AmountPerArea 2}} {{.Unit}}</td>
+                            <td>
+                                {{if eq (printf "%s" .Status) "completed"}}<span class="badge badge-success badge-sm">completed</span>
+                                {{else if eq (printf "%s" .Status) "planned"}}<span class="badge badge-warning badge-sm">planned</span>
+                                {{else}}<span class="badge badge-ghost badge-sm">{{.Status}}</span>{{end}}
+                            </td>
+                            <td class="text-right">{{formatFloatPtr .NApplied 3}}</td>
+                            <td class="text-right">{{formatFloatPtr .PApplied 3}}</td>
+                            <td class="text-right">{{formatFloatPtr .KApplied 3}}</td>
+                            <td class="text-right">{{formatFloatPtr .CostApplied 2}}</td>
+                            <td class="flex gap-1">
+                                <button class="btn btn-ghost btn-xs" onclick="document.getElementById('edit-app-{{.ID}}').showModal()">Edit</button>
+                                <button class="btn btn-ghost btn-xs text-error" onclick="confirmDelete('/applications/{{.ID}}', 'Delete this application?')">Delete</button>
+                            </td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modals (one per application) -->
+    {{range .Applications}}
+    <dialog id="edit-app-{{.ID}}" class="modal">
+        <div class="modal-box max-w-2xl">
+            <h3 class="text-lg font-bold mb-4">Edit Application</h3>
+            <form hx-put="/applications/{{.ID}}" hx-swap="none" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="label">Lawn</label>
+                    <select name="lawn_id" required class="select">
+                        {{$appLawnID := .LawnID}}
+                        {{range $.Lawns}}<option value="{{.ID}}" {{if eq .ID $appLawnID}}selected{{end}}>{{.Name}}</option>{{end}}
+                    </select>
+                </div>
+                <div>
+                    <label class="label">Product</label>
+                    <select name="product_id" required class="select">
+                        {{$appProdID := .ProductID}}
+                        {{range $.Products}}<option value="{{.ID}}" {{if eq .ID $appProdID}}selected{{end}}>{{.Name}}</option>{{end}}
+                    </select>
+                </div>
+                <div>
+                    <label class="label">Date</label>
+                    <input name="application_date" type="date" value="{{formatDate .ApplicationDate}}" required class="input">
+                </div>
+                <div>
+                    <label class="label">Amount per Area</label>
+                    <input name="amount_per_area" type="number" step="0.01" value="{{formatFloat .AmountPerArea 2}}" required class="input">
+                </div>
+                <div>
+                    <label class="label">Unit</label>
+                    <select name="unit" class="select">
+                        {{$appUnit := printf "%s" .Unit}}
+                        <option value="lbs" {{if eq $appUnit "lbs"}}selected{{end}}>lbs</option>
+                        <option value="oz" {{if eq $appUnit "oz"}}selected{{end}}>oz</option>
+                        <option value="kg" {{if eq $appUnit "kg"}}selected{{end}}>kg</option>
+                        <option value="g" {{if eq $appUnit "g"}}selected{{end}}>g</option>
+                        <option value="gal" {{if eq $appUnit "gal"}}selected{{end}}>gal</option>
+                        <option value="fl_oz" {{if eq $appUnit "fl_oz"}}selected{{end}}>fl oz</option>
+                        <option value="L" {{if eq $appUnit "L"}}selected{{end}}>L</option>
+                        <option value="mL" {{if eq $appUnit "mL"}}selected{{end}}>mL</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="label">Area Unit (sq ft)</label>
+                    <input name="area_unit" type="number" value="{{.AreaUnit}}" class="input">
+                </div>
+                <div>
+                    <label class="label">Status</label>
+                    <select name="status" class="select">
+                        {{$appStatus := printf "%s" .Status}}
+                        <option value="completed" {{if eq $appStatus "completed"}}selected{{end}}>Completed</option>
+                        <option value="planned" {{if eq $appStatus "planned"}}selected{{end}}>Planned</option>
+                        <option value="skipped" {{if eq $appStatus "skipped"}}selected{{end}}>Skipped</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="label">Notes</label>
+                    <input name="notes" value="{{if .Notes.Valid}}{{.Notes.String}}{{end}}" class="input">
+                </div>
+                <div class="md:col-span-3 flex justify-end gap-2">
+                    <button type="button" class="btn" onclick="this.closest('dialog').close()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button>close</button></form>
+    </dialog>
+    {{end}}
+
+    {{else}}
+    <div class="alert alert-info">
+        <span>No applications yet. Click "+ Log Application" to add one.</span>
+    </div>
+    {{end}}
+</div>
+{{end}}

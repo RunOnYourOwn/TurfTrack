@@ -5,71 +5,80 @@ on:
     tags:
       - "v*.*.*"
 
+# Cancel in-progress runs when a new tag is pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+
 jobs:
+  # Run Go tests before building release
   test:
     name: Test Release Candidate
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux]
     permissions:
       contents: read
     services:
       postgres:
-        image: postgres:16
+        image: postgres:16-alpine
         env:
+          POSTGRES_USER: turftrack
+          POSTGRES_PASSWORD: turftrack
           POSTGRES_DB: turftrack_test
-          POSTGRES_USER: test_user
-          POSTGRES_PASSWORD: test_password
         ports:
           - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U test_user -d turftrack_test" --health-interval=5s --health-timeout=5s --health-retries=5
-      redis:
-        image: redis:7
-        ports:
-          - 6379:6379
+        options: --health-cmd="pg_isready -U turftrack -d turftrack_test" --health-interval=5s --health-timeout=5s --health-retries=5
     env:
-      TEST_DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/turftrack_test
-      TEST_REDIS_URL: redis://localhost:6379/1
-      PYTHONUNBUFFERED: 1
-      DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/turftrack_test
-      REDIS_URL: redis://localhost:6379/0
-      CELERY_BROKER_URL: redis://localhost:6379/0
-      CELERY_RESULT_BACKEND: redis://localhost:6379/0
-      REDBEAT_REDIS_URL: redis://localhost:6379/0
-      ALEMBIC_DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/turftrack_test
+      TEST_DATABASE_URL: "host=localhost port=5432 user=turftrack password=turftrack dbname=turftrack_test sslmode=disable"
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          echo "Cleaning workspace before checkout..."
+          rm -rf $GITHUB_WORKSPACE/* || true
+          rm -rf $GITHUB_WORKSPACE/.git || true
+
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
-          python-version: "3.12"
+          go-version: '1.24'
+          cache: false
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
+      - name: Run Go unit tests
+        working-directory: go-app
+        run: |
+          go test ./... -race -count=1 -v
 
-      - name: Create virtual environment
-        working-directory: backend
-        run: uv venv
+      - name: Run integration tests
+        working-directory: go-app
+        run: |
+          go test ./... -tags integration -race -count=1 -v
 
-      - name: Install dependencies
-        working-directory: backend
-        run: uv pip install -e .
+      - name: Cleanup workspace
+        if: always()
+        run: rm -rf $GITHUB_WORKSPACE/*
 
-      - name: Set up database
-        working-directory: backend
-        run: uv run alembic upgrade head
-
-      - name: Run tests
-        id: tests
-        working-directory: backend
-        run: uv run pytest
-
+  # Build Docker image for release
   build:
-    name: Build Images
+    name: Build Docker Image
     needs: test
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux]
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image-tag: ${{ steps.image-names.outputs.image-tag }}
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          echo "Cleaning workspace before checkout..."
+          rm -rf $GITHUB_WORKSPACE/* || true
+          rm -rf $GITHUB_WORKSPACE/.git || true
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -79,171 +88,173 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Cache Docker layers
-        uses: actions/cache@v4
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
         with:
-          path: /tmp/.buildx-cache
-          key: buildx-${{ github.sha }}
-          restore-keys: |
-            buildx-
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build backend image (local)
+      - name: Generate image names
+        id: image-names
+        run: |
+          # Convert to lowercase for Docker compatibility
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_TAG="${{ env.REGISTRY }}/${REPO_LOWER}:${{ github.sha }}"
+          echo "image-tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+
+      - name: Build image (local for testing)
         uses: docker/build-push-action@v5
         with:
-          context: .
-          file: ./backend/Dockerfile.prod
+          context: ./go-app
+          file: ./go-app/Dockerfile
           platforms: linux/amd64
           load: true
-          tags: turftrack-backend:ci
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
+          tags: turftrack:ci
 
-      - name: Save backend image
-        run: docker save turftrack-backend:ci -o backend-image.tar
-      - name: Upload backend image
+      - name: Save image artifact
+        run: docker save turftrack:ci -o turftrack-image.tar
+
+      - name: Upload image artifact
         uses: actions/upload-artifact@v4
         with:
-          name: backend-image
-          path: backend-image.tar
+          name: turftrack-image
+          path: turftrack-image.tar
 
-      - name: Build celery image (local)
-        uses: docker/build-push-action@v5
-        with:
-          context: ./backend
-          file: ./backend/Dockerfile.celery
-          platforms: linux/amd64
-          load: true
-          tags: turftrack-celery:ci
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
+      - name: Clean up Docker resources
+        if: always()
+        run: docker system prune -f --volumes
 
-      - name: Save celery image
-        run: docker save turftrack-celery:ci -o celery-image.tar
-      - name: Upload celery image
-        uses: actions/upload-artifact@v4
-        with:
-          name: celery-image
-          path: celery-image.tar
+      - name: Cleanup workspace
+        if: always()
+        run: rm -rf $GITHUB_WORKSPACE/*
 
-      - name: Build frontend image (local)
-        uses: docker/build-push-action@v5
-        with:
-          context: ./frontend
-          file: ./frontend/Dockerfile.prod
-          platforms: linux/amd64
-          load: true
-          tags: turftrack-frontend:ci
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
-
-      - name: Save frontend image
-        run: docker save turftrack-frontend:ci -o frontend-image.tar
-      - name: Upload frontend image
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-image
-          path: frontend-image.tar
-
-  test-containers:
-    name: Test Built Containers
+  # Test built container
+  test-container:
+    name: Test Built Container
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux]
+    permissions:
+      contents: read
     services:
       postgres:
-        image: postgres:16
+        image: postgres:16-alpine
         env:
+          POSTGRES_USER: turftrack
+          POSTGRES_PASSWORD: turftrack
           POSTGRES_DB: turftrack_test
-          POSTGRES_USER: test_user
-          POSTGRES_PASSWORD: test_password
         ports:
           - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U test_user -d turftrack_test" --health-interval=5s --health-timeout=5s --health-retries=5
-      redis:
-        image: redis:7
-        ports:
-          - 6379:6379
+        options: --health-cmd="pg_isready -U turftrack -d turftrack_test" --health-interval=5s --health-timeout=5s --health-retries=5
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          echo "Cleaning workspace before checkout..."
+          rm -rf $GITHUB_WORKSPACE/* || true
+          rm -rf $GITHUB_WORKSPACE/.git || true
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Download backend image
+      - name: Download image artifact
         uses: actions/download-artifact@v4
         with:
-          name: backend-image
-      - name: Load backend image
-        run: docker load -i backend-image.tar
+          name: turftrack-image
 
-      - name: Download celery image
-        uses: actions/download-artifact@v4
-        with:
-          name: celery-image
-      - name: Load celery image
-        run: docker load -i celery-image.tar
+      - name: Load image
+        run: docker load -i turftrack-image.tar
 
-      - name: Download frontend image
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-image
-      - name: Load frontend image
-        run: docker load -i frontend-image.tar
-
-      - name: Test Backend Container
+      - name: Start container
         run: |
-          docker run -d --name test-backend --network host \
-            -e DATABASE_URL=postgresql+asyncpg://test_user:test_password@localhost:5432/turftrack_test \
-            -e REDIS_URL=redis://localhost:6379/0 \
-            -e CELERY_BROKER_URL=redis://localhost:6379/0 \
-            -e CELERY_RESULT_BACKEND=redis://localhost:6379/0 \
-            -e REDBEAT_REDIS_URL=redis://localhost:6379/0 \
-            -e ALEMBIC_DATABASE_URL=postgresql+asyncpg://test_user:test_password@localhost:5432/turftrack_test \
-            turftrack-backend:ci
+          docker run -d --name test-turftrack --network host \
+            -e DATABASE_URL="host=localhost port=5432 user=turftrack password=turftrack dbname=turftrack_test sslmode=disable" \
+            turftrack:ci
 
-          sleep 20
-
-          echo "Backend container logs before health check:"
-          docker logs test-backend || true
-
-          echo "Running health check..."
-          docker exec test-backend curl -v http://localhost:8000/health || echo "Health endpoint not available yet or returned error."
-
-          echo "Backend container logs after health check:"
-          docker logs test-backend || true
-
-          docker stop test-backend
-          docker rm test-backend
-
-      - name: Test Frontend Container
+      - name: Wait for healthy
         run: |
-          docker run -d --name test-frontend turftrack-frontend:ci
-          sleep 5
-          docker ps | grep test-frontend
-          docker stop test-frontend
-          docker rm test-frontend
+          echo "Polling /health (up to 30s)..."
+          for i in $(seq 1 15); do
+            STATUS=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/health 2>/dev/null || true)
+            if [ "$STATUS" = "200" ]; then
+              echo "Health check passed on attempt $i"
+              break
+            fi
+            echo "Attempt $i: status=$STATUS, retrying in 2s..."
+            sleep 2
+          done
+          if [ "$STATUS" != "200" ]; then
+            echo "=== Container logs ==="
+            docker logs test-turftrack || true
+            echo "Health check failed after 30s"
+            exit 1
+          fi
 
-      - name: Security Scan Containers
+      - name: Verify DB connectivity
         run: |
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.48.0
-          echo "Scanning backend image for vulnerabilities..."
-          trivy image --severity HIGH,CRITICAL turftrack-backend:ci || echo "Vulnerabilities found in backend image"
-          echo "Scanning frontend image for vulnerabilities..."
-          trivy image --severity HIGH,CRITICAL turftrack-frontend:ci || echo "Vulnerabilities found in frontend image"
+          BODY=$(curl -sf http://localhost:8080/health)
+          echo "Health response: $BODY"
+          echo "$BODY" | grep -q '"status":"healthy"' || {
+            echo "Health endpoint did not return healthy status"
+            exit 1
+          }
 
+      - name: Verify version endpoint
+        run: |
+          BODY=$(curl -sf http://localhost:8080/api/v1/version)
+          echo "Version response: $BODY"
+          # Verify version field exists and is non-empty
+          echo "$BODY" | grep -q '"version"' || {
+            echo "Version endpoint missing version field"
+            exit 1
+          }
+
+      - name: Stop container
+        if: always()
+        run: |
+          docker stop test-turftrack || true
+          docker rm test-turftrack || true
+
+      - name: Security scan with Trivy
+        run: |
+          # Install Trivy
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.58.0
+
+          echo "Scanning TurfTrack image for vulnerabilities..."
+          trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 turftrack:ci
+
+      - name: Clean up Docker resources
+        if: always()
+        run: docker system prune -f --volumes
+
+      - name: Cleanup workspace
+        if: always()
+        run: rm -rf $GITHUB_WORKSPACE/*
+
+  # Publish multi-arch image to GHCR
   publish:
-    name: Publish Images
-    needs: test-containers
-    runs-on: ubuntu-latest
+    name: Publish Docker Image
+    needs: test-container
+    runs-on: [self-hosted, Linux]
+    permissions:
+      contents: read
+      packages: write
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          echo "Cleaning workspace before checkout..."
+          rm -rf $GITHUB_WORKSPACE/* || true
+          rm -rf $GITHUB_WORKSPACE/.git || true
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
@@ -253,57 +264,101 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push backend image
+      - name: Extract version from tag
+        id: extract-version
+        run: |
+          VERSION=${{ github.ref_name }}
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Verify tag matches app version
+        run: |
+          TAG_VERSION="${{ github.ref_name }}"
+          # Strip leading 'v' from tag for comparison
+          TAG_NUM="${TAG_VERSION#v}"
+          # Read version from CHANGELOG (first version heading)
+          CHANGELOG_VERSION=$(grep -m1 -oP '(?<=\[)\d+\.\d+\.\d+(?=\])' CHANGELOG.md || true)
+          echo "Tag version: $TAG_NUM"
+          echo "CHANGELOG version: $CHANGELOG_VERSION"
+          if [ -n "$CHANGELOG_VERSION" ] && [ "$TAG_NUM" != "$CHANGELOG_VERSION" ]; then
+            echo "ERROR: Tag $TAG_VERSION does not match CHANGELOG version $CHANGELOG_VERSION"
+            echo "Run ./scripts/version.sh release before tagging"
+            exit 1
+          fi
+
+      - name: Build and push multi-arch image
         uses: docker/build-push-action@v5
         with:
-          context: .
-          file: ./backend/Dockerfile.prod
+          context: ./go-app
+          file: ./go-app/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/runonyourown/turftrack-backend:latest
-            ghcr.io/runonyourown/turftrack-backend:${{ github.ref_name }}
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
+            ghcr.io/runonyourown/turftrack:latest
+            ghcr.io/runonyourown/turftrack:${{ steps.extract-version.outputs.version }}
 
-      - name: Build and push celery image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./backend
-          file: ./backend/Dockerfile.celery
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ghcr.io/runonyourown/turftrack-celery:latest
-            ghcr.io/runonyourown/turftrack-celery:${{ github.ref_name }}
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
+      - name: Clean up Docker resources
+        if: always()
+        run: docker system prune -f --volumes
 
-      - name: Build and push frontend image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./frontend
-          file: ./frontend/Dockerfile.prod
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ghcr.io/runonyourown/turftrack-frontend:latest
-            ghcr.io/runonyourown/turftrack-frontend:${{ github.ref_name }}
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
+      - name: Cleanup workspace
+        if: always()
+        run: rm -rf $GITHUB_WORKSPACE/*
 
+  # Create draft GitHub release
   release:
     name: Create Draft Release
     needs: publish
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux]
+    permissions:
+      contents: write
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          echo "Cleaning workspace before checkout..."
+          rm -rf $GITHUB_WORKSPACE/* || true
+          rm -rf $GITHUB_WORKSPACE/.git || true
+
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Extract CHANGELOG entry
+        id: changelog
+        run: |
+          TAG_VERSION="${{ github.ref_name }}"
+          TAG_NUM="${TAG_VERSION#v}"
+          # Extract the section for this version from CHANGELOG.md
+          # Matches from "## [X.Y.Z]" to the next "## [" or end of file
+          NOTES=$(awk "/^## \\[${TAG_NUM}\\]/{found=1; next} /^## \\[/{if(found) exit} found{print}" CHANGELOG.md)
+          if [ -z "$NOTES" ]; then
+            NOTES="No changelog entry found for ${TAG_VERSION}."
+          fi
+          # Write to file to preserve formatting
+          echo "$NOTES" > /tmp/changelog-entry.md
+
+      - name: Build release notes
+        run: |
+          CHANGELOG=$(cat /tmp/changelog-entry.md)
+          {
+            echo '## Docker Image'
+            echo ''
+            echo '```'
+            echo 'docker pull ghcr.io/runonyourown/turftrack:${{ github.ref_name }}'
+            echo '```'
+            echo ''
+            echo '## What'\''s Changed'
+            echo ''
+            echo "$CHANGELOG"
+          } > /tmp/release-notes.md
+
       - name: Create Draft Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create ${{ github.ref_name }} \
             --draft \
-            --generate-notes \
-            --title "Release ${{ github.ref_name }}"
+            --title "Release ${{ github.ref_name }}" \
+            --notes-file /tmp/release-notes.md
+
+      - name: Cleanup workspace
+        if: always()
+        run: rm -rf $GITHUB_WORKSPACE/*
