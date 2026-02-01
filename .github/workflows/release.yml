@@ -167,29 +167,55 @@ jobs:
       - name: Load image
         run: docker load -i turftrack-image.tar
 
-      - name: Test container
+      - name: Start container
         run: |
           docker run -d --name test-turftrack --network host \
             -e DATABASE_URL="host=localhost port=5432 user=turftrack password=turftrack dbname=turftrack_test sslmode=disable" \
             turftrack:ci
 
-          echo "Waiting for application to start..."
-          sleep 10
+      - name: Wait for healthy
+        run: |
+          echo "Polling /health (up to 30s)..."
+          for i in $(seq 1 15); do
+            STATUS=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/health 2>/dev/null || true)
+            if [ "$STATUS" = "200" ]; then
+              echo "Health check passed on attempt $i"
+              break
+            fi
+            echo "Attempt $i: status=$STATUS, retrying in 2s..."
+            sleep 2
+          done
+          if [ "$STATUS" != "200" ]; then
+            echo "=== Container logs ==="
+            docker logs test-turftrack || true
+            echo "Health check failed after 30s"
+            exit 1
+          fi
 
-          echo "Container logs:"
-          docker logs test-turftrack || true
+      - name: Verify DB connectivity
+        run: |
+          BODY=$(curl -sf http://localhost:8080/health)
+          echo "Health response: $BODY"
+          echo "$BODY" | grep -q '"status":"healthy"' || {
+            echo "Health endpoint did not return healthy status"
+            exit 1
+          }
 
-          echo "Running health check..."
-          curl -v http://localhost:8080/health || echo "Health endpoint not available yet"
+      - name: Verify version endpoint
+        run: |
+          BODY=$(curl -sf http://localhost:8080/api/v1/version)
+          echo "Version response: $BODY"
+          # Verify version field exists and is non-empty
+          echo "$BODY" | grep -q '"version"' || {
+            echo "Version endpoint missing version field"
+            exit 1
+          }
 
-          echo "Testing version endpoint..."
-          curl -v http://localhost:8080/api/v1/version || echo "Version endpoint not available"
-
-          echo "Final container logs:"
-          docker logs test-turftrack || true
-
-          docker stop test-turftrack
-          docker rm test-turftrack
+      - name: Stop container
+        if: always()
+        run: |
+          docker stop test-turftrack || true
+          docker rm test-turftrack || true
 
       - name: Security scan with Trivy
         run: |
@@ -197,7 +223,7 @@ jobs:
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.58.0
 
           echo "Scanning TurfTrack image for vulnerabilities..."
-          trivy image --severity HIGH,CRITICAL turftrack:ci || echo "Vulnerabilities found in image"
+          trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 turftrack:ci
 
       - name: Clean up Docker resources
         if: always()
@@ -244,6 +270,21 @@ jobs:
           VERSION=${{ github.ref_name }}
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
+      - name: Verify tag matches app version
+        run: |
+          TAG_VERSION="${{ github.ref_name }}"
+          # Strip leading 'v' from tag for comparison
+          TAG_NUM="${TAG_VERSION#v}"
+          # Read version from CHANGELOG (first version heading)
+          CHANGELOG_VERSION=$(grep -m1 -oP '(?<=\[)\d+\.\d+\.\d+(?=\])' CHANGELOG.md || true)
+          echo "Tag version: $TAG_NUM"
+          echo "CHANGELOG version: $CHANGELOG_VERSION"
+          if [ -n "$CHANGELOG_VERSION" ] && [ "$TAG_NUM" != "$CHANGELOG_VERSION" ]; then
+            echo "ERROR: Tag $TAG_VERSION does not match CHANGELOG version $CHANGELOG_VERSION"
+            echo "Run ./scripts/version.sh release before tagging"
+            exit 1
+          fi
+
       - name: Build and push multi-arch image
         uses: docker/build-push-action@v5
         with:
@@ -280,15 +321,37 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Extract CHANGELOG entry
+        id: changelog
+        run: |
+          TAG_VERSION="${{ github.ref_name }}"
+          TAG_NUM="${TAG_VERSION#v}"
+          # Extract the section for this version from CHANGELOG.md
+          # Matches from "## [X.Y.Z]" to the next "## [" or end of file
+          NOTES=$(awk "/^## \\[${TAG_NUM}\\]/{found=1; next} /^## \\[/{if(found) exit} found{print}" CHANGELOG.md)
+          if [ -z "$NOTES" ]; then
+            NOTES="No changelog entry found for ${TAG_VERSION}."
+          fi
+          # Write to file to preserve formatting
+          echo "$NOTES" > /tmp/changelog-entry.md
+
       - name: Create Draft Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          CHANGELOG=$(cat /tmp/changelog-entry.md)
           gh release create ${{ github.ref_name }} \
             --draft \
-            --generate-notes \
             --title "Release ${{ github.ref_name }}" \
-            --notes "Docker Image: \`ghcr.io/runonyourown/turftrack:${{ github.ref_name }}\`"
+            --notes "## Docker Image
+
+\`\`\`
+docker pull ghcr.io/runonyourown/turftrack:${{ github.ref_name }}
+\`\`\`
+
+## What's Changed
+
+${CHANGELOG}"
 
       - name: Cleanup workspace
         if: always()

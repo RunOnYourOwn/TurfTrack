@@ -26,6 +26,7 @@ type Server struct {
 	DB            *sql.DB
 	Templates     *template.Template
 	WeatherClient *weather.Client // nil = use weather.NewClient(); settable for testing
+	Version       string          // application version read from VERSION file
 }
 
 // NewServer creates a new Server and parses templates.
@@ -146,7 +147,12 @@ func NewServer(db *sql.DB, templatesDir string) (*Server, error) {
 		}
 	}
 
-	return &Server{DB: db, Templates: tmpl}, nil
+	version := "dev"
+	if b, err := os.ReadFile("VERSION"); err == nil {
+		version = strings.TrimSpace(string(b))
+	}
+
+	return &Server{DB: db, Templates: tmpl, Version: version}, nil
 }
 
 // dbAvailable reports whether a database connection is present.
@@ -227,6 +233,10 @@ func (s *Server) withMiddleware(next http.Handler) http.Handler {
 }
 
 func (s *Server) render(w http.ResponseWriter, name string, data interface{}) {
+	// Inject version into template data so layout can display it
+	if m, ok := data.(map[string]interface{}); ok {
+		m["Version"] = s.Version
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := s.Templates.ExecuteTemplate(w, name, data); err != nil {
 		log.Printf("Template error (%s): %v", name, err)
@@ -1107,7 +1117,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleVersion(w http.ResponseWriter, r *http.Request) {
 	s.renderJSON(w, map[string]string{
-		"version":     "0.0.22",
+		"version":     s.Version,
 		"environment": envOr("ENVIRONMENT", "development"),
 		"go_version":  "1.23",
 	})
